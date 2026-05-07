@@ -76,150 +76,166 @@ func (i *interactorImpl) executeScript(
 	if clientConnection == nil || clientConnection.VideoPort == 0 {
 		return
 	}
+	if script == nil || script.Name == "" {
+		return
+	}
+
+	scriptDir := i.getScriptDir(serial, script.Name)
+	if scriptDir == "" {
+		return
+	}
+
 	defer i.logger.Info("closing videostream... 🛑")
 	go i.scrcpy.ReadVideoStream(serial, nil)
 
 	for _, step := range script.Steps {
-		stepZone, err := i.initStepZone(
-			serial,
-			script.Name,
-			&step,
-		)
-		if err != nil {
-			i.logger.Error(err.Error())
-			return
+		if step.Action == "" {
+			i.playEvent(serial, nil, &step)
 		}
 
-		var offsetX = 0
-		var offsetY = 0
-		var lastTimeStamp int64
-		for index, event := range step.Events {
-			var data = &event.Data
-			if index == 0 && stepZone.IsNotEmpty() && step.Action != "" {
-				offsetX, offsetY = i.countOffset(data, stepZone)
-			}
-
-			data.ApplyOffset(offsetX, offsetY)
-			var delay = event.Time - lastTimeStamp
-			time.Sleep(time.Duration(delay) * time.Millisecond)
-			lastTimeStamp = event.Time
-
-			i.scrcpy.WriteControlData(serial, *data)
+		if step.Action == models.EventOnTemplate {
+			i.playEventOnTemplate(serial, &step, scriptDir)
 		}
+
+		if step.Action == models.EventOnText {
+			i.playEventOnText(serial, &step)
+		}
+
 		time.Sleep(500 * time.Millisecond) //animation delay
 	}
 }
 
-func (i *interactorImpl) countOffset(
-	data *models.ControlBytes,
-	stepZone *models.Rectangle,
-) (int, int) {
-	if stepZone.IsEmpty() || data == nil {
-		return 0, 0
-	}
-
-	x, y := data.GetXY()
-	randX, randY := stepZone.GetRandomXY()
-	return randX - x, randY - y
-}
-
-func (i *interactorImpl) initStepZone(
+func (i *interactorImpl) playEventOnTemplate(
 	serial string,
-	scriptName string,
 	step *models.ScriptStep,
-) (*models.Rectangle, error) {
-	scriptDir := i.getScriptDir(serial, scriptName)
-
-	tesseractDir := i.filesDB.CreateLogsDir(serial, filesdb.TesseractDir)
-	if tesseractDir == "" {
-		return &models.Rectangle{}, fmt.Errorf("tesseract dir was not found")
+	scriptDir string,
+) error {
+	var imgRect = &image.Rectangle{}
+	tmpImage := filepath.Join(scriptDir, fmt.Sprintf("%d.png", step.ID))
+	if !file.Exists(tmpImage) {
+		return fmt.Errorf("template not found: %s", tmpImage)
 	}
 
-	var imgRect = &image.Rectangle{}
 	for range Attempts {
-		var err error
-		imgRect, err = i.findRectangleByStep(serial, step, scriptDir, tesseractDir)
+		mat, err := i.scrcpy.GetMatFromLastFrame(serial, true)
+		if err != nil {
+			i.logger.Error(err.Error())
+			time.Sleep(1 * time.Second)
+			continue
+		}
+		if mat == nil {
+			continue
+		}
+
+		imgRect, err = i.cv.FindImage(mat, tmpImage)
 		if err != nil {
 			i.logger.Error(err.Error())
 			time.Sleep(1 * time.Second)
 			continue
 		}
 
+		if models.ImageRectIsEmpty(imgRect) {
+			continue
+		}
+
 		break
 	}
 
-	stepZone := models.ImgRectangleToDomain(imgRect)
-	if stepZone.IsEmpty() && step.Action != "" {
-		return &models.Rectangle{}, fmt.Errorf(
-			"zone not found in script: %s - ID:%d", scriptName, step.ID,
-		)
+	if models.ImageRectIsEmpty(imgRect) {
+		return fmt.Errorf("template not found")
 	}
 
-	return stepZone, nil
+	i.playEvent(serial, imgRect, step)
+	return nil
 }
 
-func (i *interactorImpl) findRectangleByStep(
+func (i *interactorImpl) playEventOnText(
 	serial string,
 	step *models.ScriptStep,
-	scriptDir string,
-	tesseractDir string,
-) (*image.Rectangle, error) {
-	var imgRect = &image.Rectangle{}
-
-	mat, err := i.scrcpy.GetMatFromLastFrame(serial, true)
-	if err != nil {
-		return imgRect, err
+) error {
+	var textRect *image.Rectangle
+	tesseractDir := i.filesDB.CreateLogsDir(serial, filesdb.TesseractDir)
+	if tesseractDir == "" {
+		return fmt.Errorf("tesseract dir was not found")
 	}
-	if mat == nil {
-		return imgRect, fmt.Errorf("mat is nil")
-	}
+	var device = i.GetDevice(serial)
+	var ocrParams = cv.InitOcrParams(
+		step.Text,
+		device.Locale,
+		cv.PsmText,
+		cv.OemText,
+		cv.WhiteTheme,
+	)
 
-	if step.Template {
-		tmpImage := filepath.Join(scriptDir, fmt.Sprintf("%d.png", step.ID))
-		if !file.Exists(tmpImage) {
-			return imgRect, fmt.Errorf("template not found: %s", tmpImage)
-		}
-
-		templateRect, err := i.cv.FindImage(mat, tmpImage)
+	for range Attempts {
+		mat, err := i.scrcpy.GetMatFromLastFrame(serial, true)
 		if err != nil {
-			return imgRect, err
+			i.logger.Error(err.Error())
+			time.Sleep(1 * time.Second)
+			continue
+		}
+		if mat == nil {
+			continue
 		}
 
-		if models.ImageRectIsEmpty(templateRect) {
-			return imgRect, fmt.Errorf("template %d.png not found", step.ID)
-		}
-
-		if step.Action == models.EventOnTemplate {
-			imgRect = templateRect
-		}
-	}
-
-	if step.Text != "" {
-		var device = i.GetDevice(serial)
-		var ocrParams = cv.InitOcrParams(
-			step.Text,
-			device.Locale,
-			cv.PsmText,
-			cv.OemText,
-			cv.WhiteTheme,
-		)
 		rectangles, err := i.cv.FindTextRectangles(
 			mat,
 			tesseractDir,
 			ocrParams,
 		)
-		var textRect *image.Rectangle
-		if len(rectangles) > 0 && err == nil {
+
+		if err != nil {
+			i.logger.Error(err.Error())
+			time.Sleep(1 * time.Second)
+			continue
+		}
+
+		if err == nil && len(rectangles) > 0 && !rectangles[0].IsEmpty() {
 			textRect = rectangles[0].Rectangle.ToImageRectangle()
-		}
-
-		if models.ImageRectIsEmpty(textRect) {
-			return imgRect, fmt.Errorf("text %s not found", step.Text)
-		}
-
-		if step.Action == models.EventOnText {
-			imgRect = textRect
+			break
 		}
 	}
-	return imgRect, nil
+
+	if models.ImageRectIsEmpty(textRect) {
+		return fmt.Errorf("text %s not found", step.Text)
+	}
+
+	i.playEvent(serial, textRect, step)
+	return nil
+}
+
+func (i *interactorImpl) playEvent(
+	serial string,
+	rect *image.Rectangle,
+	step *models.ScriptStep,
+) {
+	var offsetX = 0
+	var offsetY = 0
+	var lastTimeStamp int64
+	for index, event := range step.Events {
+		var data = &event.Data
+		if index == 0 {
+			offsetX, offsetY = i.countOffset(data, rect)
+		}
+
+		data.ApplyOffset(offsetX, offsetY)
+		var delay = event.Time - lastTimeStamp
+		time.Sleep(time.Duration(delay) * time.Millisecond)
+		lastTimeStamp = event.Time
+
+		i.scrcpy.WriteControlData(serial, *data)
+	}
+}
+
+func (i *interactorImpl) countOffset(
+	data *models.ControlBytes,
+	stepZone *image.Rectangle,
+) (int, int) {
+	if models.ImageRectIsEmpty(stepZone) || data == nil {
+		return 0, 0
+	}
+
+	x, y := data.GetXY()
+	randX, randY := models.GetRandomXY(stepZone)
+	return randX - x, randY - y
 }

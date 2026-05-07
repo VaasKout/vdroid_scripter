@@ -78,17 +78,17 @@ func (r *Rectangle) ToImageRectangle() *image.Rectangle {
 }
 
 // GetRandomXY ...
-func (r *Rectangle) GetRandomXY() (int, int) {
-	var width = r.RightX - r.LeftX
-	var height = r.BottomY - r.TopY
+func GetRandomXY(r *image.Rectangle) (int, int) {
+	var width = r.Dx()
+	var height = r.Dy()
 
 	var xOffset = numutils.GetPercentValue(width, RectangleOffsetPercent) / 2
 	var yOffset = numutils.GetPercentValue(height, RectangleOffsetPercent) / 2
 
-	var leftXWithOffset = r.LeftX + xOffset
-	var rightXWithOffset = r.RightX - xOffset
-	var topYWithOffset = r.TopY + yOffset
-	var bottomYWithOffset = r.BottomY - yOffset
+	var leftXWithOffset = r.Min.X + xOffset
+	var rightXWithOffset = r.Max.X - xOffset
+	var topYWithOffset = r.Min.Y + yOffset
+	var bottomYWithOffset = r.Max.Y - yOffset
 
 	var xToPress = 0
 	var yToPress = 0
