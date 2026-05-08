@@ -17,6 +17,11 @@ const (
 	SideMaxDiff = 5
 )
 
+// Keyboard special symbols
+const (
+	Space = "space"
+)
+
 var keyboardSizeMap = map[string]int{
 	"nums": 10,
 	"eng":  26,

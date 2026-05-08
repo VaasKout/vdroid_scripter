@@ -9,7 +9,9 @@ import (
 	"fmt"
 	"image"
 	"path/filepath"
+	"strings"
 	"time"
+	"unicode"
 )
 
 // Attempts to find template zone or text
@@ -106,6 +108,14 @@ func (i *interactorImpl) executeScript(
 
 		if step.Flags&models.EventOnText != 0 {
 			err := i.playEventOnText(serial, &step)
+			if err != nil {
+				i.logger.Error(err.Error())
+				return
+			}
+		}
+
+		if step.Flags&models.TypeText != 0 {
+			err := i.typeText(serial, &step)
 			if err != nil {
 				i.logger.Error(err.Error())
 				return
@@ -215,6 +225,89 @@ func (i *interactorImpl) playEventOnText(
 
 	i.playEvent(serial, textRect, step)
 	return nil
+}
+
+func (i *interactorImpl) typeText(
+	serial string,
+	step *models.ScriptStep,
+) error {
+	if step == nil || step.Text == "" {
+		return fmt.Errorf("nothing to type")
+	}
+
+	keyboardKeys := i.getKeyboardKeys(serial, step)
+	chars := []rune(strings.ToLower(step.Text))
+	keysToPress := make([]cv.OCRResult, len(step.Text))
+
+charsLoop:
+	for index, ch := range chars {
+		for _, key := range keyboardKeys {
+			if key.Text == "" {
+				return fmt.Errorf("empty keyboard key")
+			}
+
+			if []rune(key.Text)[0] == ch {
+				keysToPress[index] = key
+				continue charsLoop
+			}
+			if key.Text == cv.Space && unicode.IsSpace(ch) {
+				keysToPress[index] = key
+				continue charsLoop
+			}
+		}
+		return fmt.Errorf("char %c not found", ch)
+	}
+
+	for _, key := range keysToPress {
+		var imgRect = key.Rectangle.ToImageRectangle()
+		i.playEvent(serial, imgRect, step)
+		time.Sleep(300 * time.Millisecond)
+	}
+	return nil
+}
+
+func (i *interactorImpl) getKeyboardKeys(
+	serial string,
+	step *models.ScriptStep,
+) []cv.OCRResult {
+	keyboardKeys := []cv.OCRResult{}
+	for range Attempts {
+		mat, err := i.scrcpy.GetMatFromLastFrame(serial, true)
+		if err != nil {
+			i.logger.Error(err.Error())
+			time.Sleep(1 * time.Second)
+			continue
+		}
+		if mat == nil {
+			i.logger.Error("mat is nil")
+			time.Sleep(1 * time.Second)
+			continue
+		}
+
+		modelOs := i.GetDevice(serial).ToModelOs()
+		tesseractLocale := "eng" // TODO
+		keyboardDir := i.filesDB.CreateDBDir(modelOs, filesdb.Keyboards, tesseractLocale)
+		keyboardButtons := i.filesDB.GetFiles(keyboardDir)
+		chars := []rune(step.Text)
+		filteredButtons := []string{}
+
+		for _, button := range keyboardButtons {
+			for _, ch := range chars { // TODO unique chars
+				if string(ch) == file.GetFileName(button) {
+					filteredButtons = append(filteredButtons, button)
+				}
+			}
+		}
+
+		if len(filteredButtons) == 0 {
+			time.Sleep(1 * time.Second)
+			i.logger.Error("empty keyboard buttons")
+			continue
+		}
+
+		keyboardKeys = i.cv.GetKeyboardKeys(filteredButtons, *mat)
+	}
+	return keyboardKeys
 }
 
 func (i *interactorImpl) playEvent(

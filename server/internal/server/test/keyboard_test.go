@@ -60,7 +60,7 @@ func TestSaveDefaultKeyboardScript(t *testing.T) {
 		Name:   TestScript,
 		Step: models.ScriptStep{
 			Text:   "hello",
-			Action: models.TypeText,
+			Flags:  models.TypeText,
 			Events: testTapEvent,
 		},
 	}
