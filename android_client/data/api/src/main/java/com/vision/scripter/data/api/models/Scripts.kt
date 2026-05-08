@@ -21,18 +21,18 @@ data class Script(
     val steps: List<ScriptStep> = listOf(),
 )
 
-const val EVENT_ON_TEMPLATE = "event_on_template"
-const val EVENT_ON_TEXT = "event_on_text"
-const val TYPE_TEXT = "type_text"
+const val EVENT_ON_TEMPLATE = 1 shl 0
+const val EVENT_ON_TEXT = 1 shl 1
+const val TYPE_TEXT = 1 shl 2
+const val TEMPLATE_IS_VISIBLE = 1 shl 3
+const val TEXT_IS_VISIBLE = 1 shl 4
 
 @Serializable
 data class ScriptStep(
     @SerialName("events")
     val events: List<StepEvent> = listOf(),
-    @SerialName("action")
-    val action: String = "",
-    @SerialName("template")
-    val template: Boolean,
+    @SerialName("flags")
+    val flags: Int = 0,
     @SerialName("text")
     val text: String = "",
     @SerialName("command")
@@ -40,7 +40,7 @@ data class ScriptStep(
 )
 
 fun ScriptStep.isEmpty(): Boolean {
-    return events.isEmpty() && action.isEmpty() && !template && text.isEmpty() && command.isEmpty()
+    return events.isEmpty() && flags == 0 && text.isEmpty() && command.isEmpty()
 }
 
 @Serializable

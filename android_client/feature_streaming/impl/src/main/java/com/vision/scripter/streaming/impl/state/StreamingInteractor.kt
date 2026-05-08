@@ -344,8 +344,7 @@ class StreamingInteractor @Inject constructor(
                 name = record.recordName,
                 step = ScriptStep(
                     events = record.stepEvents,
-                    action = getAction(),
-                    template = record.templateSelectMode != CvSelectMode.NONE,
+                    flags = getFlags(),
                     text = record.textToFind,
                 ),
             )
@@ -364,12 +363,12 @@ class StreamingInteractor @Inject constructor(
         }
     }
 
-    private fun getAction(): String {
+    private fun getFlags(): Int {
         val record = currentState.record
         return when {
             record.templateSelectMode == CvSelectMode.APPLY_EVENT -> EVENT_ON_TEMPLATE
             record.textSelectMode == CvSelectMode.APPLY_EVENT -> EVENT_ON_TEXT
-            else -> ""
+            else -> 0
         }
     }
 
