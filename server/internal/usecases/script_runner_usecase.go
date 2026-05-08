@@ -74,31 +74,42 @@ func (i *interactorImpl) executeScript(
 		clientConnection = &result
 	}
 	if clientConnection == nil || clientConnection.VideoPort == 0 {
+		i.logger.Error(fmt.Sprintf("no connection to %s", serial))
 		return
 	}
 	if script == nil || script.Name == "" {
+		i.logger.Error("script is empty")
 		return
 	}
 
 	scriptDir := i.getScriptDir(serial, script.Name)
 	if scriptDir == "" {
+		i.logger.Error(fmt.Sprintf("scriptDir not found %s", script.Name))
 		return
 	}
 
-	defer i.logger.Info("closing videostream... 🛑")
+	defer i.logger.Info("closing script videostream... 🛑")
 	go i.scrcpy.ReadVideoStream(serial, nil)
 
 	for _, step := range script.Steps {
-		if step.Action == "" {
+		if step.Flags == 0 {
 			i.playEvent(serial, nil, &step)
 		}
 
-		if step.Action == models.EventOnTemplate {
-			i.playEventOnTemplate(serial, &step, scriptDir)
+		if step.Flags&models.EventOnTemplate != 0 {
+			err := i.playEventOnTemplate(serial, &step, scriptDir)
+			if err != nil {
+				i.logger.Error(err.Error())
+				return
+			}
 		}
 
-		if step.Action == models.EventOnText {
-			i.playEventOnText(serial, &step)
+		if step.Flags&models.EventOnText != 0 {
+			err := i.playEventOnText(serial, &step)
+			if err != nil {
+				i.logger.Error(err.Error())
+				return
+			}
 		}
 
 		time.Sleep(500 * time.Millisecond) //animation delay
@@ -113,7 +124,7 @@ func (i *interactorImpl) playEventOnTemplate(
 	var imgRect = &image.Rectangle{}
 	tmpImage := filepath.Join(scriptDir, fmt.Sprintf("%d.png", step.ID))
 	if !file.Exists(tmpImage) {
-		return fmt.Errorf("template not found: %s", tmpImage)
+		return fmt.Errorf("template file not found: %s", tmpImage)
 	}
 
 	for range Attempts {
@@ -124,6 +135,7 @@ func (i *interactorImpl) playEventOnTemplate(
 			continue
 		}
 		if mat == nil {
+			time.Sleep(1 * time.Second)
 			continue
 		}
 
@@ -175,6 +187,7 @@ func (i *interactorImpl) playEventOnText(
 			continue
 		}
 		if mat == nil {
+			time.Sleep(1 * time.Second)
 			continue
 		}
 

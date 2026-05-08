@@ -5,11 +5,13 @@ import (
 	"fmt"
 )
 
-// Script actions
+// Script flags
 const (
-	EventOnTemplate = "event_on_template"
-	EventOnText     = "event_on_text"
-	TypeText        = "type_text"
+	EventOnTemplate   = 1 << 0
+	EventOnText       = 1 << 1
+	TypeText          = 1 << 2
+	TemplateIsVisible = 1 << 3
+	TextIsVisible     = 1 << 4
 )
 
 // Script ...
@@ -30,12 +32,11 @@ func (s *Script) ToJSON() []byte {
 
 // ScriptStep ...
 type ScriptStep struct {
-	ID       int     `json:"id,omitempty"`
-	Events   []Event `json:"events,omitempty"`
-	Action   string  `json:"action,omitempty"`
-	Template bool    `json:"template,omitempty"`
-	Text     string  `json:"text,omitempty"`
-	Command  string  `json:"command,omitempty"`
+	ID      int     `json:"id,omitempty"`
+	Events  []Event `json:"events,omitempty"`
+	Flags   int     `json:"flags,omitempty"`
+	Text    string  `json:"text,omitempty"`
+	Command string  `json:"command,omitempty"`
 }
 
 // Event ...

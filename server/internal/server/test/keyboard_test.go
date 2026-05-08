@@ -16,10 +16,6 @@ const (
 	ResetKeyboardPath = LocalURL + server.ResetKeyboard
 )
 
-const (
-	TestKeyboardScript = "test_kyboard"
-)
-
 // to get screen size use adb -s SERIAL shell wm size
 var testTapEvent = []models.Event{
 	models.Event{
@@ -61,7 +57,7 @@ func TestSaveDefaultKeyboardScript(t *testing.T) {
 		Step   models.ScriptStep `json:"step"`
 	}{
 		Serial: TestSerial,
-		Name:   TestKeyboardScript,
+		Name:   TestScript,
 		Step: models.ScriptStep{
 			Text:   "hello",
 			Action: models.TypeText,

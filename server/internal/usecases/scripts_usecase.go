@@ -81,7 +81,7 @@ func (i *interactorImpl) SaveStep(
 	var id = len(script.Steps) + 1
 	step.ID = id
 
-	if step.Template {
+	if step.Flags&models.EventOnTemplate != 0 {
 		scriptDir := i.getScriptDir(serial, name)
 		tmpImg := i.filesDB.FindFileInDBDir(serial, filesdb.TmpZone)
 		if tmpImg != "" {

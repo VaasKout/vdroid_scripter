@@ -134,7 +134,7 @@ func TestRunScript(t *testing.T) {
 	var serialPath = fmt.Sprintf("{%s}", server.SerialKey)
 	var namePath = fmt.Sprintf("{%s}", server.NameKey)
 	var url = strings.ReplaceAll(RunScriptPath, serialPath, TestSerial)
-	url = strings.ReplaceAll(url, namePath, TestScript)
+	url = strings.ReplaceAll(url, namePath, "2")
 	fmt.Println(url)
 
 	makeHTTPRequest(
