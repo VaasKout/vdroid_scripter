@@ -32,5 +32,6 @@ interface StreamingUiStateHolder {
     fun onCancelClicked()
 
     fun onSavedRecordName(name: String)
+    fun onSaveLocale(locale: String)
     fun onDialogDismissed()
 }

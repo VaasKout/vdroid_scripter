@@ -55,6 +55,8 @@ fun UsualMenu(
                 tint = MaterialTheme.colorScheme.onSurface,
                 contentDescription = ""
             )
+
+            // TODO GET keyboard for demonstration
             Icon(
                 modifier = Modifier
                     .size(32.dp)

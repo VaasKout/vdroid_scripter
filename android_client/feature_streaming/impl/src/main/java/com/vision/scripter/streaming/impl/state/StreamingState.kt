@@ -7,6 +7,14 @@ import com.vision.scripter.data.api.models.StreamingData
 import com.vision.scripter.streaming.impl.video.VideoCodec
 import com.vision.scripter.ui.states.LoadingState
 
+const val ENG = "eng"
+const val RUS = "rus"
+
+val locales = listOf(
+    ENG,
+    RUS,
+)
+
 data class StreamingState(
     val serial: String = "",
     val loadingState: LoadingState = LoadingState.LoadingOnStart,
@@ -22,13 +30,16 @@ data class StreamingState(
     val keyboard: Keyboard = Keyboard(),
     val showRecordDialog: Boolean = false,
     val showTextDialog: Boolean = false,
+    val showKeyboardDialog: Boolean = false,
 ) {
     data class Record(
         val recordName: String = "",
         val stepEvents: List<StepEvent> = listOf(),
-        val textToFind: String = "",
+        val text: String = "",
+        val locale: String = "",
         val templateSelectMode: CvSelectMode = CvSelectMode.NONE,
         val textSelectMode: CvSelectMode = CvSelectMode.NONE,
+        val typeText: Boolean = false,
     ) {
         fun clearStep() = Record(recordName = recordName)
     }
@@ -48,6 +59,7 @@ sealed interface MenuState {
         val controlRecording: Boolean = false,
         val templateSelectMode: CvSelectMode = CvSelectMode.NONE,
         val textSelectMode: CvSelectMode = CvSelectMode.NONE,
+        val typeText: Boolean = false,
     ) : MenuState
 
     data class SelectingCV(
@@ -59,8 +71,8 @@ sealed interface MenuState {
         val text: String = "",
     ) : MenuState
 
-    data class KeyboardEdit(
-        val isLoadingKeyboard: Boolean = false,
+    data class TypingText(
+        val isLoadingKeyboard: Boolean = true,
     ) : MenuState
 }
 

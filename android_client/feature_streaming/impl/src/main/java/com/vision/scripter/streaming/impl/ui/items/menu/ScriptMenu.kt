@@ -9,6 +9,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Keyboard
 import androidx.compose.material.icons.filled.RadioButtonChecked
 import androidx.compose.material.icons.filled.TextFields
 import androidx.compose.material.icons.filled.Visibility
@@ -32,6 +33,7 @@ fun ScriptMenu(
     onRecordingClick: () -> Unit,
     onCvModeClick: () -> Unit,
     onTextModeClick: () -> Unit,
+    onKeyboardClick: () -> Unit,
     onSaveClick: () -> Unit,
     onCancelClick: () -> Unit,
 ) {
@@ -92,6 +94,18 @@ fun ScriptMenu(
         Icon(
             modifier = Modifier
                 .size(32.dp)
+                .customClickable(onClick = onKeyboardClick),
+            imageVector = Icons.Filled.Keyboard,
+            tint = when {
+                menuState.typeText -> Color.Red
+                else -> MaterialTheme.colorScheme.onSurface
+            },
+            contentDescription = ""
+        )
+
+        Icon(
+            modifier = Modifier
+                .size(32.dp)
                 .customClickable(onClick = onCancelClick),
             imageVector = Icons.Filled.Close,
             tint = MaterialTheme.colorScheme.onSurface,
@@ -120,6 +134,7 @@ private fun ScriptMenuDefaultPreview() {
         onRecordingClick = {},
         onCvModeClick = {},
         onTextModeClick = {},
+        onKeyboardClick = {},
         onSaveClick = {},
         onCancelClick = {},
     )
@@ -133,10 +148,12 @@ private fun ScriptMenuRecordingPreview() {
             controlRecording = true,
             textSelectMode = CvSelectMode.APPLY_EVENT,
             templateSelectMode = CvSelectMode.VISIBLE,
+            typeText = true,
         ),
         onRecordingClick = {},
         onCvModeClick = {},
         onTextModeClick = {},
+        onKeyboardClick = {},
         onSaveClick = {},
         onCancelClick = {},
     )

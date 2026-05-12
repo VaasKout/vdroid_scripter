@@ -9,6 +9,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.vision.scripter.streaming.impl.state.MenuState
+import com.vision.scripter.streaming.impl.ui.items.KeyboardDialog
 import com.vision.scripter.streaming.impl.ui.items.RecordDialog
 import com.vision.scripter.streaming.impl.ui.items.RectanglesCanvas
 import com.vision.scripter.streaming.impl.ui.items.TextToFindDialog
@@ -87,12 +88,13 @@ fun VideoScreen(
                     onRecordingClick = uiStateHolder::onRecordingClicked,
                     onCvModeClick = uiStateHolder::onCvModeClicked,
                     onTextModeClick = uiStateHolder::onTextModeClicked,
+                    onKeyboardClick = uiStateHolder::onKeyboardClicked,
                     onSaveClick = uiStateHolder::onSaveClicked,
                     onCancelClick = uiStateHolder::onCancelClicked,
                 )
             }
 
-            is MenuState.KeyboardEdit -> {
+            is MenuState.TypingText -> {
                 KeyboardMenu(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
@@ -114,6 +116,13 @@ fun VideoScreen(
         if (state.showTextDialog) {
             TextToFindDialog(
                 onTryToFindText = uiStateHolder::onTryToFindText,
+                onDismiss = uiStateHolder::onDialogDismissed,
+            )
+        }
+
+        if (state.showKeyboardDialog) {
+            KeyboardDialog(
+                onSaveLocale = uiStateHolder::onSaveLocale,
                 onDismiss = uiStateHolder::onDialogDismissed,
             )
         }

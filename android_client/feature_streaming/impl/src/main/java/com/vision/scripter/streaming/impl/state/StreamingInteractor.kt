@@ -11,6 +11,7 @@ import com.vision.scripter.data.api.models.EVENT_ON_TEXT
 import com.vision.scripter.data.api.models.ScriptStep
 import com.vision.scripter.data.api.models.StepEvent
 import com.vision.scripter.data.api.models.StreamingData
+import com.vision.scripter.data.api.models.TYPE_TEXT
 import com.vision.scripter.data.api.models.adjustToClient
 import com.vision.scripter.network.api.ApiResponse
 import com.vision.scripter.prefs.api.DataStoreRepository
@@ -329,7 +330,7 @@ class StreamingInteractor @Inject constructor(
                             textSelectMode = menuState.selectMode,
                         ),
                         record = it.record.copy(
-                            textToFind = menuState.text,
+                            text = menuState.text,
                             textSelectMode = menuState.selectMode,
                         )
                     )
@@ -345,7 +346,7 @@ class StreamingInteractor @Inject constructor(
                 step = ScriptStep(
                     events = record.stepEvents,
                     flags = getFlags(),
-                    text = record.textToFind,
+                    text = record.text,
                 ),
             )
 
@@ -366,6 +367,7 @@ class StreamingInteractor @Inject constructor(
     private fun getFlags(): Int {
         val record = currentState.record
         return when {
+            record.typeText -> TYPE_TEXT
             record.templateSelectMode == CvSelectMode.APPLY_EVENT -> EVENT_ON_TEMPLATE
             record.textSelectMode == CvSelectMode.APPLY_EVENT -> EVENT_ON_TEXT
             else -> 0
@@ -375,23 +377,22 @@ class StreamingInteractor @Inject constructor(
     override fun onCancelClicked() {
         coroutineScope.launch {
             val menuState = currentState.menuState
-            if (menuState is MenuState.SelectingCV || menuState is MenuState.SelectingText) {
-                _stateFlow.update {
-                    it.copy(
-                        menuState = MenuState.Recording(
-                            templateSelectMode = it.record.templateSelectMode,
-                            textSelectMode = it.record.textSelectMode,
-                        )
-                    )
-                }
-            }
-
-            if (menuState is MenuState.Recording || menuState is MenuState.KeyboardEdit) {
+            if (menuState is MenuState.Recording) {
                 cvUseCase.clearAllRectangles()
                 _stateFlow.update {
                     it.copy(
                         menuState = MenuState.Usual(
                             expanded = true,
+                        )
+                    )
+                }
+            } else {
+                _stateFlow.update {
+                    it.copy(
+                        menuState = MenuState.Recording(
+                            templateSelectMode = it.record.templateSelectMode,
+                            textSelectMode = it.record.textSelectMode,
+                            typeText = it.record.typeText,
                         )
                     )
                 }
@@ -414,6 +415,20 @@ class StreamingInteractor @Inject constructor(
         }
     }
 
+    override fun onSaveLocale(locale: String) {
+        coroutineScope.launch {
+            _stateFlow.update {
+                it.copy(
+                    record = it.record.copy(locale = locale),
+                    showKeyboardDialog = false,
+                    menuState = MenuState.TypingText(),
+                )
+            }
+
+            onKeyboardInitClicked() // TODO make GET keyboard
+        }
+    }
+
     override fun onDialogDismissed() {
         val menuState = currentState.menuState
         if (menuState is MenuState.Usual) {
@@ -428,9 +443,11 @@ class StreamingInteractor @Inject constructor(
             _stateFlow.update {
                 it.copy(
                     showTextDialog = false,
+                    showKeyboardDialog = false,
                     menuState = MenuState.Recording(
                         templateSelectMode = it.record.templateSelectMode,
                         textSelectMode = it.record.textSelectMode,
+                        typeText = it.record.typeText,
                     ),
                 )
             }
@@ -500,9 +517,12 @@ class StreamingInteractor @Inject constructor(
     }
 
     override fun onKeyboardClicked() {
+        val menuState = currentState.menuState
+        if (menuState !is MenuState.Recording) return
+
         _stateFlow.update {
             it.copy(
-                menuState = MenuState.KeyboardEdit(),
+                showKeyboardDialog = true,
             )
         }
     }
@@ -510,7 +530,7 @@ class StreamingInteractor @Inject constructor(
     override fun onKeyboardInitClicked() {
         coroutineScope.launch {
             val menuState = currentState.menuState
-            if (menuState !is MenuState.KeyboardEdit) return@launch
+            if (menuState !is MenuState.TypingText) return@launch
             val screenSizes = videoUseCase.observeScreenSizes().value ?: return@launch
 
             _stateFlow.update {
@@ -523,7 +543,7 @@ class StreamingInteractor @Inject constructor(
 
             val result = scripterRepository.resetKeyboard(
                 serial = currentState.serial,
-                locale = "eng", // TODO
+                locale = currentState.record.locale,
             )
 
             if (result is ApiResponse.Success) {
@@ -531,7 +551,7 @@ class StreamingInteractor @Inject constructor(
                     val rectangle = it.rectangle ?: return@mapNotNull null
                     it.copy(rectangle = rectangle.adjustToClient(screenSizes))
                 }
-                val updatedMenuState = (currentState.menuState as? MenuState.KeyboardEdit)?.copy(
+                val updatedMenuState = (currentState.menuState as? MenuState.TypingText)?.copy(
                     isLoadingKeyboard = false,
                 ) ?: currentState.menuState
 

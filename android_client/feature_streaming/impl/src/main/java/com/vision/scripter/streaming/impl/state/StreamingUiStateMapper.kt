@@ -8,7 +8,7 @@ import javax.inject.Inject
 @ViewModelScoped
 class StreamingUiStateMapper @Inject constructor() {
     fun map(state: StreamingState): StreamingUiState {
-        val keyboardButtons = if (state.menuState is MenuState.KeyboardEdit) {
+        val keyboardButtons = if (state.menuState is MenuState.TypingText) {
             state.keyboard.buttons
         } else {
             listOf()
@@ -22,6 +22,7 @@ class StreamingUiStateMapper @Inject constructor() {
             menuState = state.menuState,
             showTextDialog = state.showTextDialog,
             showRecordDialog = state.showRecordDialog,
+            showKeyboardDialog = state.showKeyboardDialog,
         )
     }
 }

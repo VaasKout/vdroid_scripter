@@ -4,4 +4,5 @@
     <string name="step_saved">Step saved!</string>
     <string name="name_the_script">Name the script</string>
     <string name="write_the_word">Write the word to find</string>
+    <string name="choose_locale">Choose locale</string>
 </resources>

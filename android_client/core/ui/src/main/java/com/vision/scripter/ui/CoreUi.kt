@@ -21,6 +21,8 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Snackbar
@@ -35,6 +37,9 @@ import androidx.compose.material3.pulltorefresh.PullToRefreshState
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
@@ -253,6 +258,53 @@ fun TopBar(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             endContent()
+        }
+    }
+}
+
+@Composable
+fun SimpleDropdownMenu(
+    options: List<String>,
+    onSelect: (String) -> Unit,
+) {
+    if (options.isEmpty()) return
+
+    var expanded by remember {
+        mutableStateOf(false)
+    }
+
+    var selectedText by remember {
+        mutableStateOf(options.first())
+    }
+
+    Box {
+        Button(
+            onClick = {
+                expanded = true
+            }
+        ) {
+            Text(text = selectedText)
+        }
+
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = {
+                expanded = false
+            }
+        ) {
+            options.forEach { item ->
+                DropdownMenuItem(
+                    text = {
+                        Text(item)
+                    },
+
+                    onClick = {
+                        selectedText = item
+                        expanded = false
+                        onSelect(item)
+                    }
+                )
+            }
         }
     }
 }

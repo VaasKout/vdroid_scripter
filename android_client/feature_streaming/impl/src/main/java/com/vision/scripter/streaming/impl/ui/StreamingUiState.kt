@@ -10,6 +10,7 @@ data class StreamingUiState(
     val isLoading: Boolean = true,
     val showRecordDialog: Boolean = false,
     val showTextDialog: Boolean = false,
+    val showKeyboardDialog: Boolean = false,
     val hasConnection: Boolean = false,
     val rectangles: List<CvRectangle> = listOf(),
     val keyboardButtons: List<RectangleWithText> = listOf(),
