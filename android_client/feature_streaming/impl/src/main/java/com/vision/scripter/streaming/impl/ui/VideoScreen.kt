@@ -46,8 +46,7 @@ fun VideoScreen(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
                         .padding(top = 128.dp),
-                    cvMode = state.menuState.cvMode,
-                    expanded = state.menuState.expanded,
+                    menuState = state.menuState,
                     onScriptModeClick = uiStateHolder::onScriptModeClicked,
                     onKeyboardClick = uiStateHolder::onKeyboardClicked,
                     onCvModeClick = uiStateHolder::onCvModeClicked,
@@ -99,9 +98,11 @@ fun VideoScreen(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
                         .padding(top = 128.dp),
-                    isLoading = state.menuState.isLoadingKeyboard,
+                    menuState = state.menuState,
                     onKeyboardInitClick = uiStateHolder::onKeyboardInitClicked,
-                    onBackClick = uiStateHolder::onCancelClicked,
+                    onKeyboardRecordingClick = uiStateHolder::onRecordingClicked,
+                    onSaveClick = uiStateHolder::onSaveClicked,
+                    onCancelClick = uiStateHolder::onCancelClicked,
                 )
             }
         }

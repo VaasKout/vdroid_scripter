@@ -15,6 +15,8 @@ val locales = listOf(
     RUS,
 )
 
+const val SPACE_KEY = "space"
+
 data class StreamingState(
     val serial: String = "",
     val loadingState: LoadingState = LoadingState.LoadingOnStart,
@@ -52,6 +54,8 @@ data class StreamingState(
 sealed interface MenuState {
     data class Usual(
         val cvMode: CVMode = CVMode.NO_CV,
+        val keyboardLoading: Boolean = false,
+        val showKeyboardButtons: Boolean = false,
         val expanded: Boolean = false,
     ) : MenuState
 
@@ -73,6 +77,8 @@ sealed interface MenuState {
 
     data class TypingText(
         val isLoadingKeyboard: Boolean = true,
+        val recordingKeyboard: Boolean = false,
+        val typeText: String = "",
     ) : MenuState
 }
 

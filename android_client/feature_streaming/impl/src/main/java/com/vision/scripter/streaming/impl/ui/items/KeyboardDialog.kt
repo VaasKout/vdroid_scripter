@@ -31,7 +31,7 @@ fun KeyboardDialog(
     onSaveLocale: (String) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    var selectedLocale by remember { mutableStateOf("") }
+    var selectedLocale by remember { mutableStateOf(locales.first()) }
 
     AlertDialog(
         onDismissRequest = onDismiss,

@@ -1,6 +1,7 @@
 package com.vision.scripter.streaming.impl.state
 
 import android.view.MotionEvent
+import android.view.MotionEvent.ACTION_UP
 import android.view.Surface
 import androidx.core.net.toUri
 import com.vision.scripter.coroutines.api.CoroutineScopeFactory
@@ -8,11 +9,14 @@ import com.vision.scripter.data.api.ControlStreamer
 import com.vision.scripter.data.api.ScripterRepository
 import com.vision.scripter.data.api.models.EVENT_ON_TEMPLATE
 import com.vision.scripter.data.api.models.EVENT_ON_TEXT
+import com.vision.scripter.data.api.models.RectangleWithText
 import com.vision.scripter.data.api.models.ScriptStep
 import com.vision.scripter.data.api.models.StepEvent
 import com.vision.scripter.data.api.models.StreamingData
 import com.vision.scripter.data.api.models.TYPE_TEXT
 import com.vision.scripter.data.api.models.adjustToClient
+import com.vision.scripter.data.api.models.contains
+import com.vision.scripter.data.api.models.extractPressEvent
 import com.vision.scripter.network.api.ApiResponse
 import com.vision.scripter.prefs.api.DataStoreRepository
 import com.vision.scripter.streaming.impl.ui.StreamingUiCommand
@@ -174,9 +178,38 @@ class StreamingInteractor @Inject constructor(
         if (event == null) return
         coroutineScope.launch {
             mutex.withLock {
-                if (currentState.menuState is MenuState.SelectingCV) {
+                val menuState = currentState.menuState
+                if (menuState is MenuState.SelectingCV) {
                     cvUseCase.selectRectangle(x = event.x.toInt(), y = event.y.toInt())
                     return@launch
+                }
+
+                if (
+                    menuState is MenuState.TypingText &&
+                    menuState.recordingKeyboard &&
+                    event.x > 0 &&
+                    event.y > 0 &&
+                    event.action == ACTION_UP
+                ) {
+                    val letter = currentState.keyboard.buttons.firstOrNull {
+                        it.contains(x = event.x.toInt(), y = event.y.toInt())
+                    }?.text ?: return@launch
+
+                    if (letter.isEmpty()) return@launch
+
+                    val updatedTypeText = buildString {
+                        append(menuState.typeText)
+                        if (letter == SPACE_KEY) append(" ")
+                        else append(letter)
+                    }
+
+                    _stateFlow.update {
+                        it.copy(
+                            menuState = menuState.copy(
+                                typeText = updatedTypeText
+                            )
+                        )
+                    }
                 }
 
                 val screenSizes = videoUseCase.observeScreenSizes().value ?: return@launch
@@ -195,8 +228,8 @@ class StreamingInteractor @Inject constructor(
         val menuState = currentState.menuState
         if (
             bytesArray == null ||
-            menuState !is MenuState.Recording ||
-            !menuState.controlRecording
+            !(menuState is MenuState.TypingText && menuState.recordingKeyboard ||
+                    menuState is MenuState.Recording && menuState.controlRecording)
         ) return
 
         if (startRecordingTime == 0L) {
@@ -278,13 +311,27 @@ class StreamingInteractor @Inject constructor(
     override fun onRecordingClicked() {
         coroutineScope.launch {
             val mode = currentState.menuState
-            if (mode !is MenuState.Recording) return@launch
-            _stateFlow.update {
-                it.copy(
-                    menuState = mode.copy(
-                        controlRecording = !mode.controlRecording,
-                    )
-                )
+            when {
+                mode is MenuState.Recording -> {
+                    _stateFlow.update {
+                        it.copy(
+                            menuState = mode.copy(
+                                controlRecording = !mode.controlRecording,
+                            )
+                        )
+                    }
+                }
+
+                mode is MenuState.TypingText -> {
+                    _stateFlow.update {
+                        it.copy(
+                            menuState = mode.copy(
+                                recordingKeyboard = !mode.recordingKeyboard,
+                                typeText = "",
+                            )
+                        )
+                    }
+                }
             }
         }
     }
@@ -332,6 +379,25 @@ class StreamingInteractor @Inject constructor(
                         record = it.record.copy(
                             text = menuState.text,
                             textSelectMode = menuState.selectMode,
+                        )
+                    )
+                }
+                cvUseCase.nextCvMode(CVMode.NO_CV)
+                return@launch
+            }
+
+            if (menuState is MenuState.TypingText) {
+                _stateFlow.update {
+                    val pressEvent = it.record.stepEvents.extractPressEvent()
+
+                    it.copy(
+                        menuState = MenuState.Recording(
+                            typeText = menuState.typeText.isNotEmpty(),
+                        ),
+                        record = it.record.copy(
+                            text = menuState.typeText,
+                            typeText = menuState.typeText.isNotEmpty(),
+                            stepEvents = pressEvent,
                         )
                     )
                 }
@@ -425,7 +491,7 @@ class StreamingInteractor @Inject constructor(
                 )
             }
 
-            onKeyboardInitClicked() // TODO make GET keyboard
+            getOrResetKeyboard()
         }
     }
 
@@ -517,13 +583,42 @@ class StreamingInteractor @Inject constructor(
     }
 
     override fun onKeyboardClicked() {
-        val menuState = currentState.menuState
-        if (menuState !is MenuState.Recording) return
+        coroutineScope.launch {
+            val menuState = currentState.menuState
 
-        _stateFlow.update {
-            it.copy(
-                showKeyboardDialog = true,
-            )
+            if (menuState is MenuState.Usual && menuState.showKeyboardButtons) {
+                _stateFlow.update {
+                    it.copy(
+                        menuState = menuState.copy(showKeyboardButtons = false)
+                    )
+                }
+                return@launch
+            }
+
+            if (menuState is MenuState.Usual) {
+                _stateFlow.update {
+                    it.copy(
+                        menuState = menuState.copy(keyboardLoading = true)
+                    )
+                }
+                getOrResetKeyboard()
+                _stateFlow.update {
+                    it.copy(
+                        menuState = menuState.copy(
+                            keyboardLoading = false,
+                            showKeyboardButtons = it.keyboard.buttons.isNotEmpty(),
+                        )
+                    )
+                }
+            }
+
+            if (menuState is MenuState.Recording) {
+                _stateFlow.update {
+                    it.copy(
+                        showKeyboardDialog = true,
+                    )
+                }
+            }
         }
     }
 
@@ -531,7 +626,6 @@ class StreamingInteractor @Inject constructor(
         coroutineScope.launch {
             val menuState = currentState.menuState
             if (menuState !is MenuState.TypingText) return@launch
-            val screenSizes = videoUseCase.observeScreenSizes().value ?: return@launch
 
             _stateFlow.update {
                 it.copy(
@@ -547,22 +641,63 @@ class StreamingInteractor @Inject constructor(
             )
 
             if (result is ApiResponse.Success) {
-                val buttons = result.data.mapNotNull {
-                    val rectangle = it.rectangle ?: return@mapNotNull null
-                    it.copy(rectangle = rectangle.adjustToClient(screenSizes))
-                }
-                val updatedMenuState = (currentState.menuState as? MenuState.TypingText)?.copy(
-                    isLoadingKeyboard = false,
-                ) ?: currentState.menuState
-
-                _stateFlow.update {
-                    it.copy(
-                        keyboard = it.keyboard.copy(buttons = buttons),
-                        menuState = updatedMenuState,
-                    )
-                }
+                setupKeyboardRects(result.data)
             }
         }
+    }
+
+    private suspend fun getOrResetKeyboard() {
+        val keyboardResult = scripterRepository.getKeyboard(
+            serial = currentState.serial,
+            locale = currentState.record.locale,
+        )
+        if (keyboardResult is ApiResponse.Success && keyboardResult.data.isNotEmpty()) {
+            setupKeyboardRects(keyboardResult.data)
+            return
+        }
+
+        val resetResult = scripterRepository.resetKeyboard(
+            serial = currentState.serial,
+            locale = currentState.record.locale,
+        )
+        if (resetResult is ApiResponse.Success) {
+            setupKeyboardRects(resetResult.data)
+            return
+        }
+        showKeyboardError()
+    }
+
+    private fun setupKeyboardRects(data: List<RectangleWithText>) {
+        val screenSizes = videoUseCase.observeScreenSizes().value ?: return
+        val buttons = data.mapNotNull {
+            val rectangle = it.rectangle ?: return@mapNotNull null
+            it.copy(rectangle = rectangle.adjustToClient(screenSizes))
+        }
+
+        val updatedMenuState = (currentState.menuState as? MenuState.TypingText)?.copy(
+            isLoadingKeyboard = false,
+        ) ?: currentState.menuState
+
+        _stateFlow.update {
+            it.copy(
+                keyboard = it.keyboard.copy(buttons = buttons),
+                menuState = updatedMenuState,
+            )
+        }
+    }
+
+    private fun showKeyboardError() {
+        val updatedMenuState = (currentState.menuState as? MenuState.TypingText)?.copy(
+            isLoadingKeyboard = false,
+        ) ?: currentState.menuState
+
+        _stateFlow.update {
+            it.copy(
+                menuState = updatedMenuState,
+            )
+        }
+
+        uiCommandsFlow.tryEmit(StreamingUiCommand.ShowNetworkError)
     }
 
     suspend fun getStreamingData(): ApiResponse<StreamingData> {

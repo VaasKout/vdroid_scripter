@@ -171,4 +171,21 @@ class ScripterRepositoryImpl @Inject constructor(
             is ApiResponse.Error -> result
         }
     }
+
+    override suspend fun getKeyboard(
+        serial: String,
+        locale: String
+    ): ApiResponse<List<RectangleWithText>> {
+        return when (val result =
+            networkClient.get("/devices/$serial/keyboard?locale=$locale")) {
+            is ApiResponse.Success -> {
+                val json = result.data
+                val keyboardButtons = if (json.isEmpty()) KeyboardButtons()
+                else Json.decodeFromString<KeyboardButtons>(result.data)
+                ApiResponse.Success(keyboardButtons.buttons)
+            }
+
+            is ApiResponse.Error -> result
+        }
+    }
 }

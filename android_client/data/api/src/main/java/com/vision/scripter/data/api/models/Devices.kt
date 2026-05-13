@@ -49,6 +49,14 @@ data class RectangleWithText(
     val rectangle: CvRectangle? = null,
 )
 
+fun RectangleWithText?.contains(x: Int, y: Int): Boolean {
+    this ?: return false
+    val rect = this.rectangle ?: return false
+    if (this.rectangle.isEmpty() || (x == 0 && y == 0)) return false
+
+    return x in (rect.leftX..rect.rightX) && y in (rect.topY..rect.bottomY)
+}
+
 data class ScreenSizes(
     val surfaceWidth: Int = 0,
     val surfaceHeight: Int = 0,

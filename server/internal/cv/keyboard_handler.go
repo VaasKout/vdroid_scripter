@@ -120,6 +120,10 @@ func (c *cvImpl) ResetKeyboardKeys(
 		}
 
 		keyPath := filepath.Join(keyboardDir, fmt.Sprintf("%s.png", text))
+		if file.Exists(keyPath) {
+			continue
+		}
+
 		gocv.IMWrite(keyPath, cropped)
 		cropped.Close()
 
