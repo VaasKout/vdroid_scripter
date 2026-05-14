@@ -4,6 +4,7 @@ import (
 	"android_vision_scripter/internal/cv"
 	"android_vision_scripter/internal/filesdb"
 	"android_vision_scripter/pkg/core/file"
+	"android_vision_scripter/pkg/core/strutils"
 	"android_vision_scripter/pkg/models"
 	"errors"
 	"fmt"
@@ -237,7 +238,7 @@ func (i *interactorImpl) typeText(
 
 	keyboardKeys := i.getKeyboardKeys(serial, step)
 	chars := []rune(strings.ToLower(step.Text))
-	keysToPress := make([]cv.OCRResult, len(step.Text))
+	keysToPress := make([]cv.OCRResult, len(chars))
 
 charsLoop:
 	for index, ch := range chars {
@@ -285,14 +286,14 @@ func (i *interactorImpl) getKeyboardKeys(
 		}
 
 		modelOs := i.GetDevice(serial).ToModelOs()
-		tesseractLocale := "eng" // TODO
-		keyboardDir := i.filesDB.CreateDBDir(modelOs, filesdb.Keyboards, tesseractLocale)
+		keyboardDir := i.filesDB.CreateDBDir(modelOs, filesdb.Keyboards, step.Locale)
 		keyboardButtons := i.filesDB.GetFiles(keyboardDir)
-		chars := []rune(step.Text)
-		filteredButtons := []string{}
 
+		chars := strutils.GetUniqueChars(step.Text)
+
+		filteredButtons := []string{}
 		for _, button := range keyboardButtons {
-			for _, ch := range chars { // TODO unique chars
+			for _, ch := range chars {
 				if string(ch) == file.GetFileName(button) {
 					filteredButtons = append(filteredButtons, button)
 				}
@@ -306,6 +307,7 @@ func (i *interactorImpl) getKeyboardKeys(
 		}
 
 		keyboardKeys = i.cv.GetKeyboardKeys(filteredButtons, *mat)
+		break
 	}
 	return keyboardKeys
 }

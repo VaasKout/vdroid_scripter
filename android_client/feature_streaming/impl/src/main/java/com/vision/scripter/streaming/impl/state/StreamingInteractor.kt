@@ -413,6 +413,7 @@ class StreamingInteractor @Inject constructor(
                     events = record.stepEvents,
                     flags = getFlags(),
                     text = record.text,
+                    locale = record.locale,
                 ),
             )
 
@@ -484,10 +485,15 @@ class StreamingInteractor @Inject constructor(
     override fun onSaveLocale(locale: String) {
         coroutineScope.launch {
             _stateFlow.update {
+                val updatedMenuState = when (it.menuState) {
+                    is MenuState.Recording -> MenuState.TypingText()
+                    is MenuState.Usual -> it.menuState.copy(keyboardLoading = true)
+                    else -> it.menuState
+                }
                 it.copy(
                     record = it.record.copy(locale = locale),
                     showKeyboardDialog = false,
-                    menuState = MenuState.TypingText(),
+                    menuState = updatedMenuState,
                 )
             }
 
@@ -497,19 +503,17 @@ class StreamingInteractor @Inject constructor(
 
     override fun onDialogDismissed() {
         val menuState = currentState.menuState
-        if (menuState is MenuState.Usual) {
-            _stateFlow.update {
-                it.copy(
-                    showRecordDialog = false,
-                )
-            }
+        _stateFlow.update {
+            it.copy(
+                showRecordDialog = false,
+                showTextDialog = false,
+                showKeyboardDialog = false,
+            )
         }
 
         if (menuState is MenuState.Recording) {
             _stateFlow.update {
                 it.copy(
-                    showTextDialog = false,
-                    showKeyboardDialog = false,
                     menuState = MenuState.Recording(
                         templateSelectMode = it.record.templateSelectMode,
                         textSelectMode = it.record.textSelectMode,
@@ -585,39 +589,21 @@ class StreamingInteractor @Inject constructor(
     override fun onKeyboardClicked() {
         coroutineScope.launch {
             val menuState = currentState.menuState
-
             if (menuState is MenuState.Usual && menuState.showKeyboardButtons) {
                 _stateFlow.update {
                     it.copy(
-                        menuState = menuState.copy(showKeyboardButtons = false)
+                        menuState = menuState.copy(
+                            showKeyboardButtons = false,
+                            keyboardLoading = false,
+                        )
                     )
                 }
                 return@launch
             }
-
-            if (menuState is MenuState.Usual) {
-                _stateFlow.update {
-                    it.copy(
-                        menuState = menuState.copy(keyboardLoading = true)
-                    )
-                }
-                getOrResetKeyboard()
-                _stateFlow.update {
-                    it.copy(
-                        menuState = menuState.copy(
-                            keyboardLoading = false,
-                            showKeyboardButtons = it.keyboard.buttons.isNotEmpty(),
-                        )
-                    )
-                }
-            }
-
-            if (menuState is MenuState.Recording) {
-                _stateFlow.update {
-                    it.copy(
-                        showKeyboardDialog = true,
-                    )
-                }
+            _stateFlow.update {
+                it.copy(
+                    showKeyboardDialog = true,
+                )
             }
         }
     }
@@ -625,13 +611,20 @@ class StreamingInteractor @Inject constructor(
     override fun onKeyboardInitClicked() {
         coroutineScope.launch {
             val menuState = currentState.menuState
-            if (menuState !is MenuState.TypingText) return@launch
+            val updatedMenuState = when (menuState) {
+                is MenuState.Usual -> {
+                    menuState.copy(keyboardLoading = true)
+                }
 
+                is MenuState.TypingText -> {
+                    menuState.copy(isLoadingKeyboard = true)
+                }
+
+                else -> menuState
+            }
             _stateFlow.update {
                 it.copy(
-                    menuState = menuState.copy(
-                        isLoadingKeyboard = true,
-                    ),
+                    menuState = updatedMenuState,
                 )
             }
 
@@ -674,9 +667,21 @@ class StreamingInteractor @Inject constructor(
             it.copy(rectangle = rectangle.adjustToClient(screenSizes))
         }
 
-        val updatedMenuState = (currentState.menuState as? MenuState.TypingText)?.copy(
-            isLoadingKeyboard = false,
-        ) ?: currentState.menuState
+        val menuState = currentState.menuState
+        val updatedMenuState = when (menuState) {
+            is MenuState.Usual -> {
+                menuState.copy(
+                    keyboardLoading = false,
+                    showKeyboardButtons = buttons.isNotEmpty()
+                )
+            }
+
+            is MenuState.TypingText -> {
+                menuState.copy(isLoadingKeyboard = false)
+            }
+
+            else -> menuState
+        }
 
         _stateFlow.update {
             it.copy(
@@ -687,9 +692,18 @@ class StreamingInteractor @Inject constructor(
     }
 
     private fun showKeyboardError() {
-        val updatedMenuState = (currentState.menuState as? MenuState.TypingText)?.copy(
-            isLoadingKeyboard = false,
-        ) ?: currentState.menuState
+        val menuState = currentState.menuState
+        val updatedMenuState = when (menuState) {
+            is MenuState.Usual -> {
+                menuState.copy(keyboardLoading = false)
+            }
+
+            is MenuState.TypingText -> {
+                menuState.copy(isLoadingKeyboard = false)
+            }
+
+            else -> menuState
+        }
 
         _stateFlow.update {
             it.copy(

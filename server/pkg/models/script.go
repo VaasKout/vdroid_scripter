@@ -36,6 +36,7 @@ type ScriptStep struct {
 	Events  []Event `json:"events,omitempty"`
 	Flags   int     `json:"flags,omitempty"`
 	Text    string  `json:"text,omitempty"`
+	Locale  string  `json:"locale,omitempty"`
 	Command string  `json:"command,omitempty"`
 }
 
