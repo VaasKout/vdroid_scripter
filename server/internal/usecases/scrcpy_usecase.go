@@ -15,6 +15,7 @@ import (
 
 // ClientConnection ...
 type ClientConnection struct {
+	ServerPort  int
 	VideoPort   int
 	CVPort      int
 	ControlPort int
@@ -42,18 +43,18 @@ type ScrcpyUseCase interface {
 
 func (i *interactorImpl) StartScrcpyServer(
 	serial string,
-	serverPort int,
+	basePort int,
 ) bool {
 	i.logger.Info(fmt.Sprintf("closing old connections for %s... ⏳", serial))
 	i.CloseConnection(serial)
 
-	clientConnection := i.initPorts(serverPort)
+	clientConnection := i.initPorts(basePort)
 	if clientConnection == nil {
 		return false
 	}
 	i.clientsCache.Add(serial, *clientConnection)
 
-	streamURL := i.scrcpy.StartScrcpyServer(serial, serverPort)
+	streamURL := i.scrcpy.StartScrcpyServer(serial, clientConnection.ServerPort)
 	if streamURL == "" {
 		return false
 	}
@@ -63,6 +64,12 @@ func (i *interactorImpl) StartScrcpyServer(
 }
 
 func (i *interactorImpl) CloseConnection(serial string) {
+	i.logger.Info(
+		fmt.Sprintf(
+			"closing scrcpy connection for %s... 🛑",
+			serial,
+		),
+	)
 	i.scrcpy.CloseScrcpyServer(serial)
 	if connection, ok := i.clientsCache.Get(serial); ok {
 		close(connection.DoneCh)
@@ -82,14 +89,15 @@ func (i *interactorImpl) GetPortsJSON(serial string) map[string]string {
 	return map[string]string{}
 }
 
-func (i *interactorImpl) initPorts(serverPort int) *ClientConnection {
-	var videoPort = serverPort + 1
+func (i *interactorImpl) initPorts(basePort int) *ClientConnection {
+	var videoPort = basePort + 1
 	var cvPort = videoPort + 1
 	var controlPort = cvPort + 1
 
 	var cacheMap = i.clientsCache.GetMap()
 	if len(cacheMap) == 0 {
 		return &ClientConnection{
+			ServerPort:  basePort,
 			VideoPort:   videoPort,
 			CVPort:      cvPort,
 			ControlPort: controlPort,
@@ -104,11 +112,13 @@ func (i *interactorImpl) initPorts(serverPort int) *ClientConnection {
 		}
 	}
 
-	videoPort = biggestPort + 1
+	serverPort := biggestPort + 1
+	videoPort = serverPort + 1
 	cvPort = videoPort + 1
 	controlPort = cvPort + 1
 
 	return &ClientConnection{
+		ServerPort:  serverPort,
 		VideoPort:   videoPort,
 		CVPort:      cvPort,
 		ControlPort: controlPort,

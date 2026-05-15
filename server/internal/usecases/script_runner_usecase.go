@@ -20,7 +20,7 @@ const (
 	Attempts = 3
 )
 
-func (i *interactorImpl) RunScript(serial string, scriptName string, socketPort int) error {
+func (i *interactorImpl) RunScript(serial string, scriptName string, basePort int) error {
 	if serial == "" {
 		return errors.New(SerialIsEmptyError)
 	}
@@ -37,40 +37,43 @@ func (i *interactorImpl) RunScript(serial string, scriptName string, socketPort 
 	if script == nil || len(script.Steps) == 0 {
 		return errors.New("script steps are empty")
 	}
-	started := i.StartScrcpyServer(serial, socketPort)
-	if !started {
-		var errMsg = fmt.Sprintf("couldn't start scrcpy server for %s", serial)
-		return errors.New(errMsg)
+
+	var newConnection = false
+	if _, ok := i.clientsCache.Get(serial); !ok {
+		started := i.StartScrcpyServer(serial, basePort)
+		if !started {
+			var errMsg = fmt.Sprintf("couldn't start scrcpy server for %s", serial)
+			return errors.New(errMsg)
+		}
+		newConnection = started
 	}
 
-	go i.startVideoListener(serial, script)
+	go i.startVideoListener(serial, script, newConnection)
 	return nil
 }
 
 func (i *interactorImpl) startVideoListener(
 	serial string,
 	script *models.Script,
+	newConnection bool,
 ) {
 	var doneCh = make(chan struct{})
-	defer i.logger.Info(
-		fmt.Sprintf(
-			"closing scrcpy connection for %s... 🛑",
-			serial,
-		),
-	)
 
 	go func() {
 		defer close(doneCh)
-		i.executeScript(serial, script)
+		i.executeScript(serial, script, newConnection)
 	}()
 
 	<-doneCh
-	i.CloseConnection(serial)
+	if newConnection {
+		i.CloseConnection(serial)
+	}
 }
 
 func (i *interactorImpl) executeScript(
 	serial string,
 	script *models.Script,
+	newConnection bool,
 ) {
 	var clientConnection *ClientConnection
 	if result, ok := i.clientsCache.Get(serial); ok {
@@ -91,8 +94,10 @@ func (i *interactorImpl) executeScript(
 		return
 	}
 
-	defer i.logger.Info("closing script videostream... 🛑")
-	go i.scrcpy.ReadVideoStream(serial, nil)
+	defer i.logger.Info(fmt.Sprintf("end of script %s... 🛑", script.Name))
+	if newConnection {
+		go i.scrcpy.ReadVideoStream(serial, nil)
+	}
 
 	for _, step := range script.Steps {
 		if step.Flags == 0 {

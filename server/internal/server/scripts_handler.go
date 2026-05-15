@@ -3,7 +3,6 @@ package server
 import (
 	"android_vision_scripter/pkg/models"
 	"encoding/json"
-	"fmt"
 	"net/http"
 )
 
@@ -135,7 +134,6 @@ func (s *serverImpl) handleDeleteScript(w http.ResponseWriter, r *http.Request) 
 func (s *serverImpl) handleRunScript(w http.ResponseWriter, r *http.Request) {
 	var serial = r.PathValue(SerialKey)
 	var name = r.PathValue(NameKey)
-	fmt.Printf("name: %s, serial: %s\n", name, serial)
 	err := s.interactor.RunScript(serial, name, s.serverProps.SocketPort)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)

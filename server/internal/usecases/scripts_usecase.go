@@ -30,7 +30,7 @@ type ScriptsUseCase interface {
 	GetScriptNames(serial string) ([]string, error)
 	GetScript(serial string, scriptName string) (*models.Script, error)
 	DeleteScript(serial string, scriptName string) error
-	RunScript(serial string, scriptName string, socketPort int) error
+	RunScript(serial string, scriptName string, basePort int) error
 
 	SaveZone(serial string, zone *models.Rectangle) bool
 	SaveStep(
