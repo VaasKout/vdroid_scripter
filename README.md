@@ -36,4 +36,4 @@ Huge thanks to the authors and contributors of these projects.
 
 If you have any questions, ideas, or would like to contribute to development, feel free to reach out:
 
-**Email:** *VasyaKotov1@gmail.com*
+**Email:** *VasyaKotov1@gmail.com*  
