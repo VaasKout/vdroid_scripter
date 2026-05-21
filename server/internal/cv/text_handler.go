@@ -15,6 +15,7 @@ import (
 // Tesseract contants
 const (
 	DefaultOCRLanguage = "eng"
+	Numbers            = "nums"
 	WhiteTheme         = 230
 	BlackTheme         = 120
 	MaxThreshHold      = 255
@@ -34,15 +35,17 @@ var TesseractLocaleMap = map[string]string{
 	"en":    "eng",
 	"ru-RU": "rus",
 	"en-US": "eng",
+	Numbers: "eng",
 }
 
 // OcrParams ...
 type OcrParams struct {
-	Text  string
-	Lang  string
-	Psm   int
-	Theme float32
-	Oem   int
+	Text      string
+	Lang      string
+	Psm       int
+	Theme     float32
+	Oem       int
+	WhiteList string
 }
 
 // TextHandler ...
@@ -74,6 +77,10 @@ func InitOcrParams(text string, lang string, psm int, oem int, theme float32) *O
 		ocrParams.Psm = 11
 	}
 
+	if lang == Numbers {
+		ocrParams.WhiteList = "-c tessedit_char_whitelist=0123456789"
+	}
+
 	return ocrParams
 }
 
@@ -97,6 +104,7 @@ func (c *cvImpl) FindTextRectangles(
 		params.Psm,
 		params.Lang,
 		params.Oem,
+		params.WhiteList,
 	)
 
 	if err != nil {
@@ -136,6 +144,7 @@ func (c *cvImpl) readTextFromEdgesImage(
 	psm int,
 	lang string,
 	oem int,
+	whiteList string,
 ) error {
 	dir, err := file.FindDirectoryOfFile(imgPath)
 	if err != nil {
@@ -144,12 +153,13 @@ func (c *cvImpl) readTextFromEdgesImage(
 	}
 
 	cmd := fmt.Sprintf(
-		"tesseract %s %s -l %s --psm %d --oem %d tsv",
+		"tesseract %s %s -l %s --psm %d --oem %d %s tsv",
 		imgPath,
 		filepath.Join(dir, OutputTsv),
 		lang,
 		psm,
 		oem,
+		whiteList,
 	)
 	_, err = c.cmdRunner.ExecuteCommand(cmd)
 	if err != nil {

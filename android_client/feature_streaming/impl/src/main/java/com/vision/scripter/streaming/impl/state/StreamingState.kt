@@ -9,13 +9,14 @@ import com.vision.scripter.ui.states.LoadingState
 
 const val ENG = "eng"
 const val RUS = "rus"
+const val NUMS = "nums"
+const val SPACE_KEY = "space"
 
 val locales = listOf(
     ENG,
     RUS,
+    NUMS,
 )
-
-const val SPACE_KEY = "space"
 
 data class StreamingState(
     val serial: String = "",
