@@ -22,7 +22,7 @@ func (i *interactorImpl) startSocketListener(
 func (i *interactorImpl) acceptListenerWithTimeout(
 	listener net.Listener,
 ) (net.Conn, error) {
-	timeoutCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	timeoutCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	resultCh := make(chan net.Conn, 1)

@@ -34,7 +34,7 @@ const (
 // Attempts to find rectangle and establish scrcpy connection on start
 const (
 	Attempts     = 3
-	ConnAttempts = 2
+	ConnAttempts = 4
 )
 
 // Data ...
@@ -139,7 +139,15 @@ func (s *scrcpyImpl) StartScrcpyServer(
 	}
 
 	time.Sleep(1 * time.Second)
-	s.initConnections(serial, port)
+	for range ConnAttempts { // it takes too long to start scrcpy on some cheap devices
+		err := s.initConnections(serial, port)
+		if err != nil {
+			s.logAPI.Error(err.Error())
+			time.Sleep(1 * time.Second)
+			continue
+		}
+		break
+	}
 	return fmt.Sprintf(LocalTCPUrlFormat, port)
 }
 

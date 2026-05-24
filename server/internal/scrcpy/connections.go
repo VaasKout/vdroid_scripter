@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"net"
-	"time"
 
 	"gocv.io/x/gocv"
 )
@@ -115,7 +114,7 @@ func (s *scrcpyImpl) handleFramesManually(data *DecoderData, handlerCh <-chan []
 	for {
 		buf, ok := <-handlerCh
 		if !ok {
-			s.logAPI.Error("closing manual frames handler... 🛑")
+			s.logAPI.Info("closing manual frames handler... 🛑")
 			return
 		}
 
@@ -166,26 +165,35 @@ func (s *scrcpyImpl) sendVideoMetaData(serial string, ch chan []byte) error {
 	return nil
 }
 
-func (s *scrcpyImpl) initConnections(serial string, port int) {
+func (s *scrcpyImpl) initConnections(serial string, port int) error {
 	newVideoConn, err := s.startSocketConn(port)
 	if err != nil {
-		return
+		return err
 	}
 	s.logAPI.Info(fmt.Sprintf("video connection started: tcp://127.0.0.1:%d ✅", port))
 
 	newControlConn, err := s.startSocketConn(port)
 	if err != nil {
-		return
+		newVideoConn.Close()
+		return err
 	}
 	s.logAPI.Info(fmt.Sprintf("control connection started: tcp://127.0.0.1:%d ✅", port))
 
-	width, height := s.readMetaData(newVideoConn)
-	if width == 0 || height == 0 {
-		return
+	width, height, err := s.readMetaData(newVideoConn)
+	if err != nil {
+		newControlConn.Close()
+		newVideoConn.Close()
+		return fmt.Errorf("couldn't receive metadata: %v", err.Error())
 	}
 
 	var decoderData = &DecoderData{}
-	decoderData.Allocate(width, height)
+	err = decoderData.Allocate(width, height)
+	if err != nil {
+		decoderData.Free()
+		newControlConn.Close()
+		newVideoConn.Close()
+		return err
+	}
 
 	var scrcpyData = &Data{
 		Port:        port,
@@ -195,6 +203,7 @@ func (s *scrcpyImpl) initConnections(serial string, port int) {
 	}
 
 	s.scrcpyCache.Add(serial, scrcpyData)
+	return nil
 }
 
 func (s *scrcpyImpl) startSocketConn(connPort int) (net.Conn, error) {
@@ -206,50 +215,32 @@ func (s *scrcpyImpl) startSocketConn(connPort int) (net.Conn, error) {
 	return conn, nil
 }
 
-func (s *scrcpyImpl) readMetaData(conn net.Conn) (width, height int) {
+func (s *scrcpyImpl) readMetaData(conn net.Conn) (width, height int, err error) {
 	var dummyByte = make([]byte, 1)
-	for i := range ConnAttempts {
-		_, err := conn.Read(dummyByte)
-		if err != nil {
-			s.logAPI.Error(
-				fmt.Sprintf(
-					"failed to read dummy byte - attempt: %d, err:%v",
-					i+1,
-					err.Error(),
-				),
-			)
-
-			if i == ConnAttempts-1 {
-				return width, height
-			}
-			time.Sleep(1 * time.Second)
-			continue
-		}
-		break
+	_, err = conn.Read(dummyByte)
+	if err != nil {
+		return width, height, fmt.Errorf("failed to read dummy byte, err:%v", err.Error())
 	}
 	s.logAPI.Info(fmt.Sprintf("dummy byte: %v", dummyByte))
 
 	var deviceName = make([]byte, 64)
-	_, err := conn.Read(deviceName)
+	_, err = conn.Read(deviceName)
 	if err != nil {
-		s.logAPI.Error(err.Error())
-		return width, height
+		return width, height, err
 	}
 	s.logAPI.Info(fmt.Sprintf("name: %s", string(deviceName)))
 
 	var codecID = make([]byte, 4)
 	_, err = conn.Read(codecID)
 	if err != nil {
-		s.logAPI.Error(err.Error())
-		return width, height
+		return width, height, err
 	}
 	s.logAPI.Info(fmt.Sprintf("codecID: %v", codecID))
 
 	var widthBuf = make([]byte, 4)
 	_, err = conn.Read(widthBuf)
 	if err != nil {
-		s.logAPI.Error(err.Error())
-		return width, height
+		return width, height, err
 	}
 	width = int(binary.BigEndian.Uint32(widthBuf))
 	s.logAPI.Info(fmt.Sprintf("width: %d", width))
@@ -257,11 +248,14 @@ func (s *scrcpyImpl) readMetaData(conn net.Conn) (width, height int) {
 	var heightBuf = make([]byte, 4)
 	_, err = conn.Read(heightBuf)
 	if err != nil {
-		s.logAPI.Error(err.Error())
-		return width, height
+		return width, height, err
 	}
 	height = int(binary.BigEndian.Uint32(heightBuf))
 	s.logAPI.Info(fmt.Sprintf("height: %d", height))
 
-	return width, height
+	if width == 0 || height == 0 {
+		return width, height, fmt.Errorf("width: %d, height: %d", width, height)
+	}
+
+	return width, height, nil
 }
