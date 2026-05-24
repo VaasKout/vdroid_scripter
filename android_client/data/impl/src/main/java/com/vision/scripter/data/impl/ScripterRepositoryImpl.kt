@@ -101,9 +101,12 @@ class ScripterRepositoryImpl @Inject constructor(
 
     override suspend fun findText(
         serial: String,
-        text: String
+        text: String,
+        locale: String,
     ): ApiResponse<List<RectangleWithText>> {
-        return when (val result = networkClient.get("/devices/$serial/find_text?text=$text")) {
+        return when (val result = networkClient.get(
+            "/devices/$serial/find_text?text=$text&locale=$locale",
+        )) {
             is ApiResponse.Success -> {
                 val json = result.data
                 val ocrData = if (json.isEmpty()) listOf()

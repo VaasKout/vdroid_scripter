@@ -552,7 +552,7 @@ class StreamingInteractor @Inject constructor(
         }
     }
 
-    override fun onTryToFindText(text: String) {
+    override fun onTryToFindText(text: String, locale: String) {
         coroutineScope.launch {
             _stateFlow.update {
                 it.copy(
@@ -564,6 +564,7 @@ class StreamingInteractor @Inject constructor(
             val found = cvUseCase.findTextRectangles(
                 serial = currentState.serial,
                 text = text.trim(),
+                locale = locale,
                 screenSizes = screenSizes,
             )
 

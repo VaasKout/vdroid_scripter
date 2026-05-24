@@ -191,13 +191,14 @@ func (s *serverImpl) handleFindText(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 	var serial = r.PathValue(SerialKey)
 	var text = r.URL.Query().Get(TextKey)
+	var locale = r.URL.Query().Get(LocaleKey)
 
 	if serial == "" {
 		http.Error(w, `"serial" query needed`, http.StatusBadRequest)
 		return
 	}
 
-	result := s.interactor.FindText(serial, text)
+	result := s.interactor.FindText(serial, text, locale)
 	s.setHeaders(w)
 	json.NewEncoder(w).Encode(result)
 }

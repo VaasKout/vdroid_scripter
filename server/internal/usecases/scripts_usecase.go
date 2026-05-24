@@ -38,7 +38,7 @@ type ScriptsUseCase interface {
 		name string,
 		step *models.ScriptStep,
 	) bool
-	FindText(serial string, text string) []cv.OCRResult
+	FindText(serial string, text string, locale string) []cv.OCRResult
 }
 
 func (i *interactorImpl) SaveZone(serial string, zone *models.Rectangle) bool {
@@ -96,6 +96,7 @@ func (i *interactorImpl) SaveStep(
 func (i *interactorImpl) FindText(
 	serial string,
 	text string,
+	locale string,
 ) []cv.OCRResult {
 	dir := i.filesDB.CreateLogsDir(serial, filesdb.TesseractDir)
 	if dir == "" {
@@ -113,10 +114,9 @@ func (i *interactorImpl) FindText(
 	}
 	defer img.Close()
 
-	var device = i.GetDevice(serial)
 	var ocrParams = cv.InitOcrParams(
 		text,
-		device.Locale,
+		locale,
 		cv.PsmText,
 		cv.OemText,
 		cv.WhiteTheme,

@@ -96,9 +96,10 @@ class CvUseCase @Inject constructor(
     suspend fun findTextRectangles(
         serial: String,
         text: String,
+        locale: String,
         screenSizes: ScreenSizes,
     ): Boolean {
-        val result = scripterRepository.findText(serial = serial, text = text)
+        val result = scripterRepository.findText(serial = serial, text = text, locale = locale)
         if (result is ApiResponse.Success) {
             val rectangles = result.data.mapNotNull { it.rectangle }
             _rectanglesFlow.update {

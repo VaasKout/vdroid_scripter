@@ -21,7 +21,7 @@ interface StreamingUiStateHolder {
     fun onCvModeClicked()
 
     fun onTextModeClicked()
-    fun onTryToFindText(text: String)
+    fun onTryToFindText(text: String, locale: String)
 
     fun onKeyboardClicked()
     fun onKeyboardInitClicked()

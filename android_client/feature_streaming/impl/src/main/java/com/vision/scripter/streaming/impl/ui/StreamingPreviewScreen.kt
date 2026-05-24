@@ -40,7 +40,7 @@ internal class StreamingPreviewScreenUiStateHolder(state: StreamingUiState) :
     override fun onTextModeClicked() {}
     override fun onKeyboardClicked() {}
     override fun onKeyboardInitClicked() {}
-    override fun onTryToFindText(text: String) {}
+    override fun onTryToFindText(text: String, locale: String) {}
 
     override fun onRecordingClicked() {}
     override fun onSaveClicked() {}

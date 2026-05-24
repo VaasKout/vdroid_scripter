@@ -29,6 +29,7 @@ interface ScripterRepository {
     suspend fun findText(
         serial: String,
         text: String,
+        locale: String,
     ): ApiResponse<List<RectangleWithText>>
 
     suspend fun getScripts(serial: String): ApiResponse<List<String>>
