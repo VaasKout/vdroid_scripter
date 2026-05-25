@@ -21,8 +21,9 @@ sudo pacman -S go android-tools ffmpeg opencv tesseract $(pacman -Sl extra | gre
 ```bash
 brew install go android-platform-tools ffmpeg opencv tesseract tesseract-lang
 ```
+Install legacy tesseract data for more precise keyboard detection:
 ```bash
-sudo curl -L https://github.com/tesseract-ocr/tessdata/raw/main/eng.traineddata -o /opt/homebrew/share/tessdata/eng.traineddata # Legacy tesseract support
+sudo curl -L https://github.com/tesseract-ocr/tessdata/raw/main/eng.traineddata -o /opt/homebrew/share/tessdata/eng.traineddata
 ```
 
 ### Preparing the Android Device (Target Device)
