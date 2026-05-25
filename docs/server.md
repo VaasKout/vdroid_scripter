@@ -20,6 +20,8 @@ sudo pacman -S go android-tools ffmpeg opencv tesseract $(pacman -Sl extra | gre
 
 ```bash
 brew install go android-platform-tools ffmpeg opencv tesseract tesseract-lang
+```
+```bash
 sudo curl -L https://github.com/tesseract-ocr/tessdata/raw/main/eng.traineddata -o /opt/homebrew/share/tessdata/eng.traineddata # Legacy tesseract support
 ```
 
