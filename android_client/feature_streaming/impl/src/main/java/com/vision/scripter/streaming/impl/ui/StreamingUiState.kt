@@ -12,6 +12,7 @@ data class StreamingUiState(
     val dialogState: DialogState = DialogState.NONE,
     val hasConnection: Boolean = false,
     val rectangles: List<CvRectangle> = listOf(),
+    val selectedRectangles: List<CvRectangle> = listOf(),
     val keyboardButtons: List<RectangleWithText> = listOf(),
     val menuState: MenuState = MenuState.Usual(),
 )

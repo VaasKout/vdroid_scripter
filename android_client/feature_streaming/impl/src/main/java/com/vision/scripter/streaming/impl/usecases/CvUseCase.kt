@@ -16,6 +16,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -28,22 +29,23 @@ class CvUseCase @Inject constructor(
     private val scripterRepository: ScripterRepository,
 ) {
     private val cvMode = MutableStateFlow(CVMode.NO_CV)
-    private val _rectanglesFlow = MutableStateFlow<List<CvRectangle>>(listOf())
 
-    fun observe(
+    private val _rectanglesFlow = MutableStateFlow<List<CvRectangle>>(listOf())
+    private val _selectedRectangles = MutableStateFlow<List<CvRectangle>>(listOf())
+
+    fun observeRectangles(
         coroutineScope: CoroutineScope,
     ): StateFlow<List<CvRectangle>> =
-        combine(
-            _rectanglesFlow,
-            cvMode
-        ) { rects, cvMode ->
-            if (cvMode == CVMode.NO_CV) rects.filter { rect -> rect.isSelected }
-            else rects
+        combine(_rectanglesFlow, cvMode) { rects, mode ->
+            if (mode == CVMode.NO_CV) listOf() else rects
         }.stateIn(
             scope = coroutineScope,
             started = SharingStarted.WhileSubscribed(),
             initialValue = listOf(),
         )
+
+    fun observeSelectedRectangles(): StateFlow<List<CvRectangle>> =
+        _selectedRectangles.asStateFlow()
 
     suspend fun initConnection(
         host: String,
@@ -102,8 +104,8 @@ class CvUseCase @Inject constructor(
         val result = scripterRepository.findText(serial = serial, text = text, locale = locale)
         if (result is ApiResponse.Success) {
             val rectangles = result.data.mapNotNull { it.rectangle }
-            _rectanglesFlow.update {
-                rectangles.adjustToClient(screenSizes).map { it.copy(isSelected = true) }
+            _selectedRectangles.update {
+                rectangles.adjustToClient(screenSizes)
             }
         }
 
@@ -114,7 +116,7 @@ class CvUseCase @Inject constructor(
         serial: String,
         screenSizes: ScreenSizes,
     ) {
-        val tmpZone = _rectanglesFlow.value.firstOrNull { it.isSelected }
+        val tmpZone = _selectedRectangles.value.firstOrNull()
         if (!tmpZone.isEmpty()) {
             scripterRepository.saveRect(
                 serial = serial,
@@ -124,34 +126,22 @@ class CvUseCase @Inject constructor(
     }
 
     fun selectRectangle(x: Int, y: Int) {
-        _rectanglesFlow.update {
-            val selectedZone = it.smallestBy(x, y)
-            it.map { rectangle ->
-                rectangle.copy(isSelected = rectangle == selectedZone)
-            }
-        }
+        _selectedRectangles.value = listOfNotNull(_rectanglesFlow.value.smallestBy(x, y))
     }
 
     fun disableSelection() {
-        _rectanglesFlow.update {
-            it.map { rect -> rect.copy(isSelected = false) }
-        }
+        _selectedRectangles.update { listOf() }
     }
-
-    fun selectAll() {
-        _rectanglesFlow.update {
-            it.map { rect -> rect.copy(isSelected = true) }
-        }
-    }
-
 
     fun clearAllRectangles() {
         _rectanglesFlow.update { listOf() }
+        _selectedRectangles.update { listOf() }
     }
 
     fun close() {
         cvStreamer.close()
         _rectanglesFlow.update { listOf() }
+        _selectedRectangles.update { listOf() }
         cvMode.value = CVMode.NO_CV
     }
 }

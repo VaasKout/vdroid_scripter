@@ -27,6 +27,7 @@ data class StreamingState(
     val videoCodec: VideoCodec = VideoCodec.H264,
     val streamingData: StreamingData? = null,
     val cvRectangles: List<CvRectangle> = listOf(),
+    val selectedRectangles: List<CvRectangle> = listOf(),
 
     val record: Record = Record(),
     val keyboard: Keyboard = Keyboard(),

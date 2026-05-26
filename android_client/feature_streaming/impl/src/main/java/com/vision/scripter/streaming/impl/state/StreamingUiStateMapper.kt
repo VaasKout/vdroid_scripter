@@ -22,6 +22,7 @@ class StreamingUiStateMapper @Inject constructor() {
             isLoading = state.loadingState == LoadingState.LoadingOnStart,
             hasConnection = !state.streamingHost.isBlank() && state.streamingData != null,
             rectangles = state.cvRectangles,
+            selectedRectangles = state.selectedRectangles,
             keyboardButtons = keyboardButtons,
             menuState = menuState,
             dialogState = dialogState,

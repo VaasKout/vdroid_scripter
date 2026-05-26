@@ -21,6 +21,7 @@ import com.vision.scripter.data.api.models.RectangleWithText
 fun RectanglesCanvas(
     modifier: Modifier = Modifier,
     cvRectangles: List<CvRectangle>,
+    selectedRectangles: List<CvRectangle>,
     keyboardButtons: List<RectangleWithText>,
 ) {
     val textMeasurer = rememberTextMeasurer()
@@ -36,8 +37,13 @@ fun RectanglesCanvas(
             }
             return@Canvas
         }
+
         cvRectangles.forEach {
-            drawRectangle(rectangle = it, color = if (it.isSelected) Color.Blue else Color.Red)
+            drawRectangle(rectangle = it, color = Color.Red)
+        }
+
+        selectedRectangles.forEach {
+            drawRectangle(rectangle = it, color = Color.Blue)
         }
     }
 }

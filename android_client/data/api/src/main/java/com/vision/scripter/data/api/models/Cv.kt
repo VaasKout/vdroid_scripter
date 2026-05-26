@@ -2,7 +2,6 @@ package com.vision.scripter.data.api.models
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.Transient
 
 @Serializable
 data class SaveRectRequest(
@@ -22,9 +21,6 @@ data class CvRectangle(
     val topY: Int,
     @SerialName("bottom_y")
     val bottomY: Int,
-
-    @Transient
-    val isSelected: Boolean = false,
 )
 
 fun List<CvRectangle>.adjustToClient(

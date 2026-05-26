@@ -38,6 +38,7 @@ fun VideoScreen(
         RectanglesCanvas(
             modifier = Modifier.fillMaxSize(),
             cvRectangles = state.rectangles,
+            selectedRectangles = state.selectedRectangles,
             keyboardButtons = state.keyboardButtons,
         )
 

@@ -93,9 +93,15 @@ class StreamingInteractor @Inject constructor(
     }
 
     init {
-        cvUseCase.observe(coroutineScope).onEach { rectangles ->
+        cvUseCase.observeRectangles(coroutineScope).onEach { rectangles ->
             _stateFlow.update {
                 it.copy(cvRectangles = rectangles)
+            }
+        }.launchIn(coroutineScope)
+
+        cvUseCase.observeSelectedRectangles().onEach { selected ->
+            _stateFlow.update {
+                it.copy(selectedRectangles = selected)
             }
         }.launchIn(coroutineScope)
     }
@@ -285,7 +291,6 @@ class StreamingInteractor @Inject constructor(
     override fun onTextModeClicked() {
         coroutineScope.launch {
             when (menuInteractor.onTextModeClicked()) {
-                TextModeAction.SelectAll -> cvUseCase.selectAll()
                 TextModeAction.DisableSelection -> cvUseCase.disableSelection()
                 TextModeAction.ClearRectangles -> cvUseCase.clearAllRectangles()
                 TextModeAction.None -> Unit

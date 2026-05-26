@@ -90,10 +90,10 @@ class MenuInteractor @Inject constructor() {
             is MenuState.SelectingText -> {
                 val newTextMode = state.selectMode.increment()
                 _menuState.update { state.copy(selectMode = newTextMode) }
-                if (newTextMode != CvSelectMode.NONE) {
-                    TextModeAction.SelectAll
-                } else {
+                if (newTextMode == CvSelectMode.NONE) {
                     TextModeAction.DisableSelection
+                } else {
+                    TextModeAction.None
                 }
             }
 
@@ -251,7 +251,6 @@ data class CvModeAction(
 
 sealed interface TextModeAction {
     data object None : TextModeAction
-    data object SelectAll : TextModeAction
     data object DisableSelection : TextModeAction
     data object ClearRectangles : TextModeAction
 }
