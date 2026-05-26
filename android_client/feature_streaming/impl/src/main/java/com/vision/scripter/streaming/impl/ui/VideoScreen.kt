@@ -8,6 +8,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.vision.scripter.streaming.impl.state.DialogState
 import com.vision.scripter.streaming.impl.state.MenuState
 import com.vision.scripter.streaming.impl.ui.items.KeyboardDialog
 import com.vision.scripter.streaming.impl.ui.items.RecordDialog
@@ -107,25 +108,29 @@ fun VideoScreen(
             }
         }
 
-        if (state.showRecordDialog) {
-            RecordDialog(
-                onSaveRecordName = uiStateHolder::onSavedRecordName,
-                onDismiss = uiStateHolder::onDialogDismissed,
-            )
-        }
+        when (state.dialogState) {
+            DialogState.NONE -> {}
 
-        if (state.showTextDialog) {
-            TextToFindDialog(
-                onTryToFindText = uiStateHolder::onTryToFindText,
-                onDismiss = uiStateHolder::onDialogDismissed,
-            )
-        }
+            DialogState.RECORD -> {
+                RecordDialog(
+                    onSaveRecordName = uiStateHolder::onSavedRecordName,
+                    onDismiss = uiStateHolder::onDialogDismissed,
+                )
+            }
 
-        if (state.showKeyboardDialog) {
-            KeyboardDialog(
-                onSaveLocale = uiStateHolder::onSaveLocale,
-                onDismiss = uiStateHolder::onDialogDismissed,
-            )
+            DialogState.TEXT -> {
+                TextToFindDialog(
+                    onTryToFindText = uiStateHolder::onTryToFindText,
+                    onDismiss = uiStateHolder::onDialogDismissed,
+                )
+            }
+
+            DialogState.KEYBOARD -> {
+                KeyboardDialog(
+                    onSaveLocale = uiStateHolder::onSaveLocale,
+                    onDismiss = uiStateHolder::onDialogDismissed,
+                )
+            }
         }
     }
 }

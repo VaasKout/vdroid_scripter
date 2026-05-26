@@ -7,10 +7,14 @@ import javax.inject.Inject
 
 @ViewModelScoped
 class StreamingUiStateMapper @Inject constructor() {
-    fun map(state: StreamingState): StreamingUiState {
+    fun map(
+        state: StreamingState,
+        menuState: MenuState,
+        dialogState: DialogState,
+    ): StreamingUiState {
         val keyboardButtons = if (
-            state.menuState is MenuState.TypingText ||
-            state.menuState is MenuState.Usual && state.menuState.showKeyboardButtons
+            menuState is MenuState.TypingText ||
+            menuState is MenuState.Usual && menuState.showKeyboardButtons
         ) {
             state.keyboard.buttons
         } else {
@@ -22,10 +26,8 @@ class StreamingUiStateMapper @Inject constructor() {
             hasConnection = !state.streamingHost.isBlank() && state.streamingData != null,
             rectangles = state.cvRectangles,
             keyboardButtons = keyboardButtons,
-            menuState = state.menuState,
-            showTextDialog = state.showTextDialog,
-            showRecordDialog = state.showRecordDialog,
-            showKeyboardDialog = state.showKeyboardDialog,
+            menuState = menuState,
+            dialogState = dialogState,
         )
     }
 }

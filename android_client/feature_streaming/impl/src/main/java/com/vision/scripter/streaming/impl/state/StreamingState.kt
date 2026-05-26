@@ -28,12 +28,8 @@ data class StreamingState(
     val streamingData: StreamingData? = null,
     val cvRectangles: List<CvRectangle> = listOf(),
 
-    val menuState: MenuState = MenuState.Usual(),
     val record: Record = Record(),
     val keyboard: Keyboard = Keyboard(),
-    val showRecordDialog: Boolean = false,
-    val showTextDialog: Boolean = false,
-    val showKeyboardDialog: Boolean = false,
 ) {
     data class Record(
         val recordName: String = "",

@@ -9,7 +9,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
-import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Keyboard
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.rounded.Rectangle
@@ -52,7 +52,7 @@ fun UsualMenu(
                     .customClickable(
                         onClick = onScriptModeClick,
                     ),
-                imageVector = Icons.Filled.Description,
+                imageVector = Icons.Filled.Add,
                 tint = MaterialTheme.colorScheme.onSurface,
                 contentDescription = ""
             )
@@ -122,6 +122,18 @@ fun UsualMenu(
 private fun UsualMenuPreview() {
     UsualMenu(
         menuState = MenuState.Usual(),
+        onScriptModeClick = {},
+        onKeyboardClick = {},
+        onCvModeClick = {},
+        onExpandClick = {},
+    )
+}
+
+@Preview
+@Composable
+private fun UsualExpandedMenuPreview() {
+    UsualMenu(
+        menuState = MenuState.Usual(expanded = true),
         onScriptModeClick = {},
         onKeyboardClick = {},
         onCvModeClick = {},

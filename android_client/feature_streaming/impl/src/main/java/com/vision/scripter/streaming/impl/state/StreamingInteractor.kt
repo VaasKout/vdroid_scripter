@@ -33,8 +33,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.launchIn
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.shareIn
 import kotlinx.coroutines.flow.update
@@ -52,6 +52,7 @@ class StreamingInteractor @Inject constructor(
     private val videoUseCase: VideoUseCase,
     private val controlStreamer: ControlStreamer,
     private val cvUseCase: CvUseCase,
+    private val menuInteractor: MenuInteractor,
 ) : StreamingUiStateHolder {
 
     private val coroutineScope: CoroutineScope =
@@ -64,8 +65,17 @@ class StreamingInteractor @Inject constructor(
         get() = _stateFlow.value
 
     override val uiStateFlow: SharedFlow<StreamingUiState>
-        get() = stateFlow.map(uiStateMapper::map)
-            .shareIn(coroutineScope, SharingStarted.WhileSubscribed(), replay = 1)
+        get() = combine(
+            stateFlow,
+            menuInteractor.observeMenuState(),
+            menuInteractor.observeDialogState(),
+        ) { streamingState, menuState, dialogState ->
+            uiStateMapper.map(
+                state = streamingState,
+                menuState = menuState,
+                dialogState = dialogState,
+            )
+        }.shareIn(coroutineScope, SharingStarted.WhileSubscribed(), replay = 1)
 
     override val uiCommandsFlow: CommandFlow<StreamingUiCommand> = CommandFlow(coroutineScope)
 
@@ -73,6 +83,8 @@ class StreamingInteractor @Inject constructor(
 
     @Volatile
     private var streamJob: Job? = null
+
+    private var startRecordingTime = 0L
 
     override fun initArgs(serial: String) {
         _stateFlow.update {
@@ -178,7 +190,7 @@ class StreamingInteractor @Inject constructor(
         if (event == null) return
         coroutineScope.launch {
             mutex.withLock {
-                val menuState = currentState.menuState
+                val menuState = menuInteractor.observeMenuState().value
                 if (menuState is MenuState.SelectingCV) {
                     cvUseCase.selectRectangle(x = event.x.toInt(), y = event.y.toInt())
                     return@launch
@@ -197,19 +209,7 @@ class StreamingInteractor @Inject constructor(
 
                     if (letter.isEmpty()) return@launch
 
-                    val updatedTypeText = buildString {
-                        append(menuState.typeText)
-                        if (letter == SPACE_KEY) append(" ")
-                        else append(letter)
-                    }
-
-                    _stateFlow.update {
-                        it.copy(
-                            menuState = menuState.copy(
-                                typeText = updatedTypeText
-                            )
-                        )
-                    }
+                    menuInteractor.appendTypedLetter(letter)
                 }
 
                 val screenSizes = videoUseCase.observeScreenSizes().value ?: return@launch
@@ -223,9 +223,8 @@ class StreamingInteractor @Inject constructor(
         }
     }
 
-    var startRecordingTime = 0L
     private fun recordBytes(bytesArray: ByteArray?) {
-        val menuState = currentState.menuState
+        val menuState = menuInteractor.observeMenuState().value
         if (
             bytesArray == null ||
             !(menuState is MenuState.TypingText && menuState.recordingKeyboard ||
@@ -252,182 +251,135 @@ class StreamingInteractor @Inject constructor(
     }
 
     override fun onScriptModeClicked() {
-        coroutineScope.launch {
-            _stateFlow.update {
-                it.copy(
-                    showRecordDialog = true,
-                )
-            }
-        }
+        menuInteractor.onScriptModeClicked()
+    }
+
+    override fun onExpandClicked() {
+        menuInteractor.onExpandClicked()
+    }
+
+    override fun onRecordingClicked() {
+        menuInteractor.onRecordingClicked()
+    }
+
+    override fun onKeyboardClicked() {
+        menuInteractor.onKeyboardClicked()
+    }
+
+    override fun onDialogDismissed() {
+        menuInteractor.onDialogDismissed(currentState.record)
     }
 
     override fun onCvModeClicked() {
         coroutineScope.launch {
-            val menuState = currentState.menuState
-            if (menuState is MenuState.Recording) {
-                _stateFlow.update {
-                    val selectMode = it.record.templateSelectMode.incrementOnlyActive()
-                    it.copy(
-                        menuState = MenuState.SelectingCV(
-                            selectMode = selectMode,
-                        ),
-                    )
-                }
-                cvUseCase.nextCvMode(newCvMode = CVMode.CV_RECTS)
-            }
-
-            if (menuState is MenuState.SelectingCV) {
-                val selectMode = menuState.selectMode.increment()
-                val cvMode = if (selectMode != CvSelectMode.NONE) {
-                    CVMode.CV_RECTS
-                } else {
-                    CVMode.NO_CV
-                }
-                _stateFlow.update {
-                    it.copy(
-                        menuState = menuState.copy(
-                            selectMode = selectMode,
-                        )
-                    )
-                }
-                cvUseCase.nextCvMode(newCvMode = cvMode)
-                if (selectMode == CvSelectMode.NONE) cvUseCase.disableSelection()
-            }
-
-            if (menuState is MenuState.Usual) {
-                val newCVMode = menuState.cvMode.increment()
-                _stateFlow.update {
-                    it.copy(
-                        menuState = menuState.copy(
-                            cvMode = newCVMode,
-                        )
-                    )
-                }
-                cvUseCase.nextCvMode(newCvMode = newCVMode)
+            val action = menuInteractor.onCvModeClicked(
+                templateSelectMode = currentState.record.templateSelectMode,
+            ) ?: return@launch
+            cvUseCase.nextCvMode(action.newCvMode)
+            if (action.disableSelection) {
+                cvUseCase.disableSelection()
             }
         }
     }
 
-    override fun onRecordingClicked() {
+    override fun onTextModeClicked() {
         coroutineScope.launch {
-            val mode = currentState.menuState
-            when {
-                mode is MenuState.Recording -> {
-                    _stateFlow.update {
-                        it.copy(
-                            menuState = mode.copy(
-                                controlRecording = !mode.controlRecording,
-                            )
-                        )
-                    }
-                }
-
-                mode is MenuState.TypingText -> {
-                    _stateFlow.update {
-                        it.copy(
-                            menuState = mode.copy(
-                                recordingKeyboard = !mode.recordingKeyboard,
-                                typeText = "",
-                            )
-                        )
-                    }
-                }
+            when (menuInteractor.onTextModeClicked()) {
+                TextModeAction.SelectAll -> cvUseCase.selectAll()
+                TextModeAction.DisableSelection -> cvUseCase.disableSelection()
+                TextModeAction.None -> Unit
             }
         }
     }
 
-    override fun onExpandClicked() {
-        val menuState = currentState.menuState
-        if (menuState is MenuState.Usual) {
-            _stateFlow.update {
-                it.copy(
-                    menuState = menuState.copy(expanded = !menuState.expanded)
-                )
+    override fun onTryToFindText(text: String, locale: String) {
+        coroutineScope.launch {
+            menuInteractor.onTextSearchStarted()
+
+            val screenSizes = videoUseCase.observeScreenSizes().value ?: return@launch
+            val trimmed = text.trim()
+            val found = cvUseCase.findTextRectangles(
+                serial = currentState.serial,
+                text = trimmed,
+                locale = locale,
+                screenSizes = screenSizes,
+            )
+
+            if (!found) {
+                uiCommandsFlow.tryEmit(StreamingUiCommand.ShowNetworkError)
+                return@launch
             }
+            menuInteractor.onTextSearchSuccess(trimmed)
         }
     }
 
     override fun onSaveClicked() {
         coroutineScope.launch {
-            val menuState = currentState.menuState
-            if (menuState is MenuState.SelectingCV) {
-                _stateFlow.update {
-                    it.copy(
-                        menuState = MenuState.Recording(
-                            templateSelectMode = menuState.selectMode,
-                        ),
-                        record = it.record.copy(
-                            templateSelectMode = menuState.selectMode,
-                        )
+            when (val action = menuInteractor.onSaveClicked()) {
+                is SaveAction.SaveTemplate -> {
+                    _stateFlow.update {
+                        it.copy(record = it.record.copy(templateSelectMode = action.selectMode))
+                    }
+                    val screenSizes = videoUseCase.observeScreenSizes().value ?: return@launch
+                    cvUseCase.saveSelectedRectangle(
+                        serial = currentState.serial,
+                        screenSizes = screenSizes,
                     )
+                    cvUseCase.nextCvMode(CVMode.NO_CV)
                 }
-                val screenSizes = videoUseCase.observeScreenSizes().value ?: return@launch
-                cvUseCase.saveSelectedRectangle(
-                    serial = currentState.serial,
-                    screenSizes = screenSizes,
-                )
-                cvUseCase.nextCvMode(CVMode.NO_CV)
-                return@launch
-            }
 
-            if (menuState is MenuState.SelectingText) {
-                _stateFlow.update {
-                    it.copy(
-                        menuState = MenuState.Recording(
-                            textSelectMode = menuState.selectMode,
-                        ),
-                        record = it.record.copy(
-                            text = menuState.text,
-                            textSelectMode = menuState.selectMode,
+                is SaveAction.SaveTextSelection -> {
+                    _stateFlow.update {
+                        it.copy(
+                            record = it.record.copy(
+                                text = action.text,
+                                textSelectMode = action.selectMode,
+                            )
                         )
-                    )
+                    }
+                    cvUseCase.nextCvMode(CVMode.NO_CV)
                 }
-                cvUseCase.nextCvMode(CVMode.NO_CV)
-                return@launch
-            }
 
-            if (menuState is MenuState.TypingText) {
-                _stateFlow.update {
-                    val pressEvent = it.record.stepEvents.extractPressEvent()
-
-                    it.copy(
-                        menuState = MenuState.Recording(
-                            typeText = menuState.typeText.isNotEmpty(),
-                        ),
-                        record = it.record.copy(
-                            text = menuState.typeText,
-                            typeText = menuState.typeText.isNotEmpty(),
-                            stepEvents = pressEvent,
+                is SaveAction.SaveTyping -> {
+                    val pressEvent = currentState.record.stepEvents.extractPressEvent()
+                    _stateFlow.update {
+                        it.copy(
+                            record = it.record.copy(
+                                text = action.text,
+                                typeText = action.text.isNotEmpty(),
+                                stepEvents = pressEvent,
+                            )
                         )
-                    )
+                    }
+                    cvUseCase.nextCvMode(CVMode.NO_CV)
                 }
-                cvUseCase.nextCvMode(CVMode.NO_CV)
-                return@launch
-            }
 
-            val record = currentState.record
-            val success = scripterRepository.saveScriptStep(
-                serial = currentState.serial,
-                name = record.recordName,
-                step = ScriptStep(
-                    events = record.stepEvents,
-                    flags = getFlags(),
-                    text = record.text,
-                    locale = record.locale,
-                ),
-            )
-
-            if (!success) return@launch
-            uiCommandsFlow.tryEmit(StreamingUiCommand.ShowStepSavedSnackbar)
-            startRecordingTime = 0L
-            cvUseCase.nextCvMode(CVMode.NO_CV)
-            cvUseCase.clearAllRectangles()
-            _stateFlow.update {
-                it.copy(
-                    menuState = MenuState.Recording(),
-                    record = it.record.clearStep(),
-                )
+                SaveAction.SaveStep -> saveStep()
             }
+        }
+    }
+
+    private suspend fun saveStep() {
+        val record = currentState.record
+        val success = scripterRepository.saveScriptStep(
+            serial = currentState.serial,
+            name = record.recordName,
+            step = ScriptStep(
+                events = record.stepEvents,
+                flags = getFlags(),
+                text = record.text,
+                locale = record.locale,
+            ),
+        )
+        if (!success) return
+
+        uiCommandsFlow.tryEmit(StreamingUiCommand.ShowStepSavedSnackbar)
+        startRecordingTime = 0L
+        cvUseCase.nextCvMode(CVMode.NO_CV)
+        cvUseCase.clearAllRectangles()
+        menuInteractor.onStepSaved()
+        _stateFlow.update {
+            it.copy(record = it.record.clearStep())
         }
     }
 
@@ -443,28 +395,8 @@ class StreamingInteractor @Inject constructor(
 
     override fun onCancelClicked() {
         coroutineScope.launch {
-            val menuState = currentState.menuState
-            if (menuState is MenuState.Recording) {
-                cvUseCase.clearAllRectangles()
-                _stateFlow.update {
-                    it.copy(
-                        menuState = MenuState.Usual(
-                            expanded = true,
-                        )
-                    )
-                }
-            } else {
-                _stateFlow.update {
-                    it.copy(
-                        menuState = MenuState.Recording(
-                            templateSelectMode = it.record.templateSelectMode,
-                            textSelectMode = it.record.textSelectMode,
-                            typeText = it.record.typeText,
-                        )
-                    )
-                }
-            }
-
+            val wasRecording = menuInteractor.onCancelClicked(currentState.record)
+            if (wasRecording) cvUseCase.clearAllRectangles()
             cvUseCase.nextCvMode(CVMode.NO_CV)
         }
     }
@@ -472,12 +404,9 @@ class StreamingInteractor @Inject constructor(
     override fun onSavedRecordName(name: String) {
         coroutineScope.launch {
             _stateFlow.update {
-                it.copy(
-                    record = it.record.copy(recordName = name),
-                    showRecordDialog = false,
-                    menuState = MenuState.Recording(),
-                )
+                it.copy(record = it.record.copy(recordName = name))
             }
+            menuInteractor.onSavedRecordName()
             cvUseCase.nextCvMode(CVMode.NO_CV)
         }
     }
@@ -485,149 +414,16 @@ class StreamingInteractor @Inject constructor(
     override fun onSaveLocale(locale: String) {
         coroutineScope.launch {
             _stateFlow.update {
-                val updatedMenuState = when (it.menuState) {
-                    is MenuState.Recording -> MenuState.TypingText()
-                    is MenuState.Usual -> it.menuState.copy(keyboardLoading = true)
-                    else -> it.menuState
-                }
-                it.copy(
-                    record = it.record.copy(locale = locale),
-                    showKeyboardDialog = false,
-                    menuState = updatedMenuState,
-                )
+                it.copy(record = it.record.copy(locale = locale))
             }
-
+            menuInteractor.onSaveLocale()
             getOrResetKeyboard()
-        }
-    }
-
-    override fun onDialogDismissed() {
-        val menuState = currentState.menuState
-        _stateFlow.update {
-            it.copy(
-                showRecordDialog = false,
-                showTextDialog = false,
-                showKeyboardDialog = false,
-            )
-        }
-
-        if (menuState is MenuState.Recording) {
-            _stateFlow.update {
-                it.copy(
-                    menuState = MenuState.Recording(
-                        templateSelectMode = it.record.templateSelectMode,
-                        textSelectMode = it.record.textSelectMode,
-                        typeText = it.record.typeText,
-                    ),
-                )
-            }
-        }
-    }
-
-    override fun onTextModeClicked() {
-        coroutineScope.launch {
-            val menuState = currentState.menuState
-            if (menuState is MenuState.Recording) {
-                _stateFlow.update {
-                    it.copy(showTextDialog = true)
-                }
-                return@launch
-            }
-
-            if (menuState is MenuState.SelectingText) {
-                val newTextMode = menuState.selectMode.increment()
-                _stateFlow.update {
-                    it.copy(
-                        menuState = menuState.copy(
-                            selectMode = newTextMode,
-                        )
-                    )
-                }
-                if (newTextMode != CvSelectMode.NONE) {
-                    cvUseCase.selectAll()
-                    return@launch
-                }
-                cvUseCase.disableSelection()
-            }
-        }
-    }
-
-    override fun onTryToFindText(text: String, locale: String) {
-        coroutineScope.launch {
-            _stateFlow.update {
-                it.copy(
-                    showTextDialog = false,
-                )
-            }
-
-            val screenSizes = videoUseCase.observeScreenSizes().value ?: return@launch
-            val found = cvUseCase.findTextRectangles(
-                serial = currentState.serial,
-                text = text.trim(),
-                locale = locale,
-                screenSizes = screenSizes,
-            )
-
-            if (!found) {
-                uiCommandsFlow.tryEmit(StreamingUiCommand.ShowNetworkError)
-                return@launch
-            }
-
-            val menuState = currentState.menuState
-            if (menuState is MenuState.Recording) {
-                _stateFlow.update {
-                    it.copy(
-                        menuState = MenuState.SelectingText(
-                            selectMode = menuState.textSelectMode.increment(),
-                            text = text.trim(),
-                        )
-                    )
-                }
-            }
-        }
-    }
-
-    override fun onKeyboardClicked() {
-        coroutineScope.launch {
-            val menuState = currentState.menuState
-            if (menuState is MenuState.Usual && menuState.showKeyboardButtons) {
-                _stateFlow.update {
-                    it.copy(
-                        menuState = menuState.copy(
-                            showKeyboardButtons = false,
-                            keyboardLoading = false,
-                        )
-                    )
-                }
-                return@launch
-            }
-            _stateFlow.update {
-                it.copy(
-                    showKeyboardDialog = true,
-                )
-            }
         }
     }
 
     override fun onKeyboardInitClicked() {
         coroutineScope.launch {
-            val menuState = currentState.menuState
-            val updatedMenuState = when (menuState) {
-                is MenuState.Usual -> {
-                    menuState.copy(keyboardLoading = true)
-                }
-
-                is MenuState.TypingText -> {
-                    menuState.copy(isLoadingKeyboard = true)
-                }
-
-                else -> menuState
-            }
-            _stateFlow.update {
-                it.copy(
-                    menuState = updatedMenuState,
-                )
-            }
+            menuInteractor.onKeyboardInitStarted()
 
             val result = scripterRepository.resetKeyboard(
                 serial = currentState.serial,
@@ -668,50 +464,14 @@ class StreamingInteractor @Inject constructor(
             it.copy(rectangle = rectangle.adjustToClient(screenSizes))
         }
 
-        val menuState = currentState.menuState
-        val updatedMenuState = when (menuState) {
-            is MenuState.Usual -> {
-                menuState.copy(
-                    keyboardLoading = false,
-                    showKeyboardButtons = buttons.isNotEmpty()
-                )
-            }
-
-            is MenuState.TypingText -> {
-                menuState.copy(isLoadingKeyboard = false)
-            }
-
-            else -> menuState
-        }
-
         _stateFlow.update {
-            it.copy(
-                keyboard = it.keyboard.copy(buttons = buttons),
-                menuState = updatedMenuState,
-            )
+            it.copy(keyboard = it.keyboard.copy(buttons = buttons))
         }
+        menuInteractor.onKeyboardLoaded(hasButtons = buttons.isNotEmpty())
     }
 
     private fun showKeyboardError() {
-        val menuState = currentState.menuState
-        val updatedMenuState = when (menuState) {
-            is MenuState.Usual -> {
-                menuState.copy(keyboardLoading = false)
-            }
-
-            is MenuState.TypingText -> {
-                menuState.copy(isLoadingKeyboard = false)
-            }
-
-            else -> menuState
-        }
-
-        _stateFlow.update {
-            it.copy(
-                menuState = updatedMenuState,
-            )
-        }
-
+        menuInteractor.onKeyboardError()
         uiCommandsFlow.tryEmit(StreamingUiCommand.ShowNetworkError)
     }
 
