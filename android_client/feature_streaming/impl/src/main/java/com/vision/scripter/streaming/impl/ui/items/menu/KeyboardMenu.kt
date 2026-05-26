@@ -26,7 +26,7 @@ import com.vision.scripter.ui.customClickable
 @Composable
 fun KeyboardMenu(
     modifier: Modifier = Modifier,
-    menuState: MenuState.TypingText,
+    menuState: MenuState.Keyboard,
     onKeyboardRecordingClick: () -> Unit,
     onKeyboardInitClick: () -> Unit,
     onSaveClick: () -> Unit,
@@ -47,18 +47,20 @@ fun KeyboardMenu(
             return
         }
 
-        Icon(
-            modifier = Modifier
-                .size(32.dp)
-                .customClickable(
-                    onClick = onKeyboardRecordingClick,
-                ),
-            imageVector = Icons.Filled.RadioButtonChecked,
-            tint =
-                if (menuState.recordingKeyboard) Color.Red
-                else MaterialTheme.colorScheme.onSurface,
-            contentDescription = ""
-        )
+        if (!menuState.fromUsual) {
+            Icon(
+                modifier = Modifier
+                    .size(32.dp)
+                    .customClickable(
+                        onClick = onKeyboardRecordingClick,
+                    ),
+                imageVector = Icons.Filled.RadioButtonChecked,
+                tint =
+                    if (menuState.recordingKeyboard) Color.Red
+                    else MaterialTheme.colorScheme.onSurface,
+                contentDescription = "",
+            )
+        }
 
         Icon(
             modifier = Modifier
@@ -78,14 +80,16 @@ fun KeyboardMenu(
             contentDescription = ""
         )
 
-        Icon(
-            modifier = Modifier
-                .size(32.dp)
-                .customClickable(onClick = onSaveClick),
-            imageVector = Icons.Filled.Check,
-            tint = Color.Green,
-            contentDescription = ""
-        )
+        if (!menuState.fromUsual) {
+            Icon(
+                modifier = Modifier
+                    .size(32.dp)
+                    .customClickable(onClick = onSaveClick),
+                imageVector = Icons.Filled.Check,
+                tint = Color.Green,
+                contentDescription = "",
+            )
+        }
     }
 }
 
@@ -93,7 +97,22 @@ fun KeyboardMenu(
 @Composable
 private fun KeyboardMenuDefaultPreview() {
     KeyboardMenu(
-        menuState = MenuState.TypingText(isLoadingKeyboard = false),
+        menuState = MenuState.Keyboard(isLoadingKeyboard = false),
+        onKeyboardRecordingClick = {},
+        onKeyboardInitClick = {},
+        onSaveClick = {},
+        onCancelClick = {},
+    )
+}
+
+@Preview
+@Composable
+private fun KeyboardMenuFromUsualPreview() {
+    KeyboardMenu(
+        menuState = MenuState.Keyboard(
+            isLoadingKeyboard = false,
+            fromUsual = true,
+        ),
         onKeyboardRecordingClick = {},
         onKeyboardInitClick = {},
         onSaveClick = {},

@@ -51,8 +51,7 @@ data class StreamingState(
 sealed interface MenuState {
     data class Usual(
         val cvMode: CVMode = CVMode.NO_CV,
-        val keyboardLoading: Boolean = false,
-        val showKeyboardButtons: Boolean = false,
+        val textHighlighted: Boolean = false,
         val expanded: Boolean = false,
     ) : MenuState
 
@@ -72,10 +71,11 @@ sealed interface MenuState {
         val text: String = "",
     ) : MenuState
 
-    data class TypingText(
+    data class Keyboard(
         val isLoadingKeyboard: Boolean = true,
         val recordingKeyboard: Boolean = false,
         val typeText: String = "",
+        val fromUsual: Boolean = false,
     ) : MenuState
 }
 

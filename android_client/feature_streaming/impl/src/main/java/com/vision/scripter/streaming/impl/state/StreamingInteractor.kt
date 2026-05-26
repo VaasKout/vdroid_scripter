@@ -197,7 +197,7 @@ class StreamingInteractor @Inject constructor(
                 }
 
                 if (
-                    menuState is MenuState.TypingText &&
+                    menuState is MenuState.Keyboard &&
                     menuState.recordingKeyboard &&
                     event.x > 0 &&
                     event.y > 0 &&
@@ -227,7 +227,7 @@ class StreamingInteractor @Inject constructor(
         val menuState = menuInteractor.observeMenuState().value
         if (
             bytesArray == null ||
-            !(menuState is MenuState.TypingText && menuState.recordingKeyboard ||
+            !(menuState is MenuState.Keyboard && menuState.recordingKeyboard ||
                     menuState is MenuState.Recording && menuState.controlRecording)
         ) return
 
@@ -287,6 +287,7 @@ class StreamingInteractor @Inject constructor(
             when (menuInteractor.onTextModeClicked()) {
                 TextModeAction.SelectAll -> cvUseCase.selectAll()
                 TextModeAction.DisableSelection -> cvUseCase.disableSelection()
+                TextModeAction.ClearRectangles -> cvUseCase.clearAllRectangles()
                 TextModeAction.None -> Unit
             }
         }
@@ -467,7 +468,7 @@ class StreamingInteractor @Inject constructor(
         _stateFlow.update {
             it.copy(keyboard = it.keyboard.copy(buttons = buttons))
         }
-        menuInteractor.onKeyboardLoaded(hasButtons = buttons.isNotEmpty())
+        menuInteractor.onKeyboardLoaded()
     }
 
     private fun showKeyboardError() {

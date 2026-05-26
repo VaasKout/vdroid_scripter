@@ -9,11 +9,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Keyboard
 import androidx.compose.material.icons.filled.RadioButtonChecked
-import androidx.compose.material.icons.filled.TextFields
-import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
@@ -60,47 +56,13 @@ fun ScriptMenu(
             contentDescription = ""
         )
 
-        Icon(
-            modifier = Modifier
-                .size(32.dp)
-                .customClickable(onClick = onCvModeClick),
-            imageVector = when (menuState.templateSelectMode) {
-                CvSelectMode.VISIBLE,
-                CvSelectMode.APPLY_EVENT -> Icons.Filled.Visibility
-
-                else -> Icons.Filled.VisibilityOff
-            },
-            tint = when (menuState.templateSelectMode) {
-                CvSelectMode.VISIBLE -> Color.Blue
-                CvSelectMode.APPLY_EVENT -> Color.Red
-                else -> MaterialTheme.colorScheme.onSurface
-            },
-            contentDescription = ""
-        )
-
-        Icon(
-            modifier = Modifier
-                .size(32.dp)
-                .customClickable(onClick = onTextModeClick),
-            imageVector = Icons.Filled.TextFields,
-            tint = when (menuState.textSelectMode) {
-                CvSelectMode.VISIBLE -> Color.Blue
-                CvSelectMode.APPLY_EVENT -> Color.Red
-                else -> MaterialTheme.colorScheme.onSurface
-            },
-            contentDescription = ""
-        )
-
-        Icon(
-            modifier = Modifier
-                .size(32.dp)
-                .customClickable(onClick = onKeyboardClick),
-            imageVector = Icons.Filled.Keyboard,
-            tint = when {
-                menuState.typeText -> Color.Red
-                else -> MaterialTheme.colorScheme.onSurface
-            },
-            contentDescription = ""
+        BaseMenuIcons(
+            visibilitySelectMode = menuState.templateSelectMode,
+            textSelectMode = menuState.textSelectMode,
+            keyboardHighlighted = menuState.typeText,
+            onCvModeClick = onCvModeClick,
+            onTextClick = onTextModeClick,
+            onKeyboardClick = onKeyboardClick,
         )
 
         Icon(

@@ -10,10 +10,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Keyboard
-import androidx.compose.material.icons.filled.VisibilityOff
-import androidx.compose.material.icons.rounded.Rectangle
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
@@ -23,6 +19,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.vision.scripter.streaming.impl.state.CVMode
+import com.vision.scripter.streaming.impl.state.CvSelectMode
 import com.vision.scripter.streaming.impl.state.MenuState
 import com.vision.scripter.ui.customClickable
 
@@ -33,6 +30,7 @@ fun UsualMenu(
     onScriptModeClick: () -> Unit,
     onKeyboardClick: () -> Unit,
     onCvModeClick: () -> Unit,
+    onTextModeClick: () -> Unit,
     onExpandClick: () -> Unit,
 ) {
     if (menuState.expanded) {
@@ -57,34 +55,17 @@ fun UsualMenu(
                 contentDescription = ""
             )
 
-            if (menuState.keyboardLoading) {
-                CircularProgressIndicator()
-            } else {
-                Icon(
-                    modifier = Modifier
-                        .size(32.dp)
-                        .customClickable(onClick = onKeyboardClick),
-                    imageVector = Icons.Filled.Keyboard,
-                    tint = if (menuState.showKeyboardButtons) Color.Red
-                    else MaterialTheme.colorScheme.onSurface,
-                    contentDescription = ""
-                )
-            }
-
-            Icon(
-                modifier = Modifier
-                    .size(32.dp)
-                    .customClickable(
-                        onClick = onCvModeClick,
-                    ),
-                imageVector = when (menuState.cvMode) {
-                    CVMode.NO_CV -> Icons.Filled.VisibilityOff
-                    CVMode.CV_RECTS -> Icons.Rounded.Rectangle
+            BaseMenuIcons(
+                visibilitySelectMode = menuState.cvMode.toSelectMode(),
+                onCvModeClick = onCvModeClick,
+                textSelectMode = if (menuState.textHighlighted) {
+                    CvSelectMode.APPLY_EVENT
+                } else {
+                    CvSelectMode.NONE
                 },
-                tint =
-                    if (menuState.cvMode == CVMode.NO_CV) MaterialTheme.colorScheme.onSurface
-                    else Color.Red,
-                contentDescription = ""
+                onTextClick = onTextModeClick,
+                keyboardHighlighted = false,
+                onKeyboardClick = onKeyboardClick,
             )
 
             Icon(
@@ -116,6 +97,10 @@ fun UsualMenu(
     )
 }
 
+private fun CVMode.toSelectMode(): CvSelectMode = when (this) {
+    CVMode.NO_CV -> CvSelectMode.NONE
+    CVMode.CV_RECTS -> CvSelectMode.APPLY_EVENT
+}
 
 @Preview
 @Composable
@@ -125,6 +110,7 @@ private fun UsualMenuPreview() {
         onScriptModeClick = {},
         onKeyboardClick = {},
         onCvModeClick = {},
+        onTextModeClick = {},
         onExpandClick = {},
     )
 }
@@ -137,6 +123,24 @@ private fun UsualExpandedMenuPreview() {
         onScriptModeClick = {},
         onKeyboardClick = {},
         onCvModeClick = {},
+        onTextModeClick = {},
+        onExpandClick = {},
+    )
+}
+
+@Preview
+@Composable
+private fun UsualExpandedHighlightedTextPreview() {
+    UsualMenu(
+        menuState = MenuState.Usual(
+            expanded = true,
+            textHighlighted = true,
+            cvMode = CVMode.CV_RECTS,
+        ),
+        onScriptModeClick = {},
+        onKeyboardClick = {},
+        onCvModeClick = {},
+        onTextModeClick = {},
         onExpandClick = {},
     )
 }

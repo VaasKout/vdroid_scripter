@@ -51,6 +51,7 @@ fun VideoScreen(
                     onScriptModeClick = uiStateHolder::onScriptModeClicked,
                     onKeyboardClick = uiStateHolder::onKeyboardClicked,
                     onCvModeClick = uiStateHolder::onCvModeClicked,
+                    onTextModeClick = uiStateHolder::onTextModeClicked,
                     onExpandClick = uiStateHolder::onExpandClicked,
                 )
             }
@@ -94,7 +95,7 @@ fun VideoScreen(
                 )
             }
 
-            is MenuState.TypingText -> {
+            is MenuState.Keyboard -> {
                 KeyboardMenu(
                     modifier = Modifier
                         .align(Alignment.TopEnd)

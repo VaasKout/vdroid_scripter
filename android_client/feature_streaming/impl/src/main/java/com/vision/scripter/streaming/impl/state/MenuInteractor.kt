@@ -33,7 +33,7 @@ class MenuInteractor @Inject constructor() {
                 state.copy(controlRecording = !state.controlRecording)
             }
 
-            is MenuState.TypingText -> _menuState.update {
+            is MenuState.Keyboard -> _menuState.update {
                 state.copy(
                     recordingKeyboard = !state.recordingKeyboard,
                     typeText = "",
@@ -45,16 +45,6 @@ class MenuInteractor @Inject constructor() {
     }
 
     fun onKeyboardClicked() {
-        val state = _menuState.value
-        if (state is MenuState.Usual && state.showKeyboardButtons) {
-            _menuState.update {
-                state.copy(
-                    showKeyboardButtons = false,
-                    keyboardLoading = false,
-                )
-            }
-            return
-        }
         _dialogState.update { DialogState.KEYBOARD }
     }
 
@@ -107,6 +97,15 @@ class MenuInteractor @Inject constructor() {
                 }
             }
 
+            is MenuState.Usual -> {
+                if (state.textHighlighted) {
+                    _menuState.update { state.copy(textHighlighted = false) }
+                    return TextModeAction.ClearRectangles
+                }
+                _dialogState.update { DialogState.TEXT }
+                TextModeAction.None
+            }
+
             else -> TextModeAction.None
         }
     }
@@ -116,14 +115,22 @@ class MenuInteractor @Inject constructor() {
     }
 
     fun onTextSearchSuccess(text: String) {
-        val state = _menuState.value
-        if (state is MenuState.Recording) {
-            _menuState.update {
+        when (val state = _menuState.value) {
+            is MenuState.Recording -> _menuState.update {
                 MenuState.SelectingText(
                     selectMode = state.textSelectMode.increment(),
                     text = text,
                 )
             }
+
+            is MenuState.Usual -> _menuState.update {
+                state.copy(
+                    textHighlighted = true,
+                    cvMode = CVMode.NO_CV,
+                )
+            }
+
+            else -> Unit
         }
     }
 
@@ -142,7 +149,7 @@ class MenuInteractor @Inject constructor() {
                 )
             }
 
-            is MenuState.TypingText -> {
+            is MenuState.Keyboard -> {
                 _menuState.update { MenuState.Recording(typeText = state.typeText.isNotEmpty()) }
                 SaveAction.SaveTyping(text = state.typeText)
             }
@@ -156,8 +163,12 @@ class MenuInteractor @Inject constructor() {
     }
 
     fun onCancelClicked(record: StreamingState.Record): Boolean {
-        val wasRecording = _menuState.value is MenuState.Recording
-        if (wasRecording) {
+        val state = _menuState.value
+        val wasRecording = state is MenuState.Recording
+        val backToUsual = wasRecording ||
+                (state is MenuState.Keyboard && state.fromUsual)
+
+        if (backToUsual) {
             _menuState.update { MenuState.Usual(expanded = true) }
         } else {
             _menuState.update {
@@ -179,8 +190,8 @@ class MenuInteractor @Inject constructor() {
     fun onSaveLocale() {
         _dialogState.update { DialogState.NONE }
         val updated = when (val state = _menuState.value) {
-            is MenuState.Recording -> MenuState.TypingText()
-            is MenuState.Usual -> state.copy(keyboardLoading = true)
+            is MenuState.Recording -> MenuState.Keyboard()
+            is MenuState.Usual -> MenuState.Keyboard(fromUsual = true)
             else -> state
         }
         _menuState.update { updated }
@@ -201,39 +212,29 @@ class MenuInteractor @Inject constructor() {
     }
 
     fun onKeyboardInitStarted() {
-        val updated = when (val state = _menuState.value) {
-            is MenuState.Usual -> state.copy(keyboardLoading = true)
-            is MenuState.TypingText -> state.copy(isLoadingKeyboard = true)
-            else -> state
+        val state = _menuState.value
+        if (state is MenuState.Keyboard) {
+            _menuState.update { state.copy(isLoadingKeyboard = true) }
         }
-        _menuState.update { updated }
     }
 
-    fun onKeyboardLoaded(hasButtons: Boolean) {
-        val updated = when (val state = _menuState.value) {
-            is MenuState.Usual -> state.copy(
-                keyboardLoading = false,
-                showKeyboardButtons = hasButtons,
-            )
-
-            is MenuState.TypingText -> state.copy(isLoadingKeyboard = false)
-            else -> state
+    fun onKeyboardLoaded() {
+        val state = _menuState.value
+        if (state is MenuState.Keyboard) {
+            _menuState.update { state.copy(isLoadingKeyboard = false) }
         }
-        _menuState.update { updated }
     }
 
     fun onKeyboardError() {
-        val updated = when (val state = _menuState.value) {
-            is MenuState.Usual -> state.copy(keyboardLoading = false)
-            is MenuState.TypingText -> state.copy(isLoadingKeyboard = false)
-            else -> state
+        val state = _menuState.value
+        if (state is MenuState.Keyboard) {
+            _menuState.update { state.copy(isLoadingKeyboard = false) }
         }
-        _menuState.update { updated }
     }
 
     fun appendTypedLetter(letter: String) {
         val state = _menuState.value
-        if (state !is MenuState.TypingText) return
+        if (state !is MenuState.Keyboard) return
         val updatedTypeText = buildString {
             append(state.typeText)
             if (letter == SPACE_KEY) append(" ")
@@ -252,6 +253,7 @@ sealed interface TextModeAction {
     data object None : TextModeAction
     data object SelectAll : TextModeAction
     data object DisableSelection : TextModeAction
+    data object ClearRectangles : TextModeAction
 }
 
 sealed interface SaveAction {
