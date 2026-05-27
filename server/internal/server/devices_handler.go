@@ -1,6 +1,7 @@
 package server
 
 import (
+	"android_vision_scripter/pkg/models"
 	"encoding/json"
 	"net/http"
 )
@@ -34,7 +35,7 @@ func (s *serverImpl) handleDeviceFunctions() {
 func (s *serverImpl) handleDeviceList(w http.ResponseWriter) {
 	var allDevices = s.interactor.GetDevices()
 	var response = map[string]any{
-		"devices": "[]",
+		"devices": []models.AdbDevice{},
 	}
 	if len(allDevices) > 0 {
 		response["devices"] = allDevices
