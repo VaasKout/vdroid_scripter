@@ -21,7 +21,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.vision.scripter.streaming.impl.R
-import com.vision.scripter.streaming.impl.state.locales
+import com.vision.scripter.streaming.impl.state.keyboardLocales
 import com.vision.scripter.ui.SimpleDropdownMenu
 import com.vision.scripter.ui.R as CoreR
 
@@ -31,7 +31,7 @@ fun KeyboardDialog(
     onSaveLocale: (String) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    var selectedLocale by remember { mutableStateOf(locales.first()) }
+    var selectedLocale by remember { mutableStateOf(keyboardLocales.first()) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -48,7 +48,7 @@ fun KeyboardDialog(
         },
         text = {
             SimpleDropdownMenu(
-                options = locales,
+                options = keyboardLocales,
                 onSelect = {
                     selectedLocale = it
                 }

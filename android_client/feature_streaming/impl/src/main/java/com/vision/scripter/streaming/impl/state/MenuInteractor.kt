@@ -110,12 +110,13 @@ class MenuInteractor @Inject constructor() {
         }
     }
 
-    fun onTextSearchSuccess(text: String) {
+    fun onTextSearchSuccess(text: String, locale: String) {
         when (val state = _menuState.value) {
             is MenuState.Recording -> _menuState.update {
                 MenuState.SelectingText(
                     selectMode = state.textSelectMode.increment(),
                     text = text,
+                    locale = locale,
                 )
             }
 
@@ -141,6 +142,7 @@ class MenuInteractor @Inject constructor() {
                 _menuState.update { MenuState.Recording(textSelectMode = state.selectMode) }
                 SaveAction.SaveTextSelection(
                     text = state.text,
+                    locale = state.locale,
                     selectMode = state.selectMode,
                 )
             }
@@ -270,7 +272,12 @@ sealed interface TextModeAction {
 
 sealed interface SaveAction {
     data class SaveTemplate(val selectMode: CvSelectMode) : SaveAction
-    data class SaveTextSelection(val text: String, val selectMode: CvSelectMode) : SaveAction
+    data class SaveTextSelection(
+        val text: String,
+        val locale: String,
+        val selectMode: CvSelectMode,
+    ) : SaveAction
+
     data class SaveTyping(val text: String) : SaveAction
     data object SaveStep : SaveAction
 }

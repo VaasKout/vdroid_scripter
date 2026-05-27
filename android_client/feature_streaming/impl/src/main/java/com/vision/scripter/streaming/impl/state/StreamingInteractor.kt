@@ -315,7 +315,7 @@ class StreamingInteractor @Inject constructor(
 
     override fun onDialogDismissed() {
         if (menuInteractor.observeMenuState().value is MenuState.Keyboard) {
-            cvUseCase.disableSelection()
+            cvUseCase.clearSelectedRectangles()
         }
         menuInteractor.onDialogDismissed(currentState.record)
     }
@@ -327,7 +327,7 @@ class StreamingInteractor @Inject constructor(
             ) ?: return@launch
             cvUseCase.nextCvMode(action.newCvMode)
             if (action.disableSelection) {
-                cvUseCase.disableSelection()
+                cvUseCase.clearSelectedRectangles()
             }
         }
     }
@@ -335,7 +335,7 @@ class StreamingInteractor @Inject constructor(
     override fun onTextModeClicked() {
         coroutineScope.launch {
             when (menuInteractor.onTextModeClicked()) {
-                TextModeAction.DisableSelection -> cvUseCase.disableSelection()
+                TextModeAction.DisableSelection -> cvUseCase.clearSelectedRectangles()
                 TextModeAction.ClearRectangles -> cvUseCase.clearAllRectangles()
                 TextModeAction.None -> Unit
             }
@@ -359,7 +359,7 @@ class StreamingInteractor @Inject constructor(
                 uiCommandsFlow.tryEmit(StreamingUiCommand.ShowNetworkError)
                 return@launch
             }
-            menuInteractor.onTextSearchSuccess(trimmed)
+            menuInteractor.onTextSearchSuccess(text = trimmed, locale = locale)
         }
     }
 
@@ -383,6 +383,7 @@ class StreamingInteractor @Inject constructor(
                         it.copy(
                             record = it.record.copy(
                                 text = action.text,
+                                locale = action.locale,
                                 textSelectMode = action.selectMode,
                             )
                         )
@@ -446,7 +447,11 @@ class StreamingInteractor @Inject constructor(
     override fun onCancelClicked() {
         coroutineScope.launch {
             val wasRecording = menuInteractor.onCancelClicked(currentState.record)
-            if (wasRecording) cvUseCase.clearAllRectangles()
+
+            if (wasRecording) {
+                cvUseCase.clearSelectedRectangles()
+                _stateFlow.update { it.copy(record = StreamingState.Record()) }
+            }
             cvUseCase.nextCvMode(CVMode.NO_CV)
         }
     }
@@ -491,13 +496,13 @@ class StreamingInteractor @Inject constructor(
             val transition = menuInteractor.onKeyboardEdited(addNew)
             when (transition) {
                 KeyboardEditTransition.ShowCvRectangles -> {
-                    cvUseCase.disableSelection()
+                    cvUseCase.clearSelectedRectangles()
                     cvUseCase.nextCvMode(CVMode.CV_RECTS)
                 }
 
                 KeyboardEditTransition.ShowKeyboardButtons -> {
                     cvUseCase.nextCvMode(CVMode.NO_CV)
-                    cvUseCase.disableSelection()
+                    cvUseCase.clearSelectedRectangles()
                 }
 
                 KeyboardEditTransition.None -> Unit
@@ -518,7 +523,7 @@ class StreamingInteractor @Inject constructor(
                 screenSizes = screenSizes,
             )
             menuInteractor.hideDialog()
-            cvUseCase.disableSelection()
+            cvUseCase.clearSelectedRectangles()
             if (success) {
                 menuInteractor.setKeyboardLoadingState(true)
                 getOrResetKeyboard()

@@ -24,6 +24,7 @@ const (
 
 var keyboardSizeMap = map[string]int{
 	Numbers: 10,
+	Phone:   10,
 	"eng":   26,
 	"rus":   32,
 }

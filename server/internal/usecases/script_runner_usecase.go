@@ -4,6 +4,7 @@ import (
 	"android_vision_scripter/internal/cv"
 	"android_vision_scripter/internal/filesdb"
 	"android_vision_scripter/pkg/core/file"
+	"android_vision_scripter/pkg/core/numutils"
 	"android_vision_scripter/pkg/core/strutils"
 	"android_vision_scripter/pkg/models"
 	"errors"
@@ -17,7 +18,7 @@ import (
 
 // Attempts to find template zone or text
 const (
-	Attempts = 3
+	Attempts = 15
 )
 
 func (i *interactorImpl) RunScript(serial string, scriptName string, basePort int) error {
@@ -186,10 +187,9 @@ func (i *interactorImpl) playEventOnText(
 	if tesseractDir == "" {
 		return fmt.Errorf("tesseract dir was not found")
 	}
-	var device = i.GetDevice(serial)
 	var ocrParams = cv.InitOcrParams(
 		step.Text,
-		device.Locale,
+		step.Locale,
 		cv.PsmText,
 		cv.OemText,
 		cv.WhiteTheme,
@@ -203,6 +203,7 @@ func (i *interactorImpl) playEventOnText(
 			continue
 		}
 		if mat == nil {
+			i.logger.Error("mat is nil")
 			time.Sleep(1 * time.Second)
 			continue
 		}
@@ -212,6 +213,7 @@ func (i *interactorImpl) playEventOnText(
 			tesseractDir,
 			ocrParams,
 		)
+		mat.Close()
 
 		if err != nil {
 			i.logger.Error(err.Error())
@@ -219,14 +221,13 @@ func (i *interactorImpl) playEventOnText(
 			continue
 		}
 
-		if err == nil && len(rectangles) > 0 && !rectangles[0].IsEmpty() {
-			textRect = rectangles[0].Rectangle.ToImageRectangle()
-			break
+		if len(rectangles) == 0 || rectangles[0].IsEmpty() {
+			i.logger.Error(fmt.Sprintf("text %s not found", step.Text))
+			time.Sleep(1 * time.Second)
+			continue
 		}
-	}
-
-	if models.ImageRectIsEmpty(textRect) {
-		return fmt.Errorf("text %s not found", step.Text)
+		textRect = rectangles[0].Rectangle.ToImageRectangle()
+		break
 	}
 
 	i.playEvent(serial, textRect, step)
@@ -241,33 +242,46 @@ func (i *interactorImpl) typeText(
 		return fmt.Errorf("nothing to type")
 	}
 
-	keyboardKeys := i.getKeyboardKeys(serial, step)
-	chars := []rune(strings.ToLower(step.Text))
-	keysToPress := make([]cv.OCRResult, len(chars))
-
-charsLoop:
-	for index, ch := range chars {
-		for _, key := range keyboardKeys {
-			if key.Text == "" {
-				return fmt.Errorf("empty keyboard key")
-			}
-
-			if []rune(key.Text)[0] == ch {
-				keysToPress[index] = key
-				continue charsLoop
-			}
-			if key.Text == cv.Space && unicode.IsSpace(ch) {
-				keysToPress[index] = key
-				continue charsLoop
-			}
+attemptsLoop:
+	for range Attempts {
+		keyboardKeys, err := i.getKeyboardKeys(serial, step)
+		if err != nil {
+			i.logger.Error(err.Error())
+			time.Sleep(1 * time.Second)
+			continue attemptsLoop
 		}
-		return fmt.Errorf("char %c not found", ch)
-	}
+		chars := []rune(strings.ToLower(step.Text))
+		keysToPress := make([]cv.OCRResult, len(chars))
 
-	for _, key := range keysToPress {
-		var imgRect = key.Rectangle.ToImageRectangle()
-		i.playEvent(serial, imgRect, step)
-		time.Sleep(300 * time.Millisecond)
+	charsLoop:
+		for index, ch := range chars {
+			for _, key := range keyboardKeys {
+				if key.Text == "" {
+					return fmt.Errorf("empty keyboard key")
+				}
+
+				if []rune(key.Text)[0] == ch {
+					keysToPress[index] = key
+					continue charsLoop
+				}
+				if key.Text == cv.Space && unicode.IsSpace(ch) {
+					keysToPress[index] = key
+					continue charsLoop
+				}
+			}
+
+			i.logger.Error(fmt.Sprintf("char %c not found", ch))
+			time.Sleep(1 * time.Second)
+			continue attemptsLoop
+		}
+
+		for _, key := range keysToPress {
+			var imgRect = key.Rectangle.ToImageRectangle()
+			i.playEvent(serial, imgRect, step)
+			time.Sleep(numutils.RandDelay(100, 300) * time.Millisecond)
+		}
+
+		break
 	}
 	return nil
 }
@@ -275,46 +289,38 @@ charsLoop:
 func (i *interactorImpl) getKeyboardKeys(
 	serial string,
 	step *models.ScriptStep,
-) []cv.OCRResult {
+) ([]cv.OCRResult, error) {
 	keyboardKeys := []cv.OCRResult{}
-	for range Attempts {
-		mat, err := i.scrcpy.GetMatFromLastFrame(serial, true)
-		if err != nil {
-			i.logger.Error(err.Error())
-			time.Sleep(1 * time.Second)
-			continue
-		}
-		if mat == nil {
-			i.logger.Error("mat is nil")
-			time.Sleep(1 * time.Second)
-			continue
-		}
+	mat, err := i.scrcpy.GetMatFromLastFrame(serial, true)
+	if err != nil {
+		i.logger.Error(err.Error())
+		return []cv.OCRResult{}, err
+	}
+	if mat == nil {
+		return []cv.OCRResult{}, fmt.Errorf("mat is nil")
+	}
 
-		modelOs := i.GetDevice(serial).ToModelOs()
-		keyboardDir := i.filesDB.CreateDBDir(modelOs, filesdb.Keyboards, step.Locale)
-		keyboardButtons := i.filesDB.GetFiles(keyboardDir)
+	modelOs := i.GetDevice(serial).ToModelOs()
+	keyboardDir := i.filesDB.CreateDBDir(modelOs, filesdb.Keyboards, step.Locale)
+	keyboardButtons := i.filesDB.GetFiles(keyboardDir)
 
-		chars := strutils.GetUniqueChars(step.Text)
+	chars := strutils.GetUniqueChars(step.Text)
 
-		filteredButtons := []string{}
-		for _, button := range keyboardButtons {
-			for _, ch := range chars {
-				if string(ch) == file.GetFileName(button) {
-					filteredButtons = append(filteredButtons, button)
-				}
+	filteredButtons := []string{}
+	for _, button := range keyboardButtons {
+		for _, ch := range chars {
+			if string(ch) == file.GetFileName(button) {
+				filteredButtons = append(filteredButtons, button)
 			}
 		}
-
-		if len(filteredButtons) == 0 {
-			time.Sleep(1 * time.Second)
-			i.logger.Error("empty keyboard buttons")
-			continue
-		}
-
-		keyboardKeys = i.cv.GetKeyboardKeys(filteredButtons, *mat)
-		break
 	}
-	return keyboardKeys
+
+	if len(filteredButtons) == 0 {
+		return []cv.OCRResult{}, fmt.Errorf("buttons not found")
+	}
+
+	keyboardKeys = i.cv.GetKeyboardKeys(filteredButtons, *mat)
+	return keyboardKeys, nil
 }
 
 func (i *interactorImpl) playEvent(

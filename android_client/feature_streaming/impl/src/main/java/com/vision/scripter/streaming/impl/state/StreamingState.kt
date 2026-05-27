@@ -9,13 +9,20 @@ import com.vision.scripter.ui.states.LoadingState
 
 const val ENG = "eng"
 const val RUS = "rus"
-const val NUMS = "nums"
+const val NUMBERS = "numbers"
+const val PHONE = "phone"
 const val SPACE_KEY = "space"
 
 val locales = listOf(
     ENG,
     RUS,
-    NUMS,
+)
+
+val keyboardLocales = listOf(
+    ENG,
+    RUS,
+    NUMBERS,
+    PHONE,
 )
 
 data class StreamingState(
@@ -64,12 +71,13 @@ sealed interface MenuState {
     ) : MenuState
 
     data class SelectingCV(
-        val selectMode: CvSelectMode = CvSelectMode.VISIBLE,
+        val selectMode: CvSelectMode = CvSelectMode.APPLY_EVENT,
     ) : MenuState
 
     data class SelectingText(
-        val selectMode: CvSelectMode = CvSelectMode.VISIBLE,
+        val selectMode: CvSelectMode = CvSelectMode.APPLY_EVENT,
         val text: String = "",
+        val locale: String = "",
     ) : MenuState
 
     data class Keyboard(
@@ -96,22 +104,22 @@ fun CVMode.increment(): CVMode {
 
 enum class CvSelectMode {
     NONE,
-    VISIBLE,
     APPLY_EVENT,
+    VISIBLE,
 }
 
 fun CvSelectMode.increment(): CvSelectMode {
     return when (this) {
-        CvSelectMode.NONE -> CvSelectMode.VISIBLE
-        CvSelectMode.VISIBLE -> CvSelectMode.APPLY_EVENT
+        CvSelectMode.NONE -> CvSelectMode.APPLY_EVENT
+        CvSelectMode.APPLY_EVENT -> CvSelectMode.VISIBLE
         else -> CvSelectMode.NONE
     }
 }
 
 fun CvSelectMode.incrementOnlyActive(): CvSelectMode {
     return when (this) {
-        CvSelectMode.VISIBLE -> CvSelectMode.APPLY_EVENT
         CvSelectMode.APPLY_EVENT -> CvSelectMode.VISIBLE
-        else -> CvSelectMode.VISIBLE
+        CvSelectMode.VISIBLE -> CvSelectMode.APPLY_EVENT
+        else -> CvSelectMode.APPLY_EVENT
     }
 }

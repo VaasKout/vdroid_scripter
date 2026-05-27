@@ -15,7 +15,8 @@ import (
 // Tesseract contants
 const (
 	DefaultOCRLanguage = "eng"
-	Numbers            = "nums"
+	Numbers            = "numbers"
+	Phone              = "phone"
 	WhiteTheme         = 230
 	BlackTheme         = 120
 	MaxThreshHold      = 255
@@ -36,6 +37,7 @@ var TesseractLocaleMap = map[string]string{
 	"ru-RU": "rus",
 	"en-US": "eng",
 	Numbers: "eng",
+	Phone:   "eng",
 }
 
 // OcrParams ...
@@ -77,7 +79,7 @@ func InitOcrParams(text string, lang string, psm int, oem int, theme float32) *O
 		ocrParams.Psm = 11
 	}
 
-	if lang == Numbers {
+	if lang == Numbers || lang == Phone {
 		ocrParams.WhiteList = "-c tessedit_char_whitelist=0123456789"
 	}
 

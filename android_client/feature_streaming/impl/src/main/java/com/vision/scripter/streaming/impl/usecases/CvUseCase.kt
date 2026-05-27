@@ -161,7 +161,7 @@ class CvUseCase @Inject constructor(
         _selectedRectangles.value = listOfNotNull(rect)
     }
 
-    fun disableSelection() {
+    fun clearSelectedRectangles() {
         _selectedRectangles.update { listOf() }
     }
 
