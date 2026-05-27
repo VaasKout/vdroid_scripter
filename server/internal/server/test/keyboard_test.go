@@ -14,6 +14,7 @@ const (
 	GetKeyboardPath   = LocalURL + server.GetKeyboard
 	EditKeyboardPath  = LocalURL + server.EditKeyboard
 	ResetKeyboardPath = LocalURL + server.ResetKeyboard
+	DeleteButtonPath  = LocalURL + server.DeleteButton
 )
 
 // to get screen size use adb -s SERIAL shell wm size
@@ -137,10 +138,28 @@ func TestEditKeyboard(t *testing.T) {
 func TestResetKeyboard(t *testing.T) {
 	var data = ""
 	var serialPath = fmt.Sprintf("{%s}", server.SerialKey)
-	var localeKey = fmt.Sprintf("%s=ru", server.LocaleKey)
+	var localeKey = fmt.Sprintf("%s=eng", server.LocaleKey)
 	var upperCase = fmt.Sprintf("%s=false", server.UpperCaseKey)
 	var url = strings.ReplaceAll(ResetKeyboardPath, serialPath, TestSerial)
 	url = fmt.Sprintf("%s?%s&%s", url, localeKey, upperCase)
+	t.Log(url)
+
+	makeHTTPRequest(
+		url,
+		http.MethodGet,
+		nil,
+		&data,
+	)
+	t.Log(data)
+}
+
+func TestDeleteButton(t *testing.T) {
+	var data = ""
+	var serialPath = fmt.Sprintf("{%s}", server.SerialKey)
+	var localeKey = fmt.Sprintf("%s=eng", server.LocaleKey)
+	var nameKey = fmt.Sprintf("%s=q", server.NameKey)
+	var url = strings.ReplaceAll(DeleteButtonPath, serialPath, TestSerial)
+	url = fmt.Sprintf("%s?%s&%s", url, localeKey, nameKey)
 	t.Log(url)
 
 	makeHTTPRequest(

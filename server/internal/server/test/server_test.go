@@ -10,7 +10,7 @@ import (
 // Common test contants...
 const (
 	LocalURL   = "http://127.0.0.1:8080"
-	TestSerial = "xxx" // serial of the device to test
+	TestSerial = "emulator-5554" // serial of the device to test
 )
 
 func makeHTTPRequest(

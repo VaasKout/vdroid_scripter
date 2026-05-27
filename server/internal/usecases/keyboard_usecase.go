@@ -20,6 +20,7 @@ type KeyboardUseCase interface {
 		rectangle *models.Rectangle,
 	) bool
 	ResetKeyboardKeys(serial string, locale string, upperCase bool) []cv.OCRResult
+	DeleteButton(serial, locale, name string) bool
 }
 
 func (i *interactorImpl) GetKeyboardKeys(
@@ -107,4 +108,16 @@ func (i *interactorImpl) ResetKeyboardKeys(
 		locale,
 		upperCase,
 	)
+}
+
+func (i *interactorImpl) DeleteButton(
+	serial, locale, name string,
+) bool {
+	var device = i.GetDevice(serial)
+	var modelOs = device.ToModelOs()
+	if modelOs == "" {
+		return false
+	}
+
+	return i.filesDB.DeletePathInDBDir(modelOs, filesdb.Keyboards, locale, fmt.Sprintf("%s.png", name))
 }

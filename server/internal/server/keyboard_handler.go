@@ -10,6 +10,7 @@ import (
 const (
 	GetKeyboard   = "/devices/{" + SerialKey + "}/keyboard"
 	EditKeyboard  = "/devices/{" + SerialKey + "}/edit_keyboard"
+	DeleteButton  = "/devices/{" + SerialKey + "}/delete_button"
 	ResetKeyboard = "/devices/{" + SerialKey + "}/reset_keyboard"
 )
 
@@ -42,6 +43,15 @@ func (s *serverImpl) handleKeyboardFunctions() {
 		if r.Method == http.MethodGet {
 			s.logURL(r)
 			s.handleResetKeyboard(w, r)
+			return
+		}
+		http.Error(w, "use GET method", http.StatusMethodNotAllowed)
+	})
+
+	http.HandleFunc(DeleteButton, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			s.logURL(r)
+			s.handleDeleteButton(w, r)
 			return
 		}
 		http.Error(w, "use GET method", http.StatusMethodNotAllowed)
@@ -113,4 +123,23 @@ func (s *serverImpl) handleResetKeyboard(w http.ResponseWriter, r *http.Request)
 	}
 	s.setHeaders(w)
 	json.NewEncoder(w).Encode(response)
+}
+
+func (s *serverImpl) handleDeleteButton(w http.ResponseWriter, r *http.Request) {
+	defer r.Body.Close()
+	var serial = r.PathValue(SerialKey)
+	var locale = r.URL.Query().Get(LocaleKey)
+	var name = r.URL.Query().Get(NameKey)
+
+	if serial == "" {
+		http.Error(w, `"serial" query needed`, http.StatusBadRequest)
+		return
+	}
+
+	result := s.interactor.DeleteButton(serial, locale, name)
+	if !result {
+		http.Error(w, "Something went wrong", http.StatusInternalServerError)
+	}
+
+	s.sendStatusOk(w)
 }

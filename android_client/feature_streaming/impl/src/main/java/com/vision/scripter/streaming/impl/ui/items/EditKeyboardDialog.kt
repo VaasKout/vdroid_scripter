@@ -27,7 +27,7 @@ import com.vision.scripter.ui.R as CoreR
 private const val MAX_BUTTON_NAME_LENGTH = 32
 
 @Composable
-fun EditKeyboardButtonDialog(
+fun EditKeyboardDialog(
     onSave: (String) -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -99,9 +99,9 @@ fun EditKeyboardButtonDialog(
 
 @Preview
 @Composable
-private fun EditKeyboardButtonDialogPreview() {
+private fun EditKeyboardDialogPreview() {
     Box(modifier = Modifier.fillMaxSize()) {
-        EditKeyboardButtonDialog(
+        EditKeyboardDialog(
             onSave = {},
             onDismiss = {},
         )
