@@ -202,11 +202,13 @@ class StreamingInteractor @Inject constructor(
                     return@launch
                 }
 
+                selectExistingKeyboardButton(event)
+                selectNewKeyboardButton(event)
+                if (openEditKeyboardDialog()) return@launch
+
                 if (
                     menuState is MenuState.Keyboard &&
                     menuState.recordingKeyboard &&
-                    event.x > 0 &&
-                    event.y > 0 &&
                     event.action == ACTION_UP
                 ) {
                     val letter = currentState.keyboard.buttons.firstOrNull {
@@ -226,6 +228,45 @@ class StreamingInteractor @Inject constructor(
 
                 recordBytes(bytesArray)
             }
+        }
+    }
+
+    private fun openEditKeyboardDialog(): Boolean {
+        val menuState = menuInteractor.observeMenuState().value
+        val selectedRects = cvUseCase.observeSelectedRectangles().value
+        if (
+            menuState is MenuState.Keyboard &&
+            (menuState.editing || menuState.showCvRectangles) &&
+            selectedRects.isNotEmpty()
+        ) {
+            menuInteractor.onEditKeyboardRectangleSelected()
+            return true
+        }
+        return false
+    }
+
+    private fun selectExistingKeyboardButton(event: MotionEvent) {
+        val menuState = menuInteractor.observeMenuState().value
+        if (
+            menuState is MenuState.Keyboard &&
+            menuState.editing
+        ) {
+            val button = currentState.keyboard.buttons.firstOrNull {
+                it.contains(x = event.x.toInt(), y = event.y.toInt())
+            } ?: return
+            menuInteractor.setKeyboardOldKey(button.text)
+            cvUseCase.setSelectedRectangle(button.rectangle)
+        }
+    }
+
+    private fun selectNewKeyboardButton(event: MotionEvent) {
+        val menuState = menuInteractor.observeMenuState().value
+        if (
+            menuState is MenuState.Keyboard &&
+            menuState.showCvRectangles
+        ) {
+            menuInteractor.setKeyboardOldKey("")
+            cvUseCase.selectRectangle(x = event.x.toInt(), y = event.y.toInt())
         }
     }
 
@@ -273,6 +314,9 @@ class StreamingInteractor @Inject constructor(
     }
 
     override fun onDialogDismissed() {
+        if (menuInteractor.observeMenuState().value is MenuState.Keyboard) {
+            cvUseCase.disableSelection()
+        }
         menuInteractor.onDialogDismissed(currentState.record)
     }
 
@@ -300,7 +344,7 @@ class StreamingInteractor @Inject constructor(
 
     override fun onTryToFindText(text: String, locale: String) {
         coroutineScope.launch {
-            menuInteractor.onTextSearchStarted()
+            menuInteractor.hideDialog()
 
             val screenSizes = videoUseCase.observeScreenSizes().value ?: return@launch
             val trimmed = text.trim()
@@ -429,7 +473,7 @@ class StreamingInteractor @Inject constructor(
 
     override fun onKeyboardInitClicked() {
         coroutineScope.launch {
-            menuInteractor.onKeyboardInitStarted()
+            menuInteractor.setKeyboardLoadingState(true)
 
             val result = scripterRepository.resetKeyboard(
                 serial = currentState.serial,
@@ -439,6 +483,48 @@ class StreamingInteractor @Inject constructor(
             if (result is ApiResponse.Success) {
                 setupKeyboardRects(result.data)
             }
+        }
+    }
+
+    override fun onKeyboardEdited(addNew: Boolean) {
+        coroutineScope.launch {
+            val transition = menuInteractor.onKeyboardEdited(addNew)
+            when (transition) {
+                KeyboardEditTransition.ShowCvRectangles -> {
+                    cvUseCase.disableSelection()
+                    cvUseCase.nextCvMode(CVMode.CV_RECTS)
+                }
+
+                KeyboardEditTransition.ShowKeyboardButtons -> {
+                    cvUseCase.nextCvMode(CVMode.NO_CV)
+                    cvUseCase.disableSelection()
+                }
+
+                KeyboardEditTransition.None -> Unit
+            }
+        }
+    }
+
+    override fun onEditKeyboardButtonSaved(name: String) {
+        coroutineScope.launch {
+            val menuState = menuInteractor.observeMenuState().value
+            val oldName = (menuState as? MenuState.Keyboard)?.oldKey.orEmpty()
+            val screenSizes = videoUseCase.observeScreenSizes().value ?: return@launch
+            val success = cvUseCase.editKeyboardSelectedRectangle(
+                serial = currentState.serial,
+                locale = currentState.record.locale,
+                oldName = oldName,
+                newName = name,
+                screenSizes = screenSizes,
+            )
+            menuInteractor.hideDialog()
+            cvUseCase.disableSelection()
+            if (success) {
+                menuInteractor.setKeyboardLoadingState(true)
+                getOrResetKeyboard()
+                return@launch
+            }
+            uiCommandsFlow.tryEmit(StreamingUiCommand.ShowNetworkError)
         }
     }
 
@@ -473,11 +559,11 @@ class StreamingInteractor @Inject constructor(
         _stateFlow.update {
             it.copy(keyboard = it.keyboard.copy(buttons = buttons))
         }
-        menuInteractor.onKeyboardLoaded()
+        menuInteractor.setKeyboardLoadingState(false)
     }
 
     private fun showKeyboardError() {
-        menuInteractor.onKeyboardError()
+        menuInteractor.setKeyboardLoadingState(false)
         uiCommandsFlow.tryEmit(StreamingUiCommand.ShowNetworkError)
     }
 

@@ -25,6 +25,8 @@ interface StreamingUiStateHolder {
 
     fun onKeyboardClicked()
     fun onKeyboardInitClicked()
+    fun onKeyboardEdited(addNew: Boolean)
+    fun onEditKeyboardButtonSaved(name: String)
 
     fun onRecordingClicked()
     fun onSaveClicked()

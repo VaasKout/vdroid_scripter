@@ -38,4 +38,17 @@ interface ScripterRepository {
     suspend fun runScript(serial: String, name: String): Boolean
     suspend fun resetKeyboard(serial: String, locale: String): ApiResponse<List<RectangleWithText>>
     suspend fun getKeyboard(serial: String, locale: String): ApiResponse<List<RectangleWithText>>
+
+    suspend fun editKeyboard(
+        serial: String,
+        locale: String,
+        name: String,
+        rectangle: CvRectangle?,
+    ): Boolean
+
+    suspend fun deleteButton(
+        serial: String,
+        locale: String,
+        name: String,
+    ): Boolean
 }

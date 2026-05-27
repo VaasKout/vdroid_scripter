@@ -4,10 +4,11 @@ import com.vision.scripter.data.api.ScripterRepository
 import com.vision.scripter.data.api.models.AdbDevice
 import com.vision.scripter.data.api.models.AdbDevicesResponse
 import com.vision.scripter.data.api.models.CvRectangle
+import com.vision.scripter.data.api.models.EditKeyboardRequest
 import com.vision.scripter.data.api.models.KeyboardButtons
 import com.vision.scripter.data.api.models.RectangleWithText
-import com.vision.scripter.data.api.models.SaveStepRequest
 import com.vision.scripter.data.api.models.SaveRectRequest
+import com.vision.scripter.data.api.models.SaveStepRequest
 import com.vision.scripter.data.api.models.Script
 import com.vision.scripter.data.api.models.ScriptStep
 import com.vision.scripter.data.api.models.StreamingData
@@ -191,4 +192,29 @@ class ScripterRepositoryImpl @Inject constructor(
             is ApiResponse.Error -> result
         }
     }
+
+    override suspend fun editKeyboard(
+        serial: String,
+        locale: String,
+        name: String,
+        rectangle: CvRectangle?,
+    ): Boolean {
+        if (serial.isEmpty() || name.isEmpty() || rectangle.isEmpty()) return false
+        val request = EditKeyboardRequest(
+            serial = serial,
+            locale = locale,
+            name = name,
+            rectangle = rectangle,
+        )
+        val body = Json.encodeToString(request)
+        val result = networkClient.post("/devices/$serial/edit_keyboard", body)
+        return result is ApiResponse.Success
+    }
+
+    override suspend fun deleteButton(serial: String, locale: String, name: String): Boolean {
+        if (serial.isEmpty() || name.isEmpty()) return false
+        val result = networkClient.get("/devices/$serial/delete_button?locale=$locale&name=$name")
+        return result is ApiResponse.Success
+    }
+
 }

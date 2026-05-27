@@ -1,6 +1,8 @@
 package com.vision.scripter.streaming.impl.ui.items
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.AlertDialog
@@ -28,6 +30,7 @@ private const val MAX_BUTTON_NAME_LENGTH = 32
 
 @Composable
 fun EditKeyboardDialog(
+    oldKey: String,
     onSave: (String) -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -36,15 +39,29 @@ fun EditKeyboardDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {
-            Text(
-                modifier = Modifier.padding(8.dp),
-                text = stringResource(R.string.set_button),
-                style = TextStyle(
-                    color = Color.Black,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Normal,
-                ),
-            )
+            Column(
+                modifier = Modifier.padding(horizontal = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text(
+                    text = stringResource(R.string.set_button),
+                    style = TextStyle(
+                        color = Color.Black,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Normal,
+                    ),
+                )
+                if (oldKey.isNotEmpty()) {
+                    Text(
+                        text = oldKey,
+                        style = TextStyle(
+                            color = Color.Black,
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                        ),
+                    )
+                }
+            }
         },
         text = {
             OutlinedTextField(
@@ -102,6 +119,19 @@ fun EditKeyboardDialog(
 private fun EditKeyboardDialogPreview() {
     Box(modifier = Modifier.fillMaxSize()) {
         EditKeyboardDialog(
+            oldKey = "Q",
+            onSave = {},
+            onDismiss = {},
+        )
+    }
+}
+
+@Preview
+@Composable
+private fun EditKeyboardDialogNoKeyPreview() {
+    Box(modifier = Modifier.fillMaxSize()) {
+        EditKeyboardDialog(
+            oldKey = "",
             onSave = {},
             onDismiss = {},
         )

@@ -7,8 +7,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.RadioButtonChecked
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.CircularProgressIndicator
@@ -29,6 +31,7 @@ fun KeyboardMenu(
     menuState: MenuState.Keyboard,
     onKeyboardRecordingClick: () -> Unit,
     onKeyboardInitClick: () -> Unit,
+    onKeyboardEdit: (addNew: Boolean) -> Unit,
     onSaveClick: () -> Unit,
     onCancelClick: () -> Unit,
 ) {
@@ -74,6 +77,26 @@ fun KeyboardMenu(
         Icon(
             modifier = Modifier
                 .size(32.dp)
+                .customClickable(onClick = { onKeyboardEdit(false) }),
+            imageVector = Icons.Filled.Edit,
+            tint = if (menuState.editing) Color.Red
+            else MaterialTheme.colorScheme.onSurface,
+            contentDescription = ""
+        )
+
+        Icon(
+            modifier = Modifier
+                .size(32.dp)
+                .customClickable(onClick = { onKeyboardEdit(true) }),
+            imageVector = Icons.Filled.Add,
+            tint = if (menuState.showCvRectangles) Color.Red
+            else MaterialTheme.colorScheme.onSurface,
+            contentDescription = "",
+        )
+
+        Icon(
+            modifier = Modifier
+                .size(32.dp)
                 .customClickable(onClick = onCancelClick),
             imageVector = Icons.Filled.Close,
             tint = MaterialTheme.colorScheme.onSurface,
@@ -100,6 +123,7 @@ private fun KeyboardMenuDefaultPreview() {
         menuState = MenuState.Keyboard(isLoadingKeyboard = false),
         onKeyboardRecordingClick = {},
         onKeyboardInitClick = {},
+        onKeyboardEdit = {},
         onSaveClick = {},
         onCancelClick = {},
     )
@@ -115,6 +139,40 @@ private fun KeyboardMenuFromUsualPreview() {
         ),
         onKeyboardRecordingClick = {},
         onKeyboardInitClick = {},
+        onKeyboardEdit = {},
+        onSaveClick = {},
+        onCancelClick = {},
+    )
+}
+
+@Preview
+@Composable
+private fun KeyboardMenuEditingPreview() {
+    KeyboardMenu(
+        menuState = MenuState.Keyboard(
+            isLoadingKeyboard = false,
+            editing = true,
+        ),
+        onKeyboardRecordingClick = {},
+        onKeyboardInitClick = {},
+        onKeyboardEdit = {},
+        onSaveClick = {},
+        onCancelClick = {},
+    )
+}
+
+@Preview
+@Composable
+private fun KeyboardMenuEditingShowCvPreview() {
+    KeyboardMenu(
+        menuState = MenuState.Keyboard(
+            isLoadingKeyboard = false,
+            editing = true,
+            showCvRectangles = true,
+        ),
+        onKeyboardRecordingClick = {},
+        onKeyboardInitClick = {},
+        onKeyboardEdit = {},
         onSaveClick = {},
         onCancelClick = {},
     )

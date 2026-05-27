@@ -110,10 +110,6 @@ class MenuInteractor @Inject constructor() {
         }
     }
 
-    fun onTextSearchStarted() {
-        _dialogState.update { DialogState.NONE }
-    }
-
     fun onTextSearchSuccess(text: String) {
         when (val state = _menuState.value) {
             is MenuState.Recording -> _menuState.update {
@@ -183,12 +179,12 @@ class MenuInteractor @Inject constructor() {
     }
 
     fun onSavedRecordName() {
-        _dialogState.update { DialogState.NONE }
+        hideDialog()
         _menuState.update { MenuState.Recording() }
     }
 
     fun onSaveLocale() {
-        _dialogState.update { DialogState.NONE }
+        hideDialog()
         val updated = when (val state = _menuState.value) {
             is MenuState.Recording -> MenuState.Keyboard()
             is MenuState.Usual -> MenuState.Keyboard(fromUsual = true)
@@ -199,7 +195,7 @@ class MenuInteractor @Inject constructor() {
 
     fun onDialogDismissed(record: StreamingState.Record) {
         val state = _menuState.value
-        _dialogState.update { DialogState.NONE }
+        hideDialog()
         if (state is MenuState.Recording) {
             _menuState.update {
                 MenuState.Recording(
@@ -211,24 +207,10 @@ class MenuInteractor @Inject constructor() {
         }
     }
 
-    fun onKeyboardInitStarted() {
+    fun setKeyboardLoadingState(isLoading: Boolean) {
         val state = _menuState.value
         if (state is MenuState.Keyboard) {
-            _menuState.update { state.copy(isLoadingKeyboard = true) }
-        }
-    }
-
-    fun onKeyboardLoaded() {
-        val state = _menuState.value
-        if (state is MenuState.Keyboard) {
-            _menuState.update { state.copy(isLoadingKeyboard = false) }
-        }
-    }
-
-    fun onKeyboardError() {
-        val state = _menuState.value
-        if (state is MenuState.Keyboard) {
-            _menuState.update { state.copy(isLoadingKeyboard = false) }
+            _menuState.update { state.copy(isLoadingKeyboard = isLoading) }
         }
     }
 
@@ -241,6 +223,37 @@ class MenuInteractor @Inject constructor() {
             else append(letter)
         }
         _menuState.update { state.copy(typeText = updatedTypeText) }
+    }
+
+    fun onKeyboardEdited(addNew: Boolean): KeyboardEditTransition {
+        val state = _menuState.value
+        if (state !is MenuState.Keyboard) return KeyboardEditTransition.None
+        val newState = when {
+            !addNew -> state.copy(editing = !state.editing)
+            else -> state.copy(showCvRectangles = !state.showCvRectangles)
+        }
+        _menuState.update { newState }
+        return when {
+            newState.showCvRectangles -> KeyboardEditTransition.ShowCvRectangles
+            newState.editing -> KeyboardEditTransition.ShowKeyboardButtons
+            else -> KeyboardEditTransition.None
+        }
+    }
+
+    fun setKeyboardOldKey(oldKey: String) {
+        val state = _menuState.value
+        if (state !is MenuState.Keyboard) return
+        _menuState.update {
+            state.copy(oldKey = oldKey)
+        }
+    }
+
+    fun onEditKeyboardRectangleSelected() {
+        _dialogState.update { DialogState.EDIT_KEYBOARD }
+    }
+
+    fun hideDialog() {
+        _dialogState.update { DialogState.NONE }
     }
 }
 
@@ -266,5 +279,12 @@ enum class DialogState {
     NONE,
     RECORD,
     TEXT,
-    KEYBOARD;
+    KEYBOARD,
+    EDIT_KEYBOARD;
+}
+
+sealed interface KeyboardEditTransition {
+    data object None : KeyboardEditTransition
+    data object ShowKeyboardButtons : KeyboardEditTransition
+    data object ShowCvRectangles : KeyboardEditTransition
 }

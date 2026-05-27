@@ -12,6 +12,18 @@ data class SaveRectRequest(
 )
 
 @Serializable
+data class EditKeyboardRequest(
+    @SerialName("serial")
+    val serial: String,
+    @SerialName("locale")
+    val locale: String,
+    @SerialName("name")
+    val name: String,
+    @SerialName("rectangle")
+    val rectangle: CvRectangle?,
+)
+
+@Serializable
 data class CvRectangle(
     @SerialName("left_x")
     val leftX: Int,

@@ -10,6 +10,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.vision.scripter.streaming.impl.state.DialogState
 import com.vision.scripter.streaming.impl.state.MenuState
+import com.vision.scripter.streaming.impl.ui.items.EditKeyboardDialog
 import com.vision.scripter.streaming.impl.ui.items.KeyboardDialog
 import com.vision.scripter.streaming.impl.ui.items.RecordDialog
 import com.vision.scripter.streaming.impl.ui.items.RectanglesCanvas
@@ -104,6 +105,7 @@ fun VideoScreen(
                     menuState = state.menuState,
                     onKeyboardInitClick = uiStateHolder::onKeyboardInitClicked,
                     onKeyboardRecordingClick = uiStateHolder::onRecordingClicked,
+                    onKeyboardEdit = uiStateHolder::onKeyboardEdited,
                     onSaveClick = uiStateHolder::onSaveClicked,
                     onCancelClick = uiStateHolder::onCancelClicked,
                 )
@@ -130,6 +132,14 @@ fun VideoScreen(
             DialogState.KEYBOARD -> {
                 KeyboardDialog(
                     onSaveLocale = uiStateHolder::onSaveLocale,
+                    onDismiss = uiStateHolder::onDialogDismissed,
+                )
+            }
+
+            DialogState.EDIT_KEYBOARD -> {
+                EditKeyboardDialog(
+                    oldKey = (state.menuState as? MenuState.Keyboard)?.oldKey.orEmpty(),
+                    onSave = uiStateHolder::onEditKeyboardButtonSaved,
                     onDismiss = uiStateHolder::onDialogDismissed,
                 )
             }

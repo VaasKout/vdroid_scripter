@@ -125,8 +125,40 @@ class CvUseCase @Inject constructor(
         }
     }
 
+    suspend fun editKeyboardSelectedRectangle(
+        serial: String,
+        locale: String,
+        oldName: String,
+        newName: String,
+        screenSizes: ScreenSizes,
+    ): Boolean {
+        val tmpZone = _selectedRectangles.value.firstOrNull() ?: return false
+        if (newName.isEmpty()) return false
+
+        if (oldName.isNotEmpty()) {
+            val deleted = scripterRepository.deleteButton(
+                serial = serial,
+                locale = locale,
+                name = oldName
+            )
+            if (!deleted) return false
+        }
+
+        return scripterRepository.editKeyboard(
+            serial = serial,
+            locale = locale,
+            name = newName,
+            rectangle = tmpZone.adjustToServer(screenSizes),
+        )
+    }
+
     fun selectRectangle(x: Int, y: Int) {
-        _selectedRectangles.value = listOfNotNull(_rectanglesFlow.value.smallestBy(x, y))
+        val selected = _rectanglesFlow.value.smallestBy(x, y)
+        setSelectedRectangle(selected)
+    }
+
+    fun setSelectedRectangle(rect: CvRectangle?) {
+        _selectedRectangles.value = listOfNotNull(rect)
     }
 
     fun disableSelection() {

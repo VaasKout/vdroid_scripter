@@ -77,6 +77,9 @@ sealed interface MenuState {
         val recordingKeyboard: Boolean = false,
         val typeText: String = "",
         val fromUsual: Boolean = false,
+        val oldKey: String = "",
+        val editing: Boolean = false,
+        val showCvRectangles: Boolean = false,
     ) : MenuState
 }
 

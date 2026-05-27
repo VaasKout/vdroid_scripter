@@ -12,7 +12,10 @@ class StreamingUiStateMapper @Inject constructor() {
         menuState: MenuState,
         dialogState: DialogState,
     ): StreamingUiState {
-        val keyboardButtons = if (menuState is MenuState.Keyboard) {
+        val keyboardButtons = if (
+            menuState is MenuState.Keyboard &&
+            !menuState.showCvRectangles
+        ) {
             state.keyboard.buttons
         } else {
             listOf()
