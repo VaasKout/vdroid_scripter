@@ -6,36 +6,54 @@ import (
 	"fmt"
 	"image"
 	"image/color"
+	"io"
 	"log"
-	"net"
+	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
-	"sync"
 	"time"
 
 	"gocv.io/x/gocv"
 )
 
+func init() {
+	// macOS (Cocoa/AppKit) requires NSWindow to be created on the main OS thread.
+	// Lock the main goroutine to the startup thread so gocv.NewWindow runs there.
+	// Linux/X11 has no such restriction, so only do this on macOS.
+	if runtime.GOOS == "darwin" {
+		runtime.LockOSThread()
+	}
+}
+
 const (
-	TestSerial = "xxx" //serial number of the device
-	ScrcpyPath = "../../config/scrcpy-server"
+	ScrcpyVersion = "3.3.4"
+
+	ScrcpyLinkFormat = "https://github.com/Genymobile/scrcpy/releases/download/v%s/scrcpy-server-v%s"
+	ScrcpyFileFormat = "scrcpy-v%s"
+	BasePath         = "android_vision_scripter"
+	ScrcpyDir        = "scrcpy"
 )
 
 const (
 	PushFile          = "adb -s %s push %s /data/local/tmp/scrcpy-server.jar"
 	ForwardTCPPort    = "adb -s %s forward tcp:1234 localabstract:scrcpy"
-	StartScrcpyServer = "adb -s %s shell CLASSPATH=/data/local/tmp/scrcpy-server.jar app_process / com.genymobile.scrcpy.Server 3.3.4 log_level=verbose tunnel_forward=true audio=false control=false cleanup=false send_frame_meta=false"
-
-	// video_encoder=c2.android.avc.encoder video_codec_options=bitrate-mode=1,i-frame-interval=1"
+	StartScrcpyServer = "adb -s %s shell CLASSPATH=/data/local/tmp/scrcpy-server.jar app_process / com.genymobile.scrcpy.Server %s log_level=verbose tunnel_forward=true audio=false control=false cleanup=false send_frame_meta=false"
 )
 
 func main() {
-	var wg sync.WaitGroup
-	wg.Add(1)
+	var serial string
+	if len(os.Args) > 1 {
+		serial = strings.TrimSpace(os.Args[1])
+	}
+	if serial == "" {
+		panic(fmt.Errorf("missing device serial: usage: go run . SERIAL"))
+	}
 
-	err := startScrcpy()
+	err := startScrcpy(serial)
 	if err != nil {
 		panic(err)
 	}
@@ -43,18 +61,21 @@ func main() {
 	var lastFrame = gocv.NewMat()
 	defer lastFrame.Close()
 
-	go createVideoConnection(&wg, &lastFrame)
-	go showVideo(&lastFrame)
-	// go createControlConnection()
-	wg.Wait()
+	go createVideoConnection(&lastFrame)
+	showVideo(&lastFrame)
 }
 
-func startScrcpy() error {
-	var pushServerCmd = fmt.Sprintf(PushFile, TestSerial, ScrcpyPath)
-	var forwardPortCmd = fmt.Sprintf(ForwardTCPPort, TestSerial)
-	var startScrcpyServerCmd = fmt.Sprintf(StartScrcpyServer, TestSerial)
+func startScrcpy(serial string) error {
+	scrcpyPath, err := downloadScrcpyServer()
+	if err != nil {
+		return err
+	}
 
-	_, err := executeCommand(pushServerCmd)
+	var pushServerCmd = fmt.Sprintf(PushFile, serial, scrcpyPath)
+	var forwardPortCmd = fmt.Sprintf(ForwardTCPPort, serial)
+	var startScrcpyServerCmd = fmt.Sprintf(StartScrcpyServer, serial, ScrcpyVersion)
+
+	_, err = executeCommand(pushServerCmd)
 	if err != nil {
 		return err
 	}
@@ -65,6 +86,46 @@ func startScrcpy() error {
 
 	go executeCommand(startScrcpyServerCmd)
 	return nil
+}
+
+func downloadScrcpyServer() (string, error) {
+	cacheDir, err := os.UserCacheDir()
+	if err != nil {
+		return "", err
+	}
+	dir := filepath.Join(cacheDir, BasePath, ScrcpyDir)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return "", err
+	}
+
+	filePath := filepath.Join(dir, fmt.Sprintf(ScrcpyFileFormat, ScrcpyVersion))
+	if _, err := os.Stat(filePath); err == nil {
+		fmt.Printf("found scrcpy file: %s\n", filePath)
+		return filePath, nil
+	}
+
+	downloadLink := fmt.Sprintf(ScrcpyLinkFormat, ScrcpyVersion, ScrcpyVersion)
+	fmt.Printf("downloading scrcpy server: %s\n", downloadLink)
+	resp, err := http.Get(downloadLink)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("failed to download %s: %s", downloadLink, resp.Status)
+	}
+
+	out, err := os.Create(filePath)
+	if err != nil {
+		return "", err
+	}
+	defer out.Close()
+
+	if _, err := io.Copy(out, resp.Body); err != nil {
+		return "", err
+	}
+	fmt.Printf("scrcpy server downloaded: %s\n", filePath)
+	return filePath, nil
 }
 
 func showVideo(
@@ -82,10 +143,8 @@ func showVideo(
 }
 
 func createVideoConnection(
-	wg *sync.WaitGroup,
 	lastFrame *gocv.Mat,
 ) {
-	defer wg.Done()
 	streamURL := "tcp://127.0.0.1:1234"
 
 	capture, err := gocv.OpenVideoCaptureWithAPIParams(
@@ -98,7 +157,7 @@ func createVideoConnection(
 			// 8, -1, //CAP_PROP_FORMAT
 		},
 	)
-	// capture, err := gocv.OpenVideoCapture(streamURL)
+
 	if err != nil {
 		log.Fatalf("error opening stream: %v", err)
 	}
@@ -126,34 +185,20 @@ func createVideoConnection(
 		// fmt.Printf("CAP_PROP_PTS: %f\n", capture.Get(71))
 		// fmt.Printf("CAP_PROP_DTS_DELAY: %f\n", capture.Get(72))
 
-		// rects, err := findAllRectangles(lastFrame)
-		// if err != nil {
-		//     fmt.Println(err)
-		//     continue
-		// }
-		// drawRectangles(
-		//     lastFrame,
-		//     rects...,
-		// )
-	}
-}
-
-func createControlConnection() {
-	controlConn, err := net.Dial("tcp", "127.0.0.1:1234")
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer controlConn.Close()
-	fmt.Println("control connnection started")
-	for {
-		time.Sleep(1 * time.Second)
+		rects, err := findAllRectangles(lastFrame)
+		if err != nil {
+			fmt.Println(err)
+			continue
+		}
+		drawRectangles(
+			lastFrame,
+			rects...,
+		)
 	}
 }
 
 func findAllRectangles(
-
 	img *gocv.Mat,
-
 ) ([]Rectangle, error) {
 	imgRectangles, err := createRectangles(img)
 	if err != nil {
@@ -166,10 +211,8 @@ func findAllRectangles(
 }
 
 func drawRectangles(
-
 	img *gocv.Mat,
 	rectangles ...Rectangle,
-
 ) {
 	var redColor = color.RGBA{R: 255}
 	for _, rect := range rectangles {
@@ -274,6 +317,7 @@ func isCloseToBorder(inner, outer image.Rectangle) bool {
 		(topDist >= 0 && topDist <= MinBorderDistance) ||
 		(bottomDist >= 0 && bottomDist <= MinBorderDistance)) && inner.Overlaps(outer)
 }
+
 func executeCommand(cmd string) (string, error) {
 	if cmd == "" {
 		return "", fmt.Errorf("cmd is empty")

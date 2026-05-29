@@ -4,21 +4,52 @@ package main
 import (
 	"context"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"image"
+	"image/color"
 	"io"
 	"log"
 	"net"
+	"net/http"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"runtime"
+	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/asticode/go-astiav"
 	"gocv.io/x/gocv"
 )
 
+func init() {
+	// macOS (Cocoa/AppKit) requires NSWindow to be created on the main OS thread.
+	// Lock the main goroutine to the startup thread so gocv.NewWindow runs there.
+	// Linux/X11 has no such restriction, so only do this on macOS.
+	if runtime.GOOS == "darwin" {
+		runtime.LockOSThread()
+	}
+}
+
 const (
 	BufSize    = 1 * 1024 * 1024 //1MB
 	HeaderSize = 12
+)
+
+const (
+	ScrcpyVersion = "3.3.4"
+
+	ScrcpyLinkFormat = "https://github.com/Genymobile/scrcpy/releases/download/v%s/scrcpy-server-v%s"
+	ScrcpyFileFormat = "scrcpy-v%s"
+	BasePath         = "android_vision_scripter"
+	ScrcpyDir        = "scrcpy"
+
+	PushFile          = "adb -s %s push %s /data/local/tmp/scrcpy-server.jar"
+	ForwardTCPPort    = "adb -s %s forward tcp:1234 localabstract:scrcpy"
+	StartScrcpyServer = "adb -s %s shell CLASSPATH=/data/local/tmp/scrcpy-server.jar app_process / com.genymobile.scrcpy.Server %s log_level=verbose tunnel_forward=true audio=false control=false cleanup=false"
 )
 
 const (
@@ -76,10 +107,19 @@ func (d *DecoderData) Allocate(width, height int) {
 }
 
 func main() {
-	run()
-}
+	var serial string
+	if len(os.Args) > 1 {
+		serial = strings.TrimSpace(os.Args[1])
+	}
+	if serial == "" {
+		panic(fmt.Errorf("missing device serial: usage: go run . SERIAL"))
+	}
 
-func run() {
+	if err := startScrcpy(serial); err != nil {
+		panic(err)
+	}
+	time.Sleep(1 * time.Second)
+
 	astiav.SetLogLevel(astiav.LogLevelDebug)
 	astiav.SetLogCallback(func(c astiav.Classer, l astiav.LogLevel, _, msg string) {
 		var cs string
@@ -320,9 +360,244 @@ func showVideo(
 				continue
 			}
 
+			rects, err := findAllRectangles(&img)
+			if err != nil {
+				fmt.Println(err)
+				continue
+			}
+			drawRectangles(
+				&img,
+				rects...,
+			)
 			window.IMShow(img)
 			img.Close()
 			window.WaitKey(1)
 		}
 	}
+}
+
+func startScrcpy(serial string) error {
+	scrcpyPath, err := downloadScrcpyServer()
+	if err != nil {
+		return err
+	}
+
+	var pushServerCmd = fmt.Sprintf(PushFile, serial, scrcpyPath)
+	var forwardPortCmd = fmt.Sprintf(ForwardTCPPort, serial)
+	var startScrcpyServerCmd = fmt.Sprintf(StartScrcpyServer, serial, ScrcpyVersion)
+
+	_, err = executeCommand(pushServerCmd)
+	if err != nil {
+		return err
+	}
+	_, err = executeCommand(forwardPortCmd)
+	if err != nil {
+		return err
+	}
+
+	go executeCommand(startScrcpyServerCmd)
+	return nil
+}
+
+func downloadScrcpyServer() (string, error) {
+	cacheDir, err := os.UserCacheDir()
+	if err != nil {
+		return "", err
+	}
+	dir := filepath.Join(cacheDir, BasePath, ScrcpyDir)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return "", err
+	}
+
+	filePath := filepath.Join(dir, fmt.Sprintf(ScrcpyFileFormat, ScrcpyVersion))
+	if _, err := os.Stat(filePath); err == nil {
+		fmt.Printf("found scrcpy file: %s\n", filePath)
+		return filePath, nil
+	}
+
+	downloadLink := fmt.Sprintf(ScrcpyLinkFormat, ScrcpyVersion, ScrcpyVersion)
+	fmt.Printf("downloading scrcpy server: %s\n", downloadLink)
+	resp, err := http.Get(downloadLink)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("failed to download %s: %s", downloadLink, resp.Status)
+	}
+
+	out, err := os.Create(filePath)
+	if err != nil {
+		return "", err
+	}
+	defer out.Close()
+
+	if _, err := io.Copy(out, resp.Body); err != nil {
+		return "", err
+	}
+	fmt.Printf("scrcpy server downloaded: %s\n", filePath)
+	return filePath, nil
+}
+
+func executeCommand(cmd string) (string, error) {
+	if cmd == "" {
+		return "", fmt.Errorf("cmd is empty")
+	}
+	cmdExec := exec.Command("bash", "-c", cmd)
+	cmdExec.Stdin = os.Stdin
+	cmdExec.Stderr = os.Stderr
+	fmt.Println("-------")
+	fmt.Printf("(%s): Start... ⏳\n", cmd)
+	result, err := cmdExec.Output()
+	if len(result) > 0 {
+		var trimmedResult = strings.Trim(string(result), "\n")
+		fmt.Printf("(%s): %s ✅\n", cmd, trimmedResult)
+	} else {
+		fmt.Printf("(%s): DONE ✅\n", cmd)
+	}
+
+	if err != nil {
+		fmt.Printf("(%s): %s ❌\n", cmd, err.Error())
+	}
+	return string(result), err
+}
+
+const MinBorderDistance = 20
+
+type Rectangle struct {
+	LeftX   int `json:"left_x"`
+	RightX  int `json:"right_x"`
+	TopY    int `json:"top_y"`
+	BottomY int `json:"bottom_y"`
+}
+
+func ImgRectanglesToDomain(imgRectangles []image.Rectangle) []Rectangle {
+	var rectangles []Rectangle
+	for _, imgRectangle := range imgRectangles {
+		rectangles = append(rectangles, Rectangle{
+			LeftX:   imgRectangle.Min.X,
+			RightX:  imgRectangle.Max.X,
+			TopY:    imgRectangle.Min.Y,
+			BottomY: imgRectangle.Max.Y,
+		})
+	}
+	return rectangles
+}
+
+func findAllRectangles(
+	img *gocv.Mat,
+) ([]Rectangle, error) {
+	imgRectangles, err := createRectangles(img)
+	if err != nil {
+		return []Rectangle{}, err
+	}
+
+	imgRectangles = filterRectangles(imgRectangles, img)
+	rectangles := ImgRectanglesToDomain(imgRectangles)
+	return rectangles, nil
+}
+
+func drawRectangles(
+	img *gocv.Mat,
+	rectangles ...Rectangle,
+) {
+	var redColor = color.RGBA{R: 255}
+	for _, rect := range rectangles {
+		imageRect := image.Rect(rect.LeftX, rect.TopY, rect.RightX, rect.BottomY)
+		err := gocv.Rectangle(img, imageRect, redColor, 2)
+		if err != nil {
+			fmt.Println(err)
+			continue
+		}
+	}
+}
+
+func createRectangles(img *gocv.Mat) ([]image.Rectangle, error) {
+	if img == nil {
+		return []image.Rectangle{}, errors.New("img is nil")
+	}
+	grayImg := gocv.NewMat()
+	defer grayImg.Close()
+	err := gocv.CvtColor(*img, &grayImg, gocv.ColorBGRToGray)
+	if err != nil {
+		return []image.Rectangle{}, err
+	}
+
+	threshold := gocv.NewMat()
+	defer threshold.Close()
+
+	err = gocv.AdaptiveThreshold(
+		grayImg,
+		&threshold,
+		255,
+		gocv.AdaptiveThresholdGaussian,
+		gocv.ThresholdBinary,
+		11,
+		2,
+	)
+	if err != nil {
+		return []image.Rectangle{}, err
+	}
+
+	hierarchy := gocv.NewMat()
+	defer hierarchy.Close()
+	contours := gocv.FindContoursWithParams(
+		threshold,
+		&hierarchy,
+		gocv.RetrievalList,
+		gocv.ChainApproxSimple,
+	)
+
+	var rectangles []image.Rectangle
+	for i := 0; i < contours.Size(); i++ {
+		pts := contours.At(i)
+		rect := gocv.BoundingRect(pts)
+		rectangles = append(rectangles, rect)
+	}
+	return rectangles, nil
+}
+
+func filterRectangles(rects []image.Rectangle, img *gocv.Mat) []image.Rectangle {
+	sort.Slice(rects, func(i, j int) bool {
+		areaI := rects[i].Dx() * rects[i].Dy()
+		areaJ := rects[j].Dx() * rects[j].Dy()
+		return areaI > areaJ
+	})
+
+	filtered := make([]image.Rectangle, 0, len(rects))
+	for _, rect := range rects {
+		area := float64(rect.Dx() * rect.Dy())
+		if area < 1000 || rect.Size().X >= img.Cols() || rect.Size().Y >= img.Rows() {
+			continue
+		}
+
+		shouldKeep := true
+		for _, larger := range filtered {
+			currentArea := rect.Dx() * rect.Dy()
+			largerArea := larger.Dx() * larger.Dy()
+
+			if currentArea < largerArea && isCloseToBorder(rect, larger) {
+				shouldKeep = false
+				break
+			}
+		}
+
+		if shouldKeep {
+			filtered = append(filtered, rect)
+		}
+	}
+
+	return filtered
+}
+
+func isCloseToBorder(inner, outer image.Rectangle) bool {
+	leftDist := inner.Min.X - outer.Min.X
+	rightDist := outer.Max.X - inner.Max.X
+	topDist := inner.Min.Y - outer.Min.Y
+	bottomDist := outer.Max.Y - inner.Max.Y
+
+	return ((leftDist >= 0 && leftDist <= MinBorderDistance) ||
+		(rightDist >= 0 && rightDist <= MinBorderDistance) ||
+		(topDist >= 0 && topDist <= MinBorderDistance) ||
+		(bottomDist >= 0 && bottomDist <= MinBorderDistance)) && inner.Overlaps(outer)
 }
