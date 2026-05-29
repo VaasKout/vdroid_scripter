@@ -36,7 +36,7 @@ func (s *serverImpl) handleKeyboardFunctions() {
 			s.handleEditKeyboard(w, r)
 			return
 		}
-		http.Error(w, "use GET method", http.StatusMethodNotAllowed)
+		http.Error(w, "use POST method", http.StatusMethodNotAllowed)
 	})
 
 	http.HandleFunc(ResetKeyboard, func(w http.ResponseWriter, r *http.Request) {

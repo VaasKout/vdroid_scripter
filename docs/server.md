@@ -51,6 +51,12 @@ go mod tidy
 go run cmd/main.go
 ```
 
+### API Reference
+
+The server exposes an HTTP API for managing devices, scripts, the on-screen
+keyboard, and streaming sockets. See [api.md](api.md) for the full list of
+endpoints, request/response formats, and data models.
+
 ### Network & Security Notice
 
 ⚠️ **Important:** The communication between the server and client is **not encrypted (no TLS or encryption layer)**.
