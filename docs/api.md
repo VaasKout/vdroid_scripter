@@ -44,8 +44,6 @@ This document describes every HTTP endpoint exposed by the server, defined in
 | GET | `/devices/{serial}/delete_button` | Delete a keyboard key override |
 | GET | `/start_sockets/{serial}` | Start scrcpy and open streaming sockets |
 
----
-
 ## Devices
 
 ### `GET /ping`
@@ -77,8 +75,6 @@ Returns all ADB devices currently visible to the server.
   }
   ```
   `devices` is `[]` when none are connected.
-
----
 
 ## Scripts
 
@@ -164,8 +160,6 @@ Takes a screenshot and runs OCR to locate matching text on the current screen.
   ```
 - **Errors:** `400` if `serial` is empty.
 
----
-
 ## Keyboard
 
 ### `GET /devices/{serial}/keyboard`
@@ -223,8 +217,6 @@ Deletes a saved keyboard key override.
 - **Response `200`:** `{ "status": "ok" }`
 - **Errors:** `400` if `serial` is empty, `500` if the deletion fails.
 
----
-
 ## Sockets / streaming
 
 ### `GET /start_sockets/{serial}`
@@ -249,8 +241,6 @@ ports.
   results, and to send control commands.
 - **Errors:** `500` if scrcpy could not be started (the connection is then
   closed server-side).
-
----
 
 ## Data models
 
