@@ -149,7 +149,7 @@ func TestRunScript(t *testing.T) {
 func TestFindText(t *testing.T) {
 	var serialPath = fmt.Sprintf("{%s}", server.SerialKey)
 	var url = strings.ReplaceAll(FindTextPath, serialPath, TestSerial)
-	url = fmt.Sprintf("%s?%s=%s", url, server.TextKey, "Контакты")
+	url = fmt.Sprintf("%s?%s=%s", url, server.TextKey, "Contacts")
 
 	var data = ""
 	makeHTTPRequest(

@@ -84,7 +84,7 @@ func TestSaveDefaultKeyboardScript(t *testing.T) {
 func TestGetKeyboard(t *testing.T) {
 	var data = ""
 	var serialPath = fmt.Sprintf("{%s}", server.SerialKey)
-	var localeKey = fmt.Sprintf("%s=ru", server.LocaleKey)
+	var localeKey = fmt.Sprintf("%s=eng", server.LocaleKey)
 	var url = strings.ReplaceAll(GetKeyboardPath, serialPath, TestSerial)
 	url = fmt.Sprintf("%s?%s", url, localeKey)
 	t.Log(url)
