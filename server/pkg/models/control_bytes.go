@@ -3,6 +3,7 @@ package models
 import (
 	"encoding/binary"
 	"encoding/json"
+	"image"
 )
 
 // Size of control bytes buffer
@@ -38,15 +39,18 @@ func (b *ControlBytes) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// GetXY ...
-func (b *ControlBytes) GetXY() (int, int) {
-	if b == nil || len(*b) != ControlBytesSize {
+func (b *ControlBytes) CountOffset(
+	stepZone *image.Rectangle,
+) (int, int) {
+	if ImageRectIsEmpty(stepZone) || b == nil || len(*b) != ControlBytesSize {
 		return 0, 0
 	}
 
 	x := binary.BigEndian.Uint32((*b)[10:14])
 	y := binary.BigEndian.Uint32((*b)[14:18])
-	return int(x), int(y)
+
+	randX, randY := GetRandomXY(stepZone)
+	return randX - int(x), randY - int(y)
 }
 
 // ApplyOffset ...

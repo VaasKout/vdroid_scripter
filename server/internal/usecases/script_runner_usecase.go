@@ -14,11 +14,12 @@ import (
 	"strings"
 	"time"
 	"unicode"
+
+	"gocv.io/x/gocv"
 )
 
-// Attempts to find template zone or text
 const (
-	Attempts = 15
+	Timeout = 15
 )
 
 func (i *interactorImpl) RunScript(serial string, scriptName string, basePort int) error {
@@ -129,7 +130,7 @@ func (i *interactorImpl) executeScript(
 			}
 		}
 
-		time.Sleep(500 * time.Millisecond) //animation delay
+		time.Sleep(300 * time.Millisecond) //animation delay
 	}
 }
 
@@ -144,22 +145,23 @@ func (i *interactorImpl) playEventOnTemplate(
 		return fmt.Errorf("template file not found: %s", tmpImage)
 	}
 
-	for range Attempts {
+	deadline := time.Now().Add(Timeout * time.Second)
+	for time.Now().Before(deadline) {
 		mat, err := i.scrcpy.GetMatFromLastFrame(serial, true)
 		if err != nil {
 			i.logger.Error(err.Error())
-			time.Sleep(1 * time.Second)
+			sleepUntilNextSecond()
 			continue
 		}
 		if mat == nil {
-			time.Sleep(1 * time.Second)
+			sleepUntilNextSecond()
 			continue
 		}
 
 		imgRect, err = i.cv.FindImage(mat, tmpImage)
 		if err != nil {
 			i.logger.Error(err.Error())
-			time.Sleep(1 * time.Second)
+			sleepUntilNextSecond()
 			continue
 		}
 
@@ -195,18 +197,20 @@ func (i *interactorImpl) playEventOnText(
 		cv.WhiteTheme,
 	)
 
-	for range Attempts {
+	deadline := time.Now().Add(Timeout * time.Second)
+	for time.Now().Before(deadline) {
 		mat, err := i.scrcpy.GetMatFromLastFrame(serial, true)
 		if err != nil {
 			i.logger.Error(err.Error())
-			time.Sleep(1 * time.Second)
+			sleepUntilNextSecond()
 			continue
 		}
 		if mat == nil {
 			i.logger.Error("mat is nil")
-			time.Sleep(1 * time.Second)
+			sleepUntilNextSecond()
 			continue
 		}
+		_ = gocv.IMWrite("/Users/vasilykotov/Desktop/img.png", *mat)
 
 		rectangles, err := i.cv.FindTextRectangles(
 			mat,
@@ -217,13 +221,13 @@ func (i *interactorImpl) playEventOnText(
 
 		if err != nil {
 			i.logger.Error(err.Error())
-			time.Sleep(1 * time.Second)
+			sleepUntilNextSecond()
 			continue
 		}
 
 		if len(rectangles) == 0 || rectangles[0].IsEmpty() {
 			i.logger.Error(fmt.Sprintf("text %s not found", step.Text))
-			time.Sleep(1 * time.Second)
+			sleepUntilNextSecond()
 			continue
 		}
 		textRect = rectangles[0].Rectangle.ToImageRectangle()
@@ -242,12 +246,13 @@ func (i *interactorImpl) typeText(
 		return fmt.Errorf("nothing to type")
 	}
 
+	deadline := time.Now().Add(Timeout * time.Second)
 attemptsLoop:
-	for range Attempts {
+	for time.Now().Before(deadline) {
 		keyboardKeys, err := i.getKeyboardKeys(serial, step)
 		if err != nil {
 			i.logger.Error(err.Error())
-			time.Sleep(1 * time.Second)
+			sleepUntilNextSecond()
 			continue attemptsLoop
 		}
 		chars := []rune(strings.ToLower(step.Text))
@@ -271,7 +276,7 @@ attemptsLoop:
 			}
 
 			i.logger.Error(fmt.Sprintf("char %c not found", ch))
-			time.Sleep(1 * time.Second)
+			sleepUntilNextSecond()
 			continue attemptsLoop
 		}
 
@@ -334,7 +339,7 @@ func (i *interactorImpl) playEvent(
 	for index, event := range step.Events {
 		var data = &event.Data
 		if index == 0 {
-			offsetX, offsetY = i.countOffset(data, rect)
+			offsetX, offsetY = data.CountOffset(rect)
 		}
 
 		data.ApplyOffset(offsetX, offsetY)
@@ -346,15 +351,8 @@ func (i *interactorImpl) playEvent(
 	}
 }
 
-func (i *interactorImpl) countOffset(
-	data *models.ControlBytes,
-	stepZone *image.Rectangle,
-) (int, int) {
-	if models.ImageRectIsEmpty(stepZone) || data == nil {
-		return 0, 0
-	}
-
-	x, y := data.GetXY()
-	randX, randY := models.GetRandomXY(stepZone)
-	return randX - x, randY - y
+func sleepUntilNextSecond() {
+	now := time.Now()
+	next := now.Truncate(time.Second).Add(time.Second)
+	time.Sleep(next.Sub(now))
 }
