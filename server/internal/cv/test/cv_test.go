@@ -19,12 +19,57 @@ import (
 )
 
 const (
-	TestSerial = "emulator-5554" //serial number of the device
-	TestImage  = "./test.png"    //example template to compare zone on a screenshot
-	TestLocale = "eng"
+	TestSerial   = "emulator-5554" //serial number of the device
+	TestImage    = "./test.png"    //example template to compare zone on a screenshot
+	TestLocale   = "eng"
+	TestTextFile = "./text_template.png"
 )
 
 func TestGetTextFromImage(t *testing.T) {
+	var fileProps = &config.FilesProps{
+		Logs: "./logs",
+	}
+	var logAPI = logger.New(logger.INFO, true)
+	var filesDB = filesdb.New(fileProps)
+	var cmdRunner = bashcmd.New(filesDB, logAPI)
+	var cvAPI = cv.New(cmdRunner, logAPI)
+
+	dir := filesDB.CreateDBDir(fileProps.Logs, TestSerial, "tesseract")
+	testImage := TestTextFile
+
+	img := gocv.IMRead(testImage, gocv.IMReadColor)
+	if img.Empty() {
+		t.Fatal("could not read screenshot image")
+	}
+	defer img.Close()
+
+	ocrParams := cv.InitOcrParams("", TestLocale, cv.PsmText, cv.OemText)
+	ocrResult, err := cvAPI.FindTextRectangles(&img, dir, ocrParams)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	t.Log(ocrResult)
+	var rectangles = []image.Rectangle{}
+	for _, ocr := range ocrResult {
+		var imgRect = ocr.Rectangle.ToImageRectangle()
+		if imgRect == nil || models.ImageRectIsEmpty(imgRect) {
+			continue
+		}
+		rectangles = append(rectangles, *imgRect)
+	}
+
+	err = cvAPI.DrawRectangles(img, rectangles, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	params := []int{gocv.IMWriteJpegQuality, 90}
+	if ok := gocv.IMWriteWithParams(filepath.Join(dir, testImage), img, params); !ok {
+		fmt.Println("could not write image " + testImage)
+	}
+}
+
+func TestGetTextFromScreenshot(t *testing.T) {
 	var fileProps = &config.FilesProps{
 		Logs: "./logs",
 	}
@@ -42,13 +87,14 @@ func TestGetTextFromImage(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	img := gocv.IMRead(screenshot, gocv.IMReadColor)
 	if img.Empty() {
 		t.Fatal("could not read screenshot image")
 	}
 	defer img.Close()
 
-	ocrParams := cv.InitOcrParams("", TestLocale, cv.PsmText, cv.OemText, cv.WhiteTheme)
+	ocrParams := cv.InitOcrParams("", TestLocale, cv.PsmText, cv.OemText)
 	ocrResult, err := cvAPI.FindTextRectangles(&img, dir, ocrParams)
 	if err != nil {
 		t.Fatal(err)

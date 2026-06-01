@@ -17,8 +17,6 @@ const (
 	DefaultOCRLanguage = "eng"
 	Numbers            = "numbers"
 	Phone              = "phone"
-	WhiteTheme         = 230
-	BlackTheme         = 120
 	MaxThreshHold      = 255
 
 	PsmText  = 11
@@ -45,7 +43,6 @@ type OcrParams struct {
 	Text      string
 	Lang      string
 	Psm       int
-	Theme     float32
 	Oem       int
 	WhiteList string
 }
@@ -60,10 +57,9 @@ type TextHandler interface {
 }
 
 // InitOcrParams ...
-func InitOcrParams(text string, lang string, psm int, oem int, theme float32) *OcrParams {
+func InitOcrParams(text string, lang string, psm int, oem int) *OcrParams {
 	var ocrParams = new(OcrParams)
 	ocrParams.Text = text
-	ocrParams.Theme = theme
 	ocrParams.Psm = psm
 	ocrParams.Oem = oem
 
@@ -95,7 +91,7 @@ func (c *cvImpl) FindTextRectangles(
 		return []OCRResult{}, errors.New("params are empty")
 	}
 
-	err := c.createEdges(img, dir, params.Theme)
+	err := c.createEdges(img, dir)
 	if err != nil {
 		fmt.Println("Create edges error: " + err.Error())
 		return []OCRResult{}, err
@@ -108,30 +104,33 @@ func (c *cvImpl) FindTextRectangles(
 		params.Oem,
 		params.WhiteList,
 	)
-
 	if err != nil {
 		fmt.Println("ReadTextFromImage: " + err.Error())
 		return []OCRResult{}, err
 	}
 
-	result := c.findRectangleInOcrJSON(filepath.Join(dir, OcrJSON), params.Text)
-	return result, nil
+	results := c.findRectangleInOcrJSON(filepath.Join(dir, OcrJSON), params.Text)
+	return results, nil
 }
 
-func (c *cvImpl) createEdges(img *gocv.Mat, dir string, thresh float32) error {
+func (c *cvImpl) createEdges(img *gocv.Mat, dir string) error {
 	if img.Empty() {
 		return errors.New("createEdges img empty")
 	}
-	edges := gocv.NewMat()
-	defer edges.Close()
-
 	gray := gocv.NewMat()
 	defer gray.Close()
 	err := gocv.CvtColor(*img, &gray, gocv.ColorBGRToGray)
 	if err != nil {
 		return err
 	}
-	gocv.Threshold(gray, &edges, thresh, MaxThreshHold, gocv.ThresholdBinary)
+
+	edges := gocv.NewMat()
+	defer edges.Close()
+	gocv.Threshold(gray, &edges, 0, MaxThreshHold, gocv.ThresholdBinary|gocv.ThresholdOtsu)
+
+	if gocv.CountNonZero(edges)*2 < edges.Rows()*edges.Cols() {
+		gocv.BitwiseNot(edges, &edges)
+	}
 
 	var edgesPath = filepath.Join(dir, EdgesPng)
 	ok := gocv.IMWrite(edgesPath, edges)

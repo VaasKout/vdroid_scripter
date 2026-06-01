@@ -14,8 +14,6 @@ import (
 	"strings"
 	"time"
 	"unicode"
-
-	"gocv.io/x/gocv"
 )
 
 const (
@@ -194,7 +192,6 @@ func (i *interactorImpl) playEventOnText(
 		step.Locale,
 		cv.PsmText,
 		cv.OemText,
-		cv.WhiteTheme,
 	)
 
 	deadline := time.Now().Add(Timeout * time.Second)
@@ -210,7 +207,6 @@ func (i *interactorImpl) playEventOnText(
 			sleepUntilNextSecond()
 			continue
 		}
-		_ = gocv.IMWrite("/Users/vasilykotov/Desktop/img.png", *mat)
 
 		rectangles, err := i.cv.FindTextRectangles(
 			mat,

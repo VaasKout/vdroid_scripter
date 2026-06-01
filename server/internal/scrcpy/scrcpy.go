@@ -31,9 +31,8 @@ const (
 	CVRects
 )
 
-// Attempts to find rectangle and establish scrcpy connection on start
+// Attempts to establish scrcpy connection on start
 const (
-	Attempts     = 3
 	ConnAttempts = 4
 )
 

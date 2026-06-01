@@ -119,7 +119,6 @@ func (i *interactorImpl) FindText(
 		locale,
 		cv.PsmText,
 		cv.OemText,
-		cv.WhiteTheme,
 	)
 
 	result, err := i.cv.FindTextRectangles(&img, dir, ocrParams)

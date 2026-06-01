@@ -102,7 +102,6 @@ func (c *cvImpl) ResetKeyboardKeys(
 		lang,
 		PsmChars,
 		OemChars,
-		BlackTheme,
 	)
 
 	for _, rect := range keyboardRects {
