@@ -1,30 +1,28 @@
-### Dependencies
-
-To run the server, you must install the following dependencies:
-
-* **Go**
-* **ADB**
-* **FFmpeg**
-* **OpenCV**
-* **Tesseract OCR**
-
 ### Installation
 
-#### Arch Linux
+From the project root, run:
 
 ```bash
-sudo pacman -S go android-tools ffmpeg opencv tesseract $(pacman -Sl extra | grep tesseract-data | awk '{print $2}')
+./install.sh
 ```
 
-#### macOS
+The script installs the required dependencies (Go, ADB, FFmpeg, OpenCV,
+Tesseract OCR), builds the server, and installs the `vdroid-scripter` binary to
+`/usr/local/bin`. Supported out of the box: macOS (Homebrew), Arch,
+Debian/Ubuntu, and Fedora.
+
+By default the binary goes to `/usr/local/bin` (the script uses `sudo` only if
+that directory is not writable). Set `PREFIX` to install into a custom directory
+instead — the binary is placed in `$PREFIX/bin`. For example,
+`PREFIX="$HOME/.local"` installs to `~/.local/bin` (a user-local install that
+needs no `sudo`), and `PREFIX="/opt/vdroid"` installs to `/opt/vdroid/bin`.
 
 ```bash
-brew install go android-platform-tools ffmpeg opencv tesseract tesseract-lang
+PREFIX="$HOME/.local" ./install.sh
 ```
-Install legacy tesseract data for more precise keyboard detection:
-```bash
-sudo curl -L https://github.com/tesseract-ocr/tessdata/raw/main/eng.traineddata -o /opt/homebrew/share/tessdata/eng.traineddata
-```
+
+If the chosen `$PREFIX/bin` is not already on your `PATH`, the script prints the
+`export PATH=...` line to add to your shell profile.
 
 ### Preparing the Android Device (Target Device)
 
@@ -44,17 +42,22 @@ adb devices
 
 ### Running the Server
 
-Navigate to the server directory and run:
+Connect a device and start the server:
 
 ```bash
-go mod tidy
-go run cmd/main.go
+vdroid-scripter
+```
+
+For development, you can run from source instead:
+
+```bash
+cd server && go run cmd/main.go
 ```
 
 ### API Reference
 
 The server exposes an HTTP API for managing devices, scripts, the on-screen
-keyboard, and streaming sockets. See [api.md](api.md) for the full list of
+keyboard, and streaming sockets. See [api](api.md) for the full list of
 endpoints, request/response formats, and data models.
 
 ### Network & Security Notice
