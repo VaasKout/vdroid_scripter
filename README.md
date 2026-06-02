@@ -6,10 +6,8 @@
 
 This is a tool for remotely controlling Android devices and creating automation scripts using computer vision without requiring users to manually write code or commands.
 
-<br clear="left"/>
-
----
 The project consists of two main components:
+<br clear="left"/>
 
 * **Server**
   A Golang-based microservice responsible for receiving video streams and sending control inputs. It leverages [scrcpy-server](https://github.com/Genymobile/scrcpy/tree/master/server) for efficient screen streaming and interaction.
