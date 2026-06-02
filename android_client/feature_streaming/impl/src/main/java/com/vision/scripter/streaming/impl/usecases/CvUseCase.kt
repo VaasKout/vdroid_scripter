@@ -21,6 +21,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.serialization.json.Json
+import java.util.concurrent.atomic.AtomicReference
 import javax.inject.Inject
 
 @ViewModelScoped
@@ -32,6 +33,8 @@ class CvUseCase @Inject constructor(
 
     private val _rectanglesFlow = MutableStateFlow<List<CvRectangle>>(listOf())
     private val _selectedRectangles = MutableStateFlow<List<CvRectangle>>(listOf())
+
+    private val selectedRectanglesSnapshot = AtomicReference<List<CvRectangle>>(listOf())
 
     fun observeRectangles(
         coroutineScope: CoroutineScope,
@@ -163,6 +166,14 @@ class CvUseCase @Inject constructor(
 
     fun clearSelectedRectangles() {
         _selectedRectangles.update { listOf() }
+    }
+
+    fun snapshotSelectedRectangles() {
+        selectedRectanglesSnapshot.set(_selectedRectangles.value)
+    }
+
+    fun restoreSelectedRectangles() {
+        _selectedRectangles.value = selectedRectanglesSnapshot.getAndSet(listOf())
     }
 
     fun clearAllRectangles() {

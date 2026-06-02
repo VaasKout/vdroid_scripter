@@ -91,11 +91,7 @@ class MenuInteractor @Inject constructor() {
             is MenuState.SelectingText -> {
                 val text = state.flags.nextText()
                 _menuState.update { state.copy(flags = text) }
-                if (text == 0) {
-                    TextModeAction.DisableSelection
-                } else {
-                    TextModeAction.None
-                }
+                TextModeAction.None
             }
 
             is MenuState.Usual -> {
@@ -143,9 +139,10 @@ class MenuInteractor @Inject constructor() {
             is MenuState.SelectingText -> {
                 val flags = record.flags.combineText(state.flags)
                 _menuState.update { MenuState.Recording(flags = flags) }
+                val hasText = state.flags != 0
                 SaveAction.SaveTextSelection(
-                    text = state.text,
-                    locale = state.locale,
+                    text = if (hasText) state.text else "",
+                    locale = if (hasText) state.locale else "",
                     flags = flags,
                 )
             }
@@ -258,7 +255,6 @@ data class CvModeAction(
 
 sealed interface TextModeAction {
     data object None : TextModeAction
-    data object DisableSelection : TextModeAction
     data object ClearRectangles : TextModeAction
 }
 

@@ -319,7 +319,11 @@ class StreamingInteractor @Inject constructor(
 
     override fun onCvModeClicked() {
         coroutineScope.launch {
+            val enteringSelection = menuInteractor.observeMenuState().value is MenuState.Recording
             val action = menuInteractor.onCvModeClicked() ?: return@launch
+            if (enteringSelection) {
+                cvUseCase.snapshotSelectedRectangles()
+            }
             cvUseCase.nextCvMode(action.newCvMode)
             if (action.disableSelection) {
                 cvUseCase.clearSelectedRectangles()
@@ -330,7 +334,6 @@ class StreamingInteractor @Inject constructor(
     override fun onTextModeClicked() {
         coroutineScope.launch {
             when (menuInteractor.onTextModeClicked()) {
-                TextModeAction.DisableSelection -> cvUseCase.clearSelectedRectangles()
                 TextModeAction.ClearRectangles -> cvUseCase.clearAllRectangles()
                 TextModeAction.None -> Unit
             }
@@ -343,6 +346,9 @@ class StreamingInteractor @Inject constructor(
 
             val screenSizes = videoUseCase.observeScreenSizes().value ?: return@launch
             val trimmed = text.trim()
+            if (menuInteractor.observeMenuState().value is MenuState.Recording) {
+                cvUseCase.snapshotSelectedRectangles()
+            }
             val found = cvUseCase.findTextRectangles(
                 serial = currentState.serial,
                 text = trimmed,
@@ -382,6 +388,9 @@ class StreamingInteractor @Inject constructor(
                                 flags = action.flags,
                             )
                         )
+                    }
+                    if (action.flags.textFlag() == 0) {
+                        cvUseCase.clearSelectedRectangles()
                     }
                     cvUseCase.nextCvMode(CVMode.NO_CV)
                 }
@@ -431,13 +440,19 @@ class StreamingInteractor @Inject constructor(
 
     override fun onCancelClicked() {
         coroutineScope.launch {
+            val previousMenu = menuInteractor.observeMenuState().value
             val wasRecording = menuInteractor.onCancelClicked(currentState.record)
+            cvUseCase.nextCvMode(CVMode.NO_CV)
 
             if (wasRecording) {
                 cvUseCase.clearSelectedRectangles()
                 _stateFlow.update { it.copy(record = StreamingState.Record()) }
+                return@launch
             }
-            cvUseCase.nextCvMode(CVMode.NO_CV)
+
+            if (previousMenu is MenuState.SelectingCV || previousMenu is MenuState.SelectingText) {
+                cvUseCase.restoreSelectedRectangles()
+            }
         }
     }
 
