@@ -1,6 +1,6 @@
-<img src="docs/icon.png" align="left" width="120" height="120" alt="VDroid Scripter" />
-
 # VDroid Scripter
+
+<img src="docs/icon.png" align="left" width="120" height="120" alt="VDroid Scripter" />
 
 **VDroid Scripter** stands for "Visual Android Scripter".
 
