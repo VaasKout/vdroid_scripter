@@ -8,6 +8,7 @@ This is a tool for remotely controlling Android devices and creating automation 
 
 <br clear="left"/>
 
+---
 The project consists of two main components:
 
 * **Server**
