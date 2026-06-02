@@ -1,9 +1,13 @@
 package com.vision.scripter.streaming.impl.state
 
 import com.vision.scripter.data.api.models.CvRectangle
+import com.vision.scripter.data.api.models.EVENT_ON_TEMPLATE
+import com.vision.scripter.data.api.models.EVENT_ON_TEXT
 import com.vision.scripter.data.api.models.RectangleWithText
 import com.vision.scripter.data.api.models.StepEvent
 import com.vision.scripter.data.api.models.StreamingData
+import com.vision.scripter.data.api.models.TEMPLATE_IS_VISIBLE
+import com.vision.scripter.data.api.models.TEXT_IS_VISIBLE
 import com.vision.scripter.streaming.impl.video.VideoCodec
 import com.vision.scripter.ui.states.LoadingState
 
@@ -44,9 +48,7 @@ data class StreamingState(
         val stepEvents: List<StepEvent> = listOf(),
         val text: String = "",
         val locale: String = "",
-        val templateSelectMode: CvSelectMode = CvSelectMode.NONE,
-        val textSelectMode: CvSelectMode = CvSelectMode.NONE,
-        val typeText: Boolean = false,
+        val flags: Int = 0,
     ) {
         fun clearStep() = Record(recordName = recordName)
     }
@@ -65,17 +67,15 @@ sealed interface MenuState {
 
     data class Recording(
         val controlRecording: Boolean = false,
-        val templateSelectMode: CvSelectMode = CvSelectMode.NONE,
-        val textSelectMode: CvSelectMode = CvSelectMode.NONE,
-        val typeText: Boolean = false,
+        val flags: Int = 0,
     ) : MenuState
 
     data class SelectingCV(
-        val selectMode: CvSelectMode = CvSelectMode.APPLY_EVENT,
+        val flags: Int = EVENT_ON_TEMPLATE,
     ) : MenuState
 
     data class SelectingText(
-        val selectMode: CvSelectMode = CvSelectMode.APPLY_EVENT,
+        val flags: Int = EVENT_ON_TEXT,
         val text: String = "",
         val locale: String = "",
     ) : MenuState
@@ -102,24 +102,35 @@ fun CVMode.increment(): CVMode {
     return newMode ?: CVMode.NO_CV
 }
 
-enum class CvSelectMode {
-    NONE,
-    APPLY_EVENT,
-    VISIBLE,
+fun Int.hasFlag(flag: Int): Boolean = this and flag != 0
+
+fun Int.withFlag(flag: Int, enabled: Boolean): Int =
+    if (enabled) this or flag else this and flag.inv()
+
+fun Int.templateFlag(): Int = this and (EVENT_ON_TEMPLATE or TEMPLATE_IS_VISIBLE)
+
+fun Int.textFlag(): Int = this and (EVENT_ON_TEXT or TEXT_IS_VISIBLE)
+
+fun Int.combineTemplate(template: Int): Int =
+    (this and (EVENT_ON_TEMPLATE or TEMPLATE_IS_VISIBLE).inv()) or template
+
+fun Int.combineText(text: Int): Int =
+    (this and (EVENT_ON_TEXT or TEXT_IS_VISIBLE).inv()) or text
+
+fun Int.nextTemplate(): Int = when (this) {
+    EVENT_ON_TEMPLATE -> TEMPLATE_IS_VISIBLE
+    TEMPLATE_IS_VISIBLE -> 0
+    else -> EVENT_ON_TEMPLATE
 }
 
-fun CvSelectMode.increment(): CvSelectMode {
-    return when (this) {
-        CvSelectMode.NONE -> CvSelectMode.APPLY_EVENT
-        CvSelectMode.APPLY_EVENT -> CvSelectMode.VISIBLE
-        else -> CvSelectMode.NONE
-    }
+fun Int.nextTemplateActive(): Int = when (this) {
+    EVENT_ON_TEMPLATE -> TEMPLATE_IS_VISIBLE
+    TEMPLATE_IS_VISIBLE -> EVENT_ON_TEMPLATE
+    else -> EVENT_ON_TEMPLATE
 }
 
-fun CvSelectMode.incrementOnlyActive(): CvSelectMode {
-    return when (this) {
-        CvSelectMode.APPLY_EVENT -> CvSelectMode.VISIBLE
-        CvSelectMode.VISIBLE -> CvSelectMode.APPLY_EVENT
-        else -> CvSelectMode.APPLY_EVENT
-    }
+fun Int.nextText(): Int = when (this) {
+    EVENT_ON_TEXT -> TEXT_IS_VISIBLE
+    TEXT_IS_VISIBLE -> 0
+    else -> EVENT_ON_TEXT
 }

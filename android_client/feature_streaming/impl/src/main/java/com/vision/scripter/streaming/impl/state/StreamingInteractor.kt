@@ -7,13 +7,10 @@ import androidx.core.net.toUri
 import com.vision.scripter.coroutines.api.CoroutineScopeFactory
 import com.vision.scripter.data.api.ControlStreamer
 import com.vision.scripter.data.api.ScripterRepository
-import com.vision.scripter.data.api.models.EVENT_ON_TEMPLATE
-import com.vision.scripter.data.api.models.EVENT_ON_TEXT
 import com.vision.scripter.data.api.models.RectangleWithText
 import com.vision.scripter.data.api.models.ScriptStep
 import com.vision.scripter.data.api.models.StepEvent
 import com.vision.scripter.data.api.models.StreamingData
-import com.vision.scripter.data.api.models.TYPE_TEXT
 import com.vision.scripter.data.api.models.adjustToClient
 import com.vision.scripter.data.api.models.contains
 import com.vision.scripter.data.api.models.extractPressEvent
@@ -322,9 +319,7 @@ class StreamingInteractor @Inject constructor(
 
     override fun onCvModeClicked() {
         coroutineScope.launch {
-            val action = menuInteractor.onCvModeClicked(
-                templateSelectMode = currentState.record.templateSelectMode,
-            ) ?: return@launch
+            val action = menuInteractor.onCvModeClicked() ?: return@launch
             cvUseCase.nextCvMode(action.newCvMode)
             if (action.disableSelection) {
                 cvUseCase.clearSelectedRectangles()
@@ -365,10 +360,10 @@ class StreamingInteractor @Inject constructor(
 
     override fun onSaveClicked() {
         coroutineScope.launch {
-            when (val action = menuInteractor.onSaveClicked()) {
+            when (val action = menuInteractor.onSaveClicked(currentState.record)) {
                 is SaveAction.SaveTemplate -> {
                     _stateFlow.update {
-                        it.copy(record = it.record.copy(templateSelectMode = action.selectMode))
+                        it.copy(record = it.record.copy(flags = action.flags))
                     }
                     val screenSizes = videoUseCase.observeScreenSizes().value ?: return@launch
                     cvUseCase.saveSelectedRectangle(
@@ -384,7 +379,7 @@ class StreamingInteractor @Inject constructor(
                             record = it.record.copy(
                                 text = action.text,
                                 locale = action.locale,
-                                textSelectMode = action.selectMode,
+                                flags = action.flags,
                             )
                         )
                     }
@@ -397,7 +392,7 @@ class StreamingInteractor @Inject constructor(
                         it.copy(
                             record = it.record.copy(
                                 text = action.text,
-                                typeText = action.text.isNotEmpty(),
+                                flags = action.flags,
                                 stepEvents = pressEvent,
                             )
                         )
@@ -417,7 +412,7 @@ class StreamingInteractor @Inject constructor(
             name = record.recordName,
             step = ScriptStep(
                 events = record.stepEvents,
-                flags = getFlags(),
+                flags = record.flags,
                 text = record.text,
                 locale = record.locale,
             ),
@@ -431,16 +426,6 @@ class StreamingInteractor @Inject constructor(
         menuInteractor.onStepSaved()
         _stateFlow.update {
             it.copy(record = it.record.clearStep())
-        }
-    }
-
-    private fun getFlags(): Int {
-        val record = currentState.record
-        return when {
-            record.typeText -> TYPE_TEXT
-            record.templateSelectMode == CvSelectMode.APPLY_EVENT -> EVENT_ON_TEMPLATE
-            record.textSelectMode == CvSelectMode.APPLY_EVENT -> EVENT_ON_TEXT
-            else -> 0
         }
     }
 

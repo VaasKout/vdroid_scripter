@@ -18,8 +18,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import com.vision.scripter.streaming.impl.state.CvSelectMode
+import com.vision.scripter.data.api.models.EVENT_ON_TEMPLATE
+import com.vision.scripter.data.api.models.EVENT_ON_TEXT
+import com.vision.scripter.data.api.models.TEMPLATE_IS_VISIBLE
+import com.vision.scripter.data.api.models.TEXT_IS_VISIBLE
+import com.vision.scripter.data.api.models.TYPE_TEXT
 import com.vision.scripter.streaming.impl.state.MenuState
+import com.vision.scripter.streaming.impl.state.hasFlag
 import com.vision.scripter.ui.customClickable
 
 @Composable
@@ -57,9 +62,8 @@ fun ScriptMenu(
         )
 
         BaseMenuIcons(
-            visibilitySelectMode = menuState.templateSelectMode,
-            textSelectMode = menuState.textSelectMode,
-            keyboardHighlighted = menuState.typeText,
+            flags = menuState.flags,
+            keyboardHighlighted = menuState.flags.hasFlag(TYPE_TEXT),
             onCvModeClick = onCvModeClick,
             onTextClick = onTextModeClick,
             onKeyboardClick = onKeyboardClick,
@@ -90,8 +94,7 @@ fun ScriptMenu(
 private fun ScriptMenuDefaultPreview() {
     ScriptMenu(
         menuState = MenuState.Recording(
-            textSelectMode = CvSelectMode.VISIBLE,
-            templateSelectMode = CvSelectMode.APPLY_EVENT,
+            flags = EVENT_ON_TEMPLATE or TEXT_IS_VISIBLE,
         ),
         onRecordingClick = {},
         onCvModeClick = {},
@@ -108,9 +111,7 @@ private fun ScriptMenuRecordingPreview() {
     ScriptMenu(
         menuState = MenuState.Recording(
             controlRecording = true,
-            textSelectMode = CvSelectMode.APPLY_EVENT,
-            templateSelectMode = CvSelectMode.VISIBLE,
-            typeText = true,
+            flags = TEMPLATE_IS_VISIBLE or EVENT_ON_TEXT or TYPE_TEXT,
         ),
         onRecordingClick = {},
         onCvModeClick = {},

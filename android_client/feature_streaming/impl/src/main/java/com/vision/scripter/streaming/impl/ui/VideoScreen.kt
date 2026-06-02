@@ -63,7 +63,7 @@ fun VideoScreen(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
                         .padding(top = 128.dp),
-                    mode = state.menuState.selectMode,
+                    flags = state.menuState.flags,
                     onCvModeClick = uiStateHolder::onCvModeClicked,
                     onSaveClick = uiStateHolder::onSaveClicked,
                     onBackClick = uiStateHolder::onCancelClicked,
@@ -75,7 +75,7 @@ fun VideoScreen(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
                         .padding(top = 128.dp),
-                    mode = state.menuState.selectMode,
+                    flags = state.menuState.flags,
                     onTextModeClick = uiStateHolder::onTextModeClicked,
                     onSaveClick = uiStateHolder::onSaveClicked,
                     onBackClick = uiStateHolder::onCancelClicked,

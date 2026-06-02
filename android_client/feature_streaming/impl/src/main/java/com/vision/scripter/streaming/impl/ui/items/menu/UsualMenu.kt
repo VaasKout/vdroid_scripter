@@ -18,9 +18,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.vision.scripter.data.api.models.EVENT_ON_TEMPLATE
+import com.vision.scripter.data.api.models.EVENT_ON_TEXT
 import com.vision.scripter.streaming.impl.state.CVMode
-import com.vision.scripter.streaming.impl.state.CvSelectMode
 import com.vision.scripter.streaming.impl.state.MenuState
+import com.vision.scripter.streaming.impl.state.withFlag
 import com.vision.scripter.ui.customClickable
 
 @Composable
@@ -56,13 +58,8 @@ fun UsualMenu(
             )
 
             BaseMenuIcons(
-                visibilitySelectMode = menuState.cvMode.toSelectMode(),
+                flags = menuState.toFlags(),
                 onCvModeClick = onCvModeClick,
-                textSelectMode = if (menuState.textHighlighted) {
-                    CvSelectMode.APPLY_EVENT
-                } else {
-                    CvSelectMode.NONE
-                },
                 onTextClick = onTextModeClick,
                 keyboardHighlighted = false,
                 onKeyboardClick = onKeyboardClick,
@@ -97,10 +94,9 @@ fun UsualMenu(
     )
 }
 
-private fun CVMode.toSelectMode(): CvSelectMode = when (this) {
-    CVMode.NO_CV -> CvSelectMode.NONE
-    CVMode.CV_RECTS -> CvSelectMode.APPLY_EVENT
-}
+private fun MenuState.Usual.toFlags(): Int =
+    0.withFlag(EVENT_ON_TEMPLATE, cvMode == CVMode.CV_RECTS)
+        .withFlag(EVENT_ON_TEXT, textHighlighted)
 
 @Preview
 @Composable

@@ -1,5 +1,6 @@
 package com.vision.scripter.streaming.impl.state
 
+import com.vision.scripter.data.api.models.TYPE_TEXT
 import dagger.hilt.android.scopes.ViewModelScoped
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -48,25 +49,25 @@ class MenuInteractor @Inject constructor() {
         _dialogState.update { DialogState.KEYBOARD }
     }
 
-    fun onCvModeClicked(templateSelectMode: CvSelectMode): CvModeAction? {
+    fun onCvModeClicked(): CvModeAction? {
         return when (val state = _menuState.value) {
             is MenuState.Recording -> {
-                val selectMode = templateSelectMode.incrementOnlyActive()
-                _menuState.update { MenuState.SelectingCV(selectMode = selectMode) }
+                val template = state.flags.templateFlag().nextTemplateActive()
+                _menuState.update { MenuState.SelectingCV(flags = template) }
                 CvModeAction(newCvMode = CVMode.CV_RECTS)
             }
 
             is MenuState.SelectingCV -> {
-                val selectMode = state.selectMode.increment()
-                val cvMode = if (selectMode != CvSelectMode.NONE) {
+                val template = state.flags.nextTemplate()
+                val cvMode = if (template != 0) {
                     CVMode.CV_RECTS
                 } else {
                     CVMode.NO_CV
                 }
-                _menuState.update { state.copy(selectMode = selectMode) }
+                _menuState.update { state.copy(flags = template) }
                 CvModeAction(
                     newCvMode = cvMode,
-                    disableSelection = selectMode == CvSelectMode.NONE,
+                    disableSelection = template == 0,
                 )
             }
 
@@ -88,9 +89,9 @@ class MenuInteractor @Inject constructor() {
             }
 
             is MenuState.SelectingText -> {
-                val newTextMode = state.selectMode.increment()
-                _menuState.update { state.copy(selectMode = newTextMode) }
-                if (newTextMode == CvSelectMode.NONE) {
+                val text = state.flags.nextText()
+                _menuState.update { state.copy(flags = text) }
+                if (text == 0) {
                     TextModeAction.DisableSelection
                 } else {
                     TextModeAction.None
@@ -114,7 +115,7 @@ class MenuInteractor @Inject constructor() {
         when (val state = _menuState.value) {
             is MenuState.Recording -> _menuState.update {
                 MenuState.SelectingText(
-                    selectMode = state.textSelectMode.increment(),
+                    flags = state.flags.textFlag().nextText(),
                     text = text,
                     locale = locale,
                 )
@@ -131,25 +132,28 @@ class MenuInteractor @Inject constructor() {
         }
     }
 
-    fun onSaveClicked(): SaveAction {
+    fun onSaveClicked(record: StreamingState.Record): SaveAction {
         return when (val state = _menuState.value) {
             is MenuState.SelectingCV -> {
-                _menuState.update { MenuState.Recording(templateSelectMode = state.selectMode) }
-                SaveAction.SaveTemplate(selectMode = state.selectMode)
+                val flags = record.flags.combineTemplate(state.flags)
+                _menuState.update { MenuState.Recording(flags = flags) }
+                SaveAction.SaveTemplate(flags = flags)
             }
 
             is MenuState.SelectingText -> {
-                _menuState.update { MenuState.Recording(textSelectMode = state.selectMode) }
+                val flags = record.flags.combineText(state.flags)
+                _menuState.update { MenuState.Recording(flags = flags) }
                 SaveAction.SaveTextSelection(
                     text = state.text,
                     locale = state.locale,
-                    selectMode = state.selectMode,
+                    flags = flags,
                 )
             }
 
             is MenuState.Keyboard -> {
-                _menuState.update { MenuState.Recording(typeText = state.typeText.isNotEmpty()) }
-                SaveAction.SaveTyping(text = state.typeText)
+                val flags = record.flags.withFlag(TYPE_TEXT, state.typeText.isNotEmpty())
+                _menuState.update { MenuState.Recording(flags = flags) }
+                SaveAction.SaveTyping(text = state.typeText, flags = flags)
             }
 
             else -> SaveAction.SaveStep
@@ -169,13 +173,7 @@ class MenuInteractor @Inject constructor() {
         if (backToUsual) {
             _menuState.update { MenuState.Usual(expanded = true) }
         } else {
-            _menuState.update {
-                MenuState.Recording(
-                    templateSelectMode = record.templateSelectMode,
-                    textSelectMode = record.textSelectMode,
-                    typeText = record.typeText,
-                )
-            }
+            _menuState.update { MenuState.Recording(flags = record.flags) }
         }
         return wasRecording
     }
@@ -199,13 +197,7 @@ class MenuInteractor @Inject constructor() {
         val state = _menuState.value
         hideDialog()
         if (state is MenuState.Recording) {
-            _menuState.update {
-                MenuState.Recording(
-                    templateSelectMode = record.templateSelectMode,
-                    textSelectMode = record.textSelectMode,
-                    typeText = record.typeText,
-                )
-            }
+            _menuState.update { MenuState.Recording(flags = record.flags) }
         }
     }
 
@@ -271,14 +263,14 @@ sealed interface TextModeAction {
 }
 
 sealed interface SaveAction {
-    data class SaveTemplate(val selectMode: CvSelectMode) : SaveAction
+    data class SaveTemplate(val flags: Int) : SaveAction
     data class SaveTextSelection(
         val text: String,
         val locale: String,
-        val selectMode: CvSelectMode,
+        val flags: Int,
     ) : SaveAction
 
-    data class SaveTyping(val text: String) : SaveAction
+    data class SaveTyping(val text: String, val flags: Int) : SaveAction
     data object SaveStep : SaveAction
 }
 
