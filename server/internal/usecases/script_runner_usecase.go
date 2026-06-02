@@ -94,17 +94,17 @@ func (i *interactorImpl) executeScript(
 		return
 	}
 
-	defer i.logger.Info(fmt.Sprintf("end of script %s... 🛑", script.Name))
 	if newConnection {
 		go i.scrcpy.ReadVideoStream(serial, nil)
 	}
 
 	for _, step := range script.Steps {
+		i.logger.Info(fmt.Sprintf("running step %d... ⏳", step.ID))
 		if step.Flags == 0 {
 			i.playEvent(serial, nil, &step)
 		}
 
-		if step.Flags&models.EventOnTemplate != 0 {
+		if step.Flags&models.EventOnTemplate != 0 || step.Flags&models.TemplateIsVisible != 0 {
 			err := i.playEventOnTemplate(serial, &step, scriptDir)
 			if err != nil {
 				i.logger.Error(err.Error())
@@ -112,7 +112,7 @@ func (i *interactorImpl) executeScript(
 			}
 		}
 
-		if step.Flags&models.EventOnText != 0 {
+		if step.Flags&models.EventOnText != 0 || step.Flags&models.TextIsVisible != 0 {
 			err := i.playEventOnText(serial, &step)
 			if err != nil {
 				i.logger.Error(err.Error())
@@ -130,6 +130,8 @@ func (i *interactorImpl) executeScript(
 
 		time.Sleep(300 * time.Millisecond) //animation delay
 	}
+
+	i.logger.Info(fmt.Sprintf("script %s is COMPLETE ✅", script.Name))
 }
 
 func (i *interactorImpl) playEventOnTemplate(
@@ -174,7 +176,9 @@ func (i *interactorImpl) playEventOnTemplate(
 		return fmt.Errorf("template not found")
 	}
 
-	i.playEvent(serial, imgRect, step)
+	if step.Flags&models.EventOnTemplate != 0 {
+		i.playEvent(serial, imgRect, step)
+	}
 	return nil
 }
 
@@ -230,7 +234,9 @@ func (i *interactorImpl) playEventOnText(
 		break
 	}
 
-	i.playEvent(serial, textRect, step)
+	if textRect != nil && step.Flags&models.EventOnText != 0 {
+		i.playEvent(serial, textRect, step)
+	}
 	return nil
 }
 
