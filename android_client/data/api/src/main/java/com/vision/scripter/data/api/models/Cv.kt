@@ -91,6 +91,6 @@ fun CvRectangle?.contains(x: Int, y: Int): Boolean {
 
 fun List<CvRectangle>.smallestBy(x: Int, y: Int): CvRectangle? {
     return filter { it.contains(x, y) }.minByOrNull {
-        it.rightX - it.leftX * it.bottomY - it.topY
+        (it.rightX - it.leftX) * (it.bottomY - it.topY)
     }
 }

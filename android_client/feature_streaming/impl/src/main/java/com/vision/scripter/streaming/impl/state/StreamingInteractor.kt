@@ -1,7 +1,8 @@
 package com.vision.scripter.streaming.impl.state
 
-import android.view.KeyEvent.ACTION_UP
 import android.view.MotionEvent
+import android.view.MotionEvent.ACTION_DOWN
+import android.view.MotionEvent.ACTION_UP
 import android.view.Surface
 import androidx.core.net.toUri
 import com.vision.scripter.coroutines.api.CoroutineScopeFactory
@@ -195,7 +196,9 @@ class StreamingInteractor @Inject constructor(
             mutex.withLock {
                 val menuState = menuInteractor.observeMenuState().value
                 if (menuState is MenuState.SelectingCV) {
-                    cvUseCase.selectRectangle(x = event.x.toInt(), y = event.y.toInt())
+                    if (event.action == ACTION_DOWN) {
+                        cvUseCase.selectRectangle(x = event.x.toInt(), y = event.y.toInt())
+                    }
                     return@launch
                 }
 
@@ -270,11 +273,13 @@ class StreamingInteractor @Inject constructor(
                     menuState is MenuState.Recording && menuState.controlRecording)
         ) return
 
-        if (startRecordingTime == 0L) {
+        val elapsedMs = if (startRecordingTime == 0L) {
             startRecordingTime = System.nanoTime()
+            0L
+        } else {
+            (System.nanoTime() - startRecordingTime) / 1_000_000L
         }
 
-        val elapsedMs = (System.nanoTime() - startRecordingTime) / 1_000_000L
         val newStepEvent = StepEvent(
             time = elapsedMs,
             data = bytesArray,
