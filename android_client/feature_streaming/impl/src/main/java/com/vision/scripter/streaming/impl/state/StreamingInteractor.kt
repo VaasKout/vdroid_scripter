@@ -1,7 +1,7 @@
 package com.vision.scripter.streaming.impl.state
 
+import android.view.KeyEvent.ACTION_UP
 import android.view.MotionEvent
-import android.view.MotionEvent.ACTION_UP
 import android.view.Surface
 import androidx.core.net.toUri
 import com.vision.scripter.coroutines.api.CoroutineScopeFactory
@@ -203,18 +203,13 @@ class StreamingInteractor @Inject constructor(
                 selectNewKeyboardButton(event)
                 if (openEditKeyboardDialog()) return@launch
 
-                if (
-                    menuState is MenuState.Keyboard &&
-                    menuState.recordingKeyboard &&
-                    event.action == ACTION_UP
-                ) {
+                if (menuState is MenuState.Keyboard && menuState.recordingKeyboard) {
                     val letter = currentState.keyboard.buttons.firstOrNull {
                         it.contains(x = event.x.toInt(), y = event.y.toInt())
                     }?.text ?: return@launch
 
                     if (letter.isEmpty()) return@launch
-
-                    menuInteractor.appendTypedLetter(letter)
+                    if (event.action == ACTION_UP) menuInteractor.appendTypedLetter(letter)
                 }
 
                 val screenSizes = videoUseCase.observeScreenSizes().value ?: return@launch
