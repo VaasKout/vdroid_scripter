@@ -29,6 +29,7 @@ const (
 const (
 	NoCV = iota
 	CVRects
+	Yolo
 )
 
 // Attempts to establish scrcpy connection on start

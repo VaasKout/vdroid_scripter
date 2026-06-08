@@ -18,6 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.vision.scripter.data.api.models.EVENT_ON_CLASS
 import com.vision.scripter.data.api.models.EVENT_ON_TEMPLATE
 import com.vision.scripter.data.api.models.EVENT_ON_TEXT
 import com.vision.scripter.streaming.impl.state.CVMode
@@ -96,6 +97,7 @@ fun UsualMenu(
 
 private fun MenuState.Usual.toFlags(): Int =
     0.withFlag(EVENT_ON_TEMPLATE, cvMode == CVMode.CV_RECTS)
+        .withFlag(EVENT_ON_CLASS, cvMode == CVMode.YOLO)
         .withFlag(EVENT_ON_TEXT, textHighlighted)
 
 @Preview

@@ -1,6 +1,8 @@
 package com.vision.scripter.streaming.impl.state
 
+import com.vision.scripter.data.api.models.CLASS_IS_VISIBLE
 import com.vision.scripter.data.api.models.CvRectangle
+import com.vision.scripter.data.api.models.EVENT_ON_CLASS
 import com.vision.scripter.data.api.models.EVENT_ON_TEMPLATE
 import com.vision.scripter.data.api.models.EVENT_ON_TEXT
 import com.vision.scripter.data.api.models.RectangleWithText
@@ -94,6 +96,7 @@ sealed interface MenuState {
 enum class CVMode(val value: Int) {
     NO_CV(0),
     CV_RECTS(1),
+    YOLO(2),
 }
 
 fun CVMode.increment(): CVMode {
@@ -110,6 +113,8 @@ fun Int.withFlag(flag: Int, enabled: Boolean): Int =
 fun Int.templateFlag(): Int = this and (EVENT_ON_TEMPLATE or TEMPLATE_IS_VISIBLE)
 
 fun Int.textFlag(): Int = this and (EVENT_ON_TEXT or TEXT_IS_VISIBLE)
+
+fun Int.classFlag(): Int = this and (EVENT_ON_CLASS or CLASS_IS_VISIBLE)
 
 fun Int.combineTemplate(template: Int): Int =
     (this and (EVENT_ON_TEMPLATE or TEMPLATE_IS_VISIBLE).inv()) or template

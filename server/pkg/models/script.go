@@ -9,9 +9,11 @@ import (
 const (
 	EventOnTemplate   = 1 << 0
 	EventOnText       = 1 << 1
-	TypeText          = 1 << 2
+	EventOnClass      = 1 << 2
 	TemplateIsVisible = 1 << 3
 	TextIsVisible     = 1 << 4
+	ClassIsVisible    = 1 << 5
+	TypeText          = 1 << 6
 )
 
 // Script ...

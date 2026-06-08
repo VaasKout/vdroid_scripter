@@ -9,6 +9,7 @@ import (
 	"android_vision_scripter/internal/scrcpy"
 	"android_vision_scripter/internal/server"
 	"android_vision_scripter/internal/usecases"
+	"android_vision_scripter/internal/yolo"
 	"android_vision_scripter/pkg/core/network"
 	"android_vision_scripter/pkg/logger"
 	"fmt"
@@ -39,9 +40,10 @@ func main() {
 	cmdRunner := bashcmd.New(filesDB, logAPI)
 	cvAPI := cv.New(cmdRunner, logAPI)
 	scrcpy := scrcpy.New(cmdRunner, cvAPI, filesDB, cfg.ScrcpyProps, logAPI)
+	yoloAPI := yolo.New(filesDB, logAPI)
 	network := network.New(logAPI)
 
-	interactor := usecases.New(cvAPI, cmdRunner, filesDB, scrcpy, network, logAPI)
+	interactor := usecases.New(cvAPI, cmdRunner, filesDB, scrcpy, yoloAPI, network, logAPI)
 	serverAPI := server.New(interactor, cfg.ServerProps, logAPI)
 
 	// Uncomment to watch alloc space in real time

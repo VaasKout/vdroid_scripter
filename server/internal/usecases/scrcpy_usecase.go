@@ -7,7 +7,6 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
-	"image"
 	"io"
 	"net"
 	"time"
@@ -300,46 +299,67 @@ func (i *interactorImpl) writeToCVClient(
 				continue
 			}
 
-			rects, err := i.getRectangles(serial)
+			rects, err := i.getRectangles(serial, cvMode)
 			if err != nil {
 				return
 			}
+
 			err = i.sendRectangles(rects, cvListenerConn)
 			if err != nil {
 				return
+			}
+
+			if cvMode == scrcpy.Yolo {
+				sleepUntilNextSecond()
 			}
 		}
 	}
 }
 
-func (i *interactorImpl) getRectangles(serial string) ([]image.Rectangle, error) {
-	mat, err := i.scrcpy.GetMatFromLastFrame(serial, false)
+func (i *interactorImpl) getRectangles(
+	serial string,
+	cvMode int,
+) ([]models.Rectangle, error) {
+	var rgb = cvMode == scrcpy.Yolo
+	mat, err := i.scrcpy.GetMatFromLastFrame(serial, rgb)
 	if mat == nil {
-		return []image.Rectangle{}, nil
+		return []models.Rectangle{}, nil
 	}
 	defer mat.Close()
 
 	if err != nil {
-		return []image.Rectangle{}, err
+		return []models.Rectangle{}, err
+	}
+
+	if cvMode == scrcpy.Yolo {
+		detections := i.yolo.DetectLabels(*mat)
+		rects := []models.Rectangle{}
+
+		// TODO make mapper method
+		for _, detection := range detections {
+			rect := detection.Rectangle
+			rect.Label = detection.Label
+			rects = append(rects, rect)
+		}
+		return rects, nil
 	}
 
 	rects, err := i.cv.FindAllRectangles(mat)
 	if err != nil {
 		i.logger.Error(err.Error())
-		return []image.Rectangle{}, err
+		return []models.Rectangle{}, err
 	}
-	return rects, nil
+	return models.ImgRectanglesToDomain(rects), nil
 }
 
 func (i *interactorImpl) sendRectangles(
-	rects []image.Rectangle,
+	rects []models.Rectangle,
 	cvListenerConn net.Conn,
 ) error {
 	if len(rects) == 0 {
 		return nil
 	}
-	domainRects := models.ImgRectanglesToDomain(rects)
-	bytes, err := json.Marshal(domainRects)
+	bytes, err := json.Marshal(rects)
 	if err != nil {
 		i.logger.Error(err.Error())
 		return err

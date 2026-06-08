@@ -25,9 +25,11 @@ data class Script(
 
 const val EVENT_ON_TEMPLATE = 1 shl 0
 const val EVENT_ON_TEXT = 1 shl 1
-const val TYPE_TEXT = 1 shl 2
+const val EVENT_ON_CLASS = 1 shl 2
 const val TEMPLATE_IS_VISIBLE = 1 shl 3
 const val TEXT_IS_VISIBLE = 1 shl 4
+const val CLASS_IS_VISIBLE = 1 shl 5
+const val TYPE_TEXT = 1 shl 6
 
 @Serializable
 data class ScriptStep(

@@ -173,6 +173,9 @@ func (y *yoloImpl) parseOutput(
 		classes = append(classes, bestClass)
 	}
 
+	if len(boxes) == 0 {
+		return []Detection{}
+	}
 	indices := gocv.NMSBoxes(boxes, scores, ScoreThreshold, NMSThreshold)
 	var detections = make([]Detection, 0, len(indices))
 	for _, index := range indices {

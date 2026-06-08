@@ -6,6 +6,7 @@ import (
 	"android_vision_scripter/internal/cv"
 	"android_vision_scripter/internal/filesdb"
 	"android_vision_scripter/internal/scrcpy"
+	"android_vision_scripter/internal/yolo"
 	"android_vision_scripter/pkg/core/cache"
 	"android_vision_scripter/pkg/core/network"
 	"android_vision_scripter/pkg/logger"
@@ -31,6 +32,7 @@ type interactorImpl struct {
 	cmd     bashcmd.CmdAPI
 	filesDB filesdb.FilesDB
 	scrcpy  scrcpy.Scrcpy
+	yolo    yolo.Yolo
 	network network.Client
 	logger  *logger.Logger
 
@@ -44,6 +46,7 @@ func New(
 	cmd bashcmd.CmdAPI,
 	filesDB filesdb.FilesDB,
 	scrcpy scrcpy.Scrcpy,
+	yolo yolo.Yolo,
 	network network.Client,
 	logger *logger.Logger,
 ) Interactor {
@@ -56,6 +59,7 @@ func New(
 		filesDB: filesDB,
 		logger:  logger,
 		scrcpy:  scrcpy,
+		yolo:    yolo,
 		network: network,
 
 		devicesCache: devicesCache,

@@ -69,7 +69,7 @@ class CvUseCase @Inject constructor(
         screenSizes: ScreenSizes,
     ) {
         while (true) {
-            if (cvMode.value != CVMode.CV_RECTS) {
+            if (cvMode.value == CVMode.NO_CV) {
                 delay(100)
                 continue
             }

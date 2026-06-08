@@ -12,10 +12,11 @@ const (
 
 // Rectangle ...
 type Rectangle struct {
-	LeftX   int `json:"left_x"`
-	RightX  int `json:"right_x"`
-	TopY    int `json:"top_y"`
-	BottomY int `json:"bottom_y"`
+	LeftX   int    `json:"left_x"`
+	RightX  int    `json:"right_x"`
+	TopY    int    `json:"top_y"`
+	BottomY int    `json:"bottom_y"`
+	Label   string `json:"label,omitempty"`
 }
 
 // Center ...

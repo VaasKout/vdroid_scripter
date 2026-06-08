@@ -40,12 +40,46 @@ fun RectanglesCanvas(
 
         cvRectangles.forEach {
             drawRectangle(rectangle = it, color = Color.Red)
+            if (it.label.isNotEmpty()) {
+                drawLabel(
+                    textMeasurer = textMeasurer,
+                    rectangle = it,
+                    label = it.label,
+                )
+            }
         }
 
         selectedRectangles.forEach {
             drawRectangle(rectangle = it, color = Color.Blue)
         }
     }
+}
+
+private fun DrawScope.drawLabel(
+    textMeasurer: TextMeasurer,
+    rectangle: CvRectangle,
+    label: String,
+) {
+    val measured = textMeasurer.measure(
+        text = label,
+        style = TextStyle(color = Color.White, fontSize = 10.sp),
+    )
+    val padding = 2.dp.toPx()
+    val left = rectangle.leftX.toFloat()
+    val top = rectangle.topY.toFloat()
+
+    drawRect(
+        color = Color.Red,
+        topLeft = Offset(left, top),
+        size = Size(
+            width = measured.size.width + padding * 2,
+            height = measured.size.height + padding * 2,
+        ),
+    )
+    drawText(
+        textLayoutResult = measured,
+        topLeft = Offset(left + padding, top + padding),
+    )
 }
 
 private fun DrawScope.drawTextInRectangle(

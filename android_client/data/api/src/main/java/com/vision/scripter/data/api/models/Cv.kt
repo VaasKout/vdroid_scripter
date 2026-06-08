@@ -33,6 +33,8 @@ data class CvRectangle(
     val topY: Int,
     @SerialName("bottom_y")
     val bottomY: Int,
+    @SerialName("label")
+    val label: String = "",
 )
 
 fun List<CvRectangle>.adjustToClient(
