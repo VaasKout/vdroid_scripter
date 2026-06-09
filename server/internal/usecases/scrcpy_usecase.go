@@ -10,6 +10,8 @@ import (
 	"io"
 	"net"
 	"time"
+
+	"gocv.io/x/gocv"
 )
 
 // ClientConnection ...
@@ -293,13 +295,12 @@ func (i *interactorImpl) writeToCVClient(
 				return
 			}
 			cvMode = newMode
-		default:
-			if cvMode == scrcpy.NoCV {
-				time.Sleep(100 * time.Millisecond)
+
+			if newMode == scrcpy.NoCV {
 				continue
 			}
 
-			rects, err := i.getRectangles(serial, cvMode)
+			rects, err := i.getRectangles(serial, cvMode, false)
 			if err != nil {
 				return
 			}
@@ -307,6 +308,26 @@ func (i *interactorImpl) writeToCVClient(
 			err = i.sendRectangles(rects, cvListenerConn)
 			if err != nil {
 				return
+			}
+		default:
+			if cvMode == scrcpy.NoCV {
+				time.Sleep(100 * time.Millisecond)
+				continue
+			}
+
+			rects, err := i.getRectangles(serial, cvMode, true)
+			if err != nil {
+				return
+			}
+
+			err = i.sendRectangles(rects, cvListenerConn)
+			if err != nil {
+				return
+			}
+
+			if len(rects) == 0 {
+				time.Sleep(100 * time.Millisecond)
+				continue
 			}
 
 			if cvMode == scrcpy.Yolo {
@@ -319,31 +340,52 @@ func (i *interactorImpl) writeToCVClient(
 func (i *interactorImpl) getRectangles(
 	serial string,
 	cvMode int,
+	frameOnly bool,
 ) ([]models.Rectangle, error) {
 	var rgb = cvMode == scrcpy.Yolo
-	mat, err := i.scrcpy.GetMatFromLastFrame(serial, rgb)
+	mat, _ := i.scrcpy.GetMatFromLastFrame(serial, rgb)
+	if mat == nil && !frameOnly {
+		mat = i.getScreenshotMat(serial, cvMode)
+	}
 	if mat == nil {
 		return []models.Rectangle{}, nil
 	}
 	defer mat.Close()
 
-	if err != nil {
-		return []models.Rectangle{}, err
+	return i.detectRectangles(cvMode, mat)
+}
+
+func (i *interactorImpl) getScreenshotMat(
+	serial string,
+	cvMode int,
+) *gocv.Mat {
+	screenshot := i.cmd.ScreenShot(serial)
+	if screenshot == "" {
+		return nil
 	}
 
+	img := gocv.IMRead(screenshot, gocv.IMReadColor)
+	if img.Empty() {
+		img.Close()
+		return nil
+	}
+	if cvMode != scrcpy.CVRects {
+		return &img
+	}
+
+	defer img.Close()
+	gray := gocv.NewMat()
+	gocv.CvtColor(img, &gray, gocv.ColorBGRToGray)
+	return &gray
+}
+
+func (i *interactorImpl) detectRectangles(
+	cvMode int,
+	mat *gocv.Mat,
+) ([]models.Rectangle, error) {
 	if cvMode == scrcpy.Yolo {
-		detections := i.yolo.DetectLabels(*mat)
-		rects := []models.Rectangle{}
-
-		// TODO make mapper method
-		for _, detection := range detections {
-			rect := detection.Rectangle
-			rect.Label = detection.Label
-			rects = append(rects, rect)
-		}
-		return rects, nil
+		return i.yolo.DetectLabels(*mat), nil
 	}
-
 	rects, err := i.cv.FindAllRectangles(mat)
 	if err != nil {
 		i.logger.Error(err.Error())

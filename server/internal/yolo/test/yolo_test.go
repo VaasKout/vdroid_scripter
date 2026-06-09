@@ -35,17 +35,12 @@ func TestDetectLabels(t *testing.T) {
 	defer img.Close()
 
 	start := time.Now()
-	detections := yoloAPI.DetectLabels(img)
+	rects := yoloAPI.DetectLabels(img)
 	elapsed := time.Since(start)
 
 	t.Logf("elapsed: %dms", elapsed.Milliseconds())
-	t.Logf("found %d detections", len(detections))
-	for _, detection := range detections {
-		t.Logf(
-			"label=%s confidence=%.2f rectangle=%+v",
-			detection.Label,
-			detection.Confidence,
-			detection.Rectangle,
-		)
+	t.Logf("found %d detections", len(rects))
+	for _, rect := range rects {
+		t.Logf("label=%s rectangle=%+v", rect.Label, rect)
 	}
 }

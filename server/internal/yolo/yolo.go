@@ -29,16 +29,9 @@ const (
 	PadColor       = 114
 )
 
-// Detection ...
-type Detection struct {
-	Label      string
-	Confidence float32
-	Rectangle  models.Rectangle
-}
-
 // Yolo ...
 type Yolo interface {
-	DetectLabels(img gocv.Mat) []Detection
+	DetectLabels(img gocv.Mat) []models.Rectangle
 }
 
 type yoloImpl struct {
@@ -47,6 +40,7 @@ type yoloImpl struct {
 	net     gocv.Net
 	labels  []string
 	mu      sync.Mutex
+	loaded  bool
 }
 
 // New instance of Yolo
@@ -83,11 +77,12 @@ func (y *yoloImpl) loadModel() {
 	y.net = net
 	y.labels = readLabels(filepath.Join(dir, ObjNames))
 	y.logAPI.Info(fmt.Sprintf("loaded onnx model: %s ✅", modelPath))
+	y.loaded = true
 }
 
-func (y *yoloImpl) DetectLabels(img gocv.Mat) []Detection {
-	if img.Empty() {
-		return []Detection{}
+func (y *yoloImpl) DetectLabels(img gocv.Mat) []models.Rectangle {
+	if !y.loaded || img.Empty() {
+		return []models.Rectangle{}
 	}
 
 	padded, scale, padX, padY := letterbox(img, InputSize)
@@ -119,10 +114,10 @@ func (y *yoloImpl) parseOutput(
 	padY int,
 	originalWidth int,
 	originalHeight int,
-) []Detection {
+) []models.Rectangle {
 	dims := output.Size()
 	if len(dims) != 3 {
-		return []Detection{}
+		return []models.Rectangle{}
 	}
 
 	reshaped := output.Reshape(1, dims[1])
@@ -139,7 +134,7 @@ func (y *yoloImpl) parseOutput(
 	var numClasses = matrix.Rows() - 4
 	var numBoxes = matrix.Cols()
 	if numClasses <= 0 {
-		return []Detection{}
+		return []models.Rectangle{}
 	}
 
 	var boxes = []image.Rectangle{}
@@ -174,19 +169,17 @@ func (y *yoloImpl) parseOutput(
 	}
 
 	if len(boxes) == 0 {
-		return []Detection{}
+		return []models.Rectangle{}
 	}
 	indices := gocv.NMSBoxes(boxes, scores, ScoreThreshold, NMSThreshold)
-	var detections = make([]Detection, 0, len(indices))
+	var rects = make([]models.Rectangle, 0, len(indices))
 	for _, index := range indices {
 		var box = boxes[index]
-		detections = append(detections, Detection{
-			Label:      y.labelName(classes[index]),
-			Confidence: scores[index],
-			Rectangle:  *models.ImgRectangleToDomain(&box),
-		})
+		var rect = *models.ImgRectangleToDomain(&box)
+		rect.Label = y.labelName(classes[index])
+		rects = append(rects, rect)
 	}
-	return detections
+	return rects
 }
 
 func highestScore(matrix gocv.Mat, box int, numClasses int) (float32, int) {

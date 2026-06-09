@@ -31,7 +31,8 @@ class CvUseCase @Inject constructor(
 ) {
     private val cvMode = MutableStateFlow(CVMode.NO_CV)
 
-    private val _rectanglesFlow = MutableStateFlow<List<CvRectangle>>(listOf())
+    private val _cvRectanglesFlow = MutableStateFlow<List<CvRectangle>>(listOf())
+    private val _yoloRectanglesFlow = MutableStateFlow<List<CvRectangle>>(listOf())
     private val _selectedRectangles = MutableStateFlow<List<CvRectangle>>(listOf())
 
     private val selectedRectanglesSnapshot = AtomicReference<List<CvRectangle>>(listOf())
@@ -39,8 +40,16 @@ class CvUseCase @Inject constructor(
     fun observeRectangles(
         coroutineScope: CoroutineScope,
     ): StateFlow<List<CvRectangle>> =
-        combine(_rectanglesFlow, cvMode) { rects, mode ->
-            if (mode == CVMode.NO_CV) listOf() else rects
+        combine(
+            _cvRectanglesFlow,
+            _yoloRectanglesFlow,
+            cvMode,
+        ) { cvRects, yoloRects, mode ->
+            when (mode) {
+                CVMode.NO_CV -> listOf()
+                CVMode.CV_RECTS -> cvRects
+                CVMode.YOLO -> yoloRects
+            }
         }.stateIn(
             scope = coroutineScope,
             started = SharingStarted.WhileSubscribed(),
@@ -85,14 +94,19 @@ class CvUseCase @Inject constructor(
                 listOf()
             }
 
-            _rectanglesFlow.update {
-                rectangles.adjustToClient(screenSizes)
+            val adjusted = rectangles.adjustToClient(screenSizes)
+            when (cvMode.value) {
+                CVMode.CV_RECTS -> _cvRectanglesFlow.update { adjusted }
+                CVMode.YOLO -> _yoloRectanglesFlow.update { adjusted }
+                else -> {}
             }
         }
     }
 
     suspend fun nextCvMode(newCvMode: CVMode) {
         if (newCvMode != cvMode.value) {
+            _cvRectanglesFlow.update { listOf() }
+            _yoloRectanglesFlow.update { listOf() }
             cvStreamer.sendCvMode(newCvMode.value)
             cvMode.value = newCvMode
         }
@@ -156,7 +170,12 @@ class CvUseCase @Inject constructor(
     }
 
     fun selectRectangle(x: Int, y: Int) {
-        val selected = _rectanglesFlow.value.smallestBy(x, y)
+        val current = when (cvMode.value) {
+            CVMode.NO_CV -> listOf()
+            CVMode.CV_RECTS -> _cvRectanglesFlow.value
+            CVMode.YOLO -> _yoloRectanglesFlow.value
+        }
+        val selected = current.smallestBy(x, y)
         setSelectedRectangle(selected)
     }
 
@@ -177,13 +196,15 @@ class CvUseCase @Inject constructor(
     }
 
     fun clearAllRectangles() {
-        _rectanglesFlow.update { listOf() }
+        _cvRectanglesFlow.update { listOf() }
+        _yoloRectanglesFlow.update { listOf() }
         _selectedRectangles.update { listOf() }
     }
 
     fun close() {
         cvStreamer.close()
-        _rectanglesFlow.update { listOf() }
+        _cvRectanglesFlow.update { listOf() }
+        _yoloRectanglesFlow.update { listOf() }
         _selectedRectangles.update { listOf() }
         cvMode.value = CVMode.NO_CV
     }
