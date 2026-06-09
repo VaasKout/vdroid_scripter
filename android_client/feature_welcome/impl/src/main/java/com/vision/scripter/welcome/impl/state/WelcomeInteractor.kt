@@ -44,20 +44,19 @@ class WelcomeInteractor @Inject constructor(
             val fullUrl = dataStoreRepository.getServerUrl()
             if (fullUrl.isEmpty()) return@launch
 
-            val serverAvailable = scripterRepository.pingServer()
-            if (!serverAvailable) {
-                val uri = fullUrl.toUri()
-                val port = uri.port
-                val url = "${uri.scheme}://${uri.host}"
-                _stateFlow.update {
-                    it.copy(
-                        oldUrl = url,
-                        oldPort = if (port <= 0) "" else port.toString(),
-                    )
-                }
-                return@launch
+            val uri = fullUrl.toUri()
+            val port = uri.port
+            val url = "${uri.scheme}://${uri.host}"
+            _stateFlow.update {
+                it.copy(
+                    oldUrl = url,
+                    oldPort = if (port <= 0) "" else port.toString(),
+                )
             }
-            uiCommandsFlow.tryEmit(WelcomeUiCommand.NavigateToMain)
+            val serverAvailable = scripterRepository.pingServer()
+            if (serverAvailable) {
+                uiCommandsFlow.tryEmit(WelcomeUiCommand.NavigateToMain)
+            }
         }
     }
 

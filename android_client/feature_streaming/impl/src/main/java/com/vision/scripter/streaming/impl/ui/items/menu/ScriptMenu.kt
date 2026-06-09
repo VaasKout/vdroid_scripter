@@ -24,7 +24,6 @@ import com.vision.scripter.data.api.models.TEMPLATE_IS_VISIBLE
 import com.vision.scripter.data.api.models.TEXT_IS_VISIBLE
 import com.vision.scripter.data.api.models.TYPE_TEXT
 import com.vision.scripter.streaming.impl.state.MenuState
-import com.vision.scripter.streaming.impl.state.hasFlag
 import com.vision.scripter.ui.customClickable
 
 @Composable
@@ -63,7 +62,6 @@ fun ScriptMenu(
 
         BaseMenuIcons(
             flags = menuState.flags,
-            keyboardHighlighted = menuState.flags.hasFlag(TYPE_TEXT),
             onCvModeClick = onCvModeClick,
             onTextClick = onTextModeClick,
             onKeyboardClick = onKeyboardClick,

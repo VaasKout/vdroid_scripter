@@ -20,6 +20,7 @@ import com.vision.scripter.data.api.models.EVENT_ON_TEMPLATE
 import com.vision.scripter.data.api.models.EVENT_ON_TEXT
 import com.vision.scripter.data.api.models.TEMPLATE_IS_VISIBLE
 import com.vision.scripter.data.api.models.TEXT_IS_VISIBLE
+import com.vision.scripter.data.api.models.TYPE_TEXT
 import com.vision.scripter.streaming.impl.state.classFlag
 import com.vision.scripter.streaming.impl.state.hasFlag
 import com.vision.scripter.streaming.impl.state.templateFlag
@@ -28,7 +29,6 @@ import com.vision.scripter.ui.customClickable
 @Composable
 fun ColumnScope.BaseMenuIcons(
     flags: Int,
-    keyboardHighlighted: Boolean,
     onCvModeClick: () -> Unit,
     onTextClick: () -> Unit,
     onKeyboardClick: () -> Unit,
@@ -42,7 +42,7 @@ fun ColumnScope.BaseMenuIcons(
             flags.templateFlag() != 0 -> Icons.Filled.Visibility
             else -> Icons.Filled.VisibilityOff
         },
-        tint = if (flags.classFlag() != 0) classTint(flags) else templateTint(flags),
+        tint = detectionTint(flags),
         contentDescription = "",
     )
 
@@ -60,22 +60,16 @@ fun ColumnScope.BaseMenuIcons(
             .size(32.dp)
             .customClickable(onClick = onKeyboardClick),
         imageVector = Icons.Filled.Keyboard,
-        tint = if (keyboardHighlighted) Color.Red else MaterialTheme.colorScheme.onSurface,
+        tint = if (flags.hasFlag(TYPE_TEXT)) Color.Red
+        else MaterialTheme.colorScheme.onSurface,
         contentDescription = "",
     )
 }
 
 @Composable
-fun templateTint(flags: Int): Color = when {
-    flags.hasFlag(TEMPLATE_IS_VISIBLE) -> Color.Blue
-    flags.hasFlag(EVENT_ON_TEMPLATE) -> Color.Red
-    else -> MaterialTheme.colorScheme.onSurface
-}
-
-@Composable
-fun classTint(flags: Int): Color = when {
-    flags.hasFlag(CLASS_IS_VISIBLE) -> Color.Blue
-    flags.hasFlag(EVENT_ON_CLASS) -> Color.Red
+fun detectionTint(flags: Int): Color = when {
+    flags.hasFlag(TEMPLATE_IS_VISIBLE) || flags.hasFlag(CLASS_IS_VISIBLE) -> Color.Blue
+    flags.hasFlag(EVENT_ON_TEMPLATE) || flags.hasFlag(EVENT_ON_CLASS) -> Color.Red
     else -> MaterialTheme.colorScheme.onSurface
 }
 

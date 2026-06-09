@@ -62,7 +62,6 @@ fun UsualMenu(
                 flags = menuState.toFlags(),
                 onCvModeClick = onCvModeClick,
                 onTextClick = onTextModeClick,
-                keyboardHighlighted = false,
                 onKeyboardClick = onKeyboardClick,
             )
 

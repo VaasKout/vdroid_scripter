@@ -50,7 +50,7 @@ fun SelectingTemplateMenu(
             } else {
                 Icons.Filled.VisibilityOff
             },
-            tint = templateTint(flags),
+            tint = detectionTint(flags),
             contentDescription = ""
         )
 
