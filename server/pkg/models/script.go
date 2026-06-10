@@ -47,6 +47,11 @@ func (s *ScriptStep) HasEventFlag() bool {
 		(s.HasFlag(EventOnTemplate) || s.HasFlag(EventOnText) || s.HasFlag(EventOnClass))
 }
 
+func (s *ScriptStep) HasVisibleFlag() bool {
+	return s != nil &&
+		(s.HasFlag(TemplateIsVisible) || s.HasFlag(TextIsVisible) || s.HasFlag(ClassIsVisible))
+}
+
 func (s *ScriptStep) HasAnyTemplateFlags() bool {
 	return s != nil && (s.HasFlag(EventOnTemplate) || s.HasFlag(TemplateIsVisible))
 }

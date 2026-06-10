@@ -106,12 +106,25 @@ func (i *interactorImpl) executeScript(
 			i.playEvent(serial, nil, &step)
 		}
 
-		err := i.playEventOnRect(serial, &step, scriptDir)
-		if err != nil {
-			i.logger.Error(err.Error())
-			return
+		if step.HasVisibleFlag() {
+			foundRect, err := i.findRectangle(serial, &step, scriptDir)
+			if err != nil {
+				i.logger.Error(err.Error())
+				return
+			}
+			if foundRect == nil {
+				return
+			}
 		}
 
+		if step.HasEventFlag() {
+			foundRect, err := i.findRectangle(serial, &step, scriptDir)
+			if err != nil {
+				i.logger.Error(err.Error())
+				return
+			}
+			i.playEvent(serial, foundRect, &step)
+		}
 		if step.HasFlag(models.TypeText) {
 			err := i.typeText(serial, &step)
 			if err != nil {
@@ -126,11 +139,11 @@ func (i *interactorImpl) executeScript(
 	i.logger.Info(fmt.Sprintf("script %s is COMPLETE ✅", script.Name))
 }
 
-func (i *interactorImpl) playEventOnRect(
+func (i *interactorImpl) findRectangle(
 	serial string,
 	step *models.ScriptStep,
 	scriptDir string,
-) error {
+) (*image.Rectangle, error) {
 	var foundRect *image.Rectangle
 	deadline := time.Now().Add(Timeout * time.Second)
 	for time.Now().Before(deadline) {
@@ -161,13 +174,10 @@ func (i *interactorImpl) playEventOnRect(
 	}
 
 	if models.ImageRectIsEmpty(foundRect) {
-		return fmt.Errorf("rectangle for step %d not found", step.ID)
+		return nil, fmt.Errorf("rectangle for step %d not found", step.ID)
 	}
 
-	if step.HasEventFlag() {
-		i.playEvent(serial, foundRect, step)
-	}
-	return nil
+	return foundRect, nil
 }
 
 func (i *interactorImpl) findRectByFlag(
