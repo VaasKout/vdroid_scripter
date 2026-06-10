@@ -42,6 +42,27 @@ type ScriptStep struct {
 	Command string  `json:"command,omitempty"`
 }
 
+func (s *ScriptStep) HasEventFlag() bool {
+	return s != nil &&
+		(s.HasFlag(EventOnTemplate) || s.HasFlag(EventOnText) || s.HasFlag(EventOnClass))
+}
+
+func (s *ScriptStep) HasAnyTemplateFlags() bool {
+	return s != nil && (s.HasFlag(EventOnTemplate) || s.HasFlag(TemplateIsVisible))
+}
+
+func (s *ScriptStep) HasAnyTextFlags() bool {
+	return s != nil && (s.HasFlag(EventOnText) || s.HasFlag(TextIsVisible))
+}
+
+func (s *ScriptStep) HasAnyYoloFlags() bool {
+	return s != nil && (s.HasFlag(EventOnClass) || s.HasFlag(ClassIsVisible))
+}
+
+func (s *ScriptStep) HasFlag(flag int) bool {
+	return s != nil && s.Flags&flag != 0
+}
+
 // Event ...
 type Event struct {
 	Time int64        `json:"time"`

@@ -14,6 +14,8 @@ import (
 	"strings"
 	"time"
 	"unicode"
+
+	"gocv.io/x/gocv"
 )
 
 const (
@@ -104,23 +106,13 @@ func (i *interactorImpl) executeScript(
 			i.playEvent(serial, nil, &step)
 		}
 
-		if step.Flags&models.EventOnTemplate != 0 || step.Flags&models.TemplateIsVisible != 0 {
-			err := i.playEventOnTemplate(serial, &step, scriptDir)
-			if err != nil {
-				i.logger.Error(err.Error())
-				return
-			}
+		err := i.playEventOnRect(serial, &step, scriptDir)
+		if err != nil {
+			i.logger.Error(err.Error())
+			return
 		}
 
-		if step.Flags&models.EventOnText != 0 || step.Flags&models.TextIsVisible != 0 {
-			err := i.playEventOnText(serial, &step)
-			if err != nil {
-				i.logger.Error(err.Error())
-				return
-			}
-		}
-
-		if step.Flags&models.TypeText != 0 {
+		if step.HasFlag(models.TypeText) {
 			err := i.typeText(serial, &step)
 			if err != nil {
 				i.logger.Error(err.Error())
@@ -134,17 +126,12 @@ func (i *interactorImpl) executeScript(
 	i.logger.Info(fmt.Sprintf("script %s is COMPLETE ✅", script.Name))
 }
 
-func (i *interactorImpl) playEventOnTemplate(
+func (i *interactorImpl) playEventOnRect(
 	serial string,
 	step *models.ScriptStep,
 	scriptDir string,
 ) error {
-	var imgRect = &image.Rectangle{}
-	tmpImage := filepath.Join(scriptDir, fmt.Sprintf("%d.png", step.ID))
-	if !file.Exists(tmpImage) {
-		return fmt.Errorf("template file not found: %s", tmpImage)
-	}
-
+	var foundRect *image.Rectangle
 	deadline := time.Now().Add(Timeout * time.Second)
 	for time.Now().Before(deadline) {
 		mat, err := i.scrcpy.GetMatFromLastFrame(serial, true)
@@ -158,65 +145,7 @@ func (i *interactorImpl) playEventOnTemplate(
 			continue
 		}
 
-		imgRect, err = i.cv.FindImage(mat, tmpImage)
-		if err != nil {
-			i.logger.Error(err.Error())
-			sleepUntilNextSecond()
-			continue
-		}
-
-		if models.ImageRectIsEmpty(imgRect) {
-			continue
-		}
-
-		break
-	}
-
-	if models.ImageRectIsEmpty(imgRect) {
-		return fmt.Errorf("template not found")
-	}
-
-	if step.Flags&models.EventOnTemplate != 0 {
-		i.playEvent(serial, imgRect, step)
-	}
-	return nil
-}
-
-func (i *interactorImpl) playEventOnText(
-	serial string,
-	step *models.ScriptStep,
-) error {
-	var textRect *image.Rectangle
-	tesseractDir := i.filesDB.CreateLogsDir(serial, filesdb.TesseractDir)
-	if tesseractDir == "" {
-		return fmt.Errorf("tesseract dir was not found")
-	}
-	var ocrParams = cv.InitOcrParams(
-		step.Text,
-		step.Locale,
-		cv.PsmText,
-		cv.OemText,
-	)
-
-	deadline := time.Now().Add(Timeout * time.Second)
-	for time.Now().Before(deadline) {
-		mat, err := i.scrcpy.GetMatFromLastFrame(serial, true)
-		if err != nil {
-			i.logger.Error(err.Error())
-			sleepUntilNextSecond()
-			continue
-		}
-		if mat == nil {
-			i.logger.Error("mat is nil")
-			sleepUntilNextSecond()
-			continue
-		}
-
-		rectangles, err := i.cv.FindTextRectangles(
-			mat,
-			tesseractDir,
-			ocrParams,
-		)
+		foundRect, err = i.findRectByFlag(serial, mat, step, scriptDir)
 		mat.Close()
 
 		if err != nil {
@@ -224,20 +153,69 @@ func (i *interactorImpl) playEventOnText(
 			sleepUntilNextSecond()
 			continue
 		}
-
-		if len(rectangles) == 0 || rectangles[0].IsEmpty() {
-			i.logger.Error(fmt.Sprintf("text %s not found", step.Text))
+		if models.ImageRectIsEmpty(foundRect) {
 			sleepUntilNextSecond()
 			continue
 		}
-		textRect = rectangles[0].Rectangle.ToImageRectangle()
 		break
 	}
 
-	if textRect != nil && step.Flags&models.EventOnText != 0 {
-		i.playEvent(serial, textRect, step)
+	if models.ImageRectIsEmpty(foundRect) {
+		return fmt.Errorf("rectangle for step %d not found", step.ID)
+	}
+
+	if step.HasEventFlag() {
+		i.playEvent(serial, foundRect, step)
 	}
 	return nil
+}
+
+func (i *interactorImpl) findRectByFlag(
+	serial string,
+	mat *gocv.Mat,
+	step *models.ScriptStep,
+	scriptDir string,
+) (*image.Rectangle, error) {
+	if step.HasAnyTemplateFlags() {
+		tmpImage := filepath.Join(scriptDir, fmt.Sprintf("%d.png", step.ID))
+		if !file.Exists(tmpImage) {
+			return nil, fmt.Errorf("template file not found: %s", tmpImage)
+		}
+		return i.cv.FindImage(mat, tmpImage)
+	}
+
+	if step.HasAnyTextFlags() {
+		tesseractDir := i.filesDB.CreateLogsDir(serial, filesdb.TesseractDir)
+		if tesseractDir == "" {
+			return nil, fmt.Errorf("tesseract dir was not found")
+		}
+		var ocrParams = cv.InitOcrParams(
+			step.Text,
+			step.Locale,
+			cv.PsmText,
+			cv.OemText,
+		)
+		rectangles, err := i.cv.FindTextRectangles(mat, tesseractDir, ocrParams)
+		if err != nil {
+			return nil, err
+		}
+		if len(rectangles) == 0 || rectangles[0].IsEmpty() {
+			return nil, nil
+		}
+		return rectangles[0].Rectangle.ToImageRectangle(), nil
+	}
+
+	if step.HasAnyYoloFlags() {
+		var labels = i.yolo.DetectLabels(*mat)
+		for _, rect := range labels {
+			if strings.EqualFold(rect.Label, step.Text) {
+				return rect.ToImageRectangle(), nil
+			}
+		}
+		return nil, fmt.Errorf("yolo class not found: %s", step.Text)
+	}
+
+	return nil, fmt.Errorf("unknown flag %d", step.Flags)
 }
 
 func (i *interactorImpl) typeText(
