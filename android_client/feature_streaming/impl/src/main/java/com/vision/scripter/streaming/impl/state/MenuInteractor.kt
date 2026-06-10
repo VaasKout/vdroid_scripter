@@ -58,16 +58,18 @@ class MenuInteractor @Inject constructor() {
             }
 
             is MenuState.SelectingCV -> {
-                val template = state.flags.nextTemplate()
-                val cvMode = if (template != 0) {
-                    CVMode.CV_RECTS
-                } else {
-                    CVMode.NO_CV
+                val detection = state.flags.nextDetection()
+                val cvMode = when {
+                    detection.templateFlag() != 0 -> CVMode.CV_RECTS
+                    detection.classFlag() != 0 -> CVMode.YOLO
+                    else -> CVMode.NO_CV
                 }
-                _menuState.update { state.copy(flags = template) }
+                val sourceChanged =
+                    (state.flags.classFlag() != 0) != (detection.classFlag() != 0)
+                _menuState.update { state.copy(flags = detection) }
                 CvModeAction(
                     newCvMode = cvMode,
-                    disableSelection = template == 0,
+                    disableSelection = detection == 0 || sourceChanged,
                 )
             }
 
@@ -131,7 +133,7 @@ class MenuInteractor @Inject constructor() {
     fun onSaveClicked(record: StreamingState.Record): SaveAction {
         return when (val state = _menuState.value) {
             is MenuState.SelectingCV -> {
-                val flags = record.flags.combineTemplate(state.flags)
+                val flags = record.flags.combineDetection(state.flags)
                 _menuState.update { MenuState.Recording(flags = flags) }
                 SaveAction.SaveTemplate(flags = flags)
             }

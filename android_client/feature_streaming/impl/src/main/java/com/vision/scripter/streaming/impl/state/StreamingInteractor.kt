@@ -368,14 +368,23 @@ class StreamingInteractor @Inject constructor(
         coroutineScope.launch {
             when (val action = menuInteractor.onSaveClicked(currentState.record)) {
                 is SaveAction.SaveTemplate -> {
+                    val label = cvUseCase.observeSelectedRectangles()
+                        .value.firstOrNull()?.label.orEmpty()
                     _stateFlow.update {
-                        it.copy(record = it.record.copy(flags = action.flags))
+                        it.copy(
+                            record = it.record.copy(
+                                flags = action.flags,
+                                label = label,
+                            )
+                        )
                     }
-                    val screenSizes = videoUseCase.observeScreenSizes().value ?: return@launch
-                    cvUseCase.saveSelectedRectangle(
-                        serial = currentState.serial,
-                        screenSizes = screenSizes,
-                    )
+                    if (action.flags.templateFlag() != 0) {
+                        val screenSizes = videoUseCase.observeScreenSizes().value ?: return@launch
+                        cvUseCase.saveSelectedRectangle(
+                            serial = currentState.serial,
+                            screenSizes = screenSizes,
+                        )
+                    }
                     cvUseCase.nextCvMode(CVMode.NO_CV)
                 }
 
@@ -423,6 +432,7 @@ class StreamingInteractor @Inject constructor(
                 events = record.stepEvents,
                 flags = record.flags,
                 text = record.text,
+                label = record.label,
                 locale = record.locale,
             ),
         )

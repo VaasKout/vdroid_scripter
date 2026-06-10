@@ -49,6 +49,7 @@ data class StreamingState(
         val recordName: String = "",
         val stepEvents: List<StepEvent> = listOf(),
         val text: String = "",
+        val label: String = "",
         val locale: String = "",
         val flags: Int = 0,
     ) {
@@ -116,15 +117,18 @@ fun Int.textFlag(): Int = this and (EVENT_ON_TEXT or TEXT_IS_VISIBLE)
 
 fun Int.classFlag(): Int = this and (EVENT_ON_CLASS or CLASS_IS_VISIBLE)
 
-fun Int.combineTemplate(template: Int): Int =
-    (this and (EVENT_ON_TEMPLATE or TEMPLATE_IS_VISIBLE).inv()) or template
+fun Int.combineDetection(detection: Int): Int =
+    (this and (EVENT_ON_TEMPLATE or TEMPLATE_IS_VISIBLE or EVENT_ON_CLASS or CLASS_IS_VISIBLE)
+        .inv()) or detection
 
 fun Int.combineText(text: Int): Int =
     (this and (EVENT_ON_TEXT or TEXT_IS_VISIBLE).inv()) or text
 
-fun Int.nextTemplate(): Int = when (this) {
+fun Int.nextDetection(): Int = when (this) {
     EVENT_ON_TEMPLATE -> TEMPLATE_IS_VISIBLE
-    TEMPLATE_IS_VISIBLE -> 0
+    TEMPLATE_IS_VISIBLE -> EVENT_ON_CLASS
+    EVENT_ON_CLASS -> CLASS_IS_VISIBLE
+    CLASS_IS_VISIBLE -> 0
     else -> EVENT_ON_TEMPLATE
 }
 

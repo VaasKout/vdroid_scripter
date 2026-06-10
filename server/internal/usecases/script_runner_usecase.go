@@ -218,11 +218,11 @@ func (i *interactorImpl) findRectByFlag(
 	if step.HasAnyYoloFlags() {
 		var labels = i.yolo.DetectLabels(*mat)
 		for _, rect := range labels {
-			if strings.EqualFold(rect.Label, step.Text) {
+			if strings.EqualFold(rect.Label, step.Label) {
 				return rect.ToImageRectangle(), nil
 			}
 		}
-		return nil, fmt.Errorf("yolo class not found: %s", step.Text)
+		return nil, fmt.Errorf("yolo class not found: %s", step.Label)
 	}
 
 	return nil, fmt.Errorf("unknown flag %d", step.Flags)

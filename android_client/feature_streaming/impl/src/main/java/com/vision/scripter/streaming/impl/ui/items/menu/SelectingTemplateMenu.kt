@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Camera
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
@@ -20,6 +21,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.vision.scripter.data.api.models.EVENT_ON_TEMPLATE
+import com.vision.scripter.streaming.impl.state.classFlag
 import com.vision.scripter.streaming.impl.state.templateFlag
 import com.vision.scripter.ui.customClickable
 
@@ -45,10 +47,10 @@ fun SelectingTemplateMenu(
             modifier = Modifier
                 .size(32.dp)
                 .customClickable(onClick = onCvModeClick),
-            imageVector = if (flags.templateFlag() != 0) {
-                Icons.Filled.Visibility
-            } else {
-                Icons.Filled.VisibilityOff
+            imageVector = when {
+                flags.classFlag() != 0 -> Icons.Filled.Camera
+                flags.templateFlag() != 0 -> Icons.Filled.Visibility
+                else -> Icons.Filled.VisibilityOff
             },
             tint = detectionTint(flags),
             contentDescription = ""

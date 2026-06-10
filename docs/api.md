@@ -292,8 +292,9 @@ ports.
 | ----- | ---- | ---- | ----- |
 | ID | `id` | int | omitempty |
 | Events | `events` | [Event](#event) array | omitempty |
-| Flags | `flags` | int | Bit flags: `EventOnTemplate=1`, `EventOnText=2`, `TypeText=4`, `TemplateIsVisible=8`, `TextIsVisible=16` |
-| Text | `text` | string | omitempty |
+| Flags | `flags` | int | Bit flags: `EventOnTemplate=1`, `EventOnText=2`, `EventOnClass=4`, `TemplateIsVisible=8`, `TextIsVisible=16`, `ClassIsVisible=32`, `TypeText=64` |
+| Text | `text` | string | omitempty; OCR search text / text to type |
+| Label | `label` | string | omitempty; YOLO class name for `EventOnClass`/`ClassIsVisible` |
 | Locale | `locale` | string | omitempty |
 | Command | `command` | string | omitempty |
 

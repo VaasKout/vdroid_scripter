@@ -39,6 +39,8 @@ data class ScriptStep(
     val flags: Int = 0,
     @SerialName("text")
     val text: String = "",
+    @SerialName("label")
+    val label: String = "",
     @SerialName("locale")
     val locale: String = "",
     @SerialName("command")
