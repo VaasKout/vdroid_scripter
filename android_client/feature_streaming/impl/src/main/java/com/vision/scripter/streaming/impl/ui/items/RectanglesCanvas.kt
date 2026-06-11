@@ -28,7 +28,11 @@ fun RectanglesCanvas(
     Canvas(modifier = modifier) {
         if (keyboardButtons.isNotEmpty()) {
             keyboardButtons.forEach {
-                drawRectangle(rectangle = it.rectangle, color = Color.Red)
+                drawRectangle(
+                    textMeasurer = textMeasurer,
+                    rectangle = it.rectangle,
+                    color = Color.Red
+                )
                 drawTextInRectangle(
                     textMeasurer = textMeasurer,
                     rectangle = it.rectangle,
@@ -39,47 +43,21 @@ fun RectanglesCanvas(
         }
 
         cvRectangles.forEach {
-            drawRectangle(rectangle = it, color = Color.Red)
-            if (it.label.isNotEmpty()) {
-                drawLabel(
-                    textMeasurer = textMeasurer,
-                    rectangle = it,
-                    label = it.label,
-                )
-            }
+            drawRectangle(
+                textMeasurer = textMeasurer,
+                rectangle = it,
+                color = Color.Red,
+            )
         }
 
         selectedRectangles.forEach {
-            drawRectangle(rectangle = it, color = Color.Blue)
+            drawRectangle(
+                textMeasurer = textMeasurer,
+                rectangle = it,
+                color = Color.Blue,
+            )
         }
     }
-}
-
-private fun DrawScope.drawLabel(
-    textMeasurer: TextMeasurer,
-    rectangle: CvRectangle,
-    label: String,
-) {
-    val measured = textMeasurer.measure(
-        text = label,
-        style = TextStyle(color = Color.White, fontSize = 10.sp),
-    )
-    val padding = 2.dp.toPx()
-    val left = rectangle.leftX.toFloat()
-    val top = rectangle.topY.toFloat()
-
-    drawRect(
-        color = Color.Red,
-        topLeft = Offset(left, top),
-        size = Size(
-            width = measured.size.width + padding * 2,
-            height = measured.size.height + padding * 2,
-        ),
-    )
-    drawText(
-        textLayoutResult = measured,
-        topLeft = Offset(left + padding, top + padding),
-    )
 }
 
 private fun DrawScope.drawTextInRectangle(
@@ -104,6 +82,7 @@ private fun DrawScope.drawTextInRectangle(
 }
 
 private fun DrawScope.drawRectangle(
+    textMeasurer: TextMeasurer,
     rectangle: CvRectangle?,
     color: Color,
 ) {
@@ -117,5 +96,26 @@ private fun DrawScope.drawRectangle(
         style = Stroke(
             width = 1.dp.toPx()
         )
+    )
+    if (rectangle.label.isEmpty()) return
+    val measured = textMeasurer.measure(
+        text = rectangle.label,
+        style = TextStyle(color = Color.White, fontSize = 10.sp),
+    )
+    val padding = 2.dp.toPx()
+    val left = rectangle.leftX.toFloat()
+    val top = rectangle.topY.toFloat()
+
+    drawRect(
+        color = color,
+        topLeft = Offset(left, top),
+        size = Size(
+            width = measured.size.width + padding * 2,
+            height = measured.size.height + padding * 2,
+        ),
+    )
+    drawText(
+        textLayoutResult = measured,
+        topLeft = Offset(left + padding, top + padding),
     )
 }
