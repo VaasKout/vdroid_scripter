@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"gocv.io/x/gocv"
 )
@@ -66,6 +67,7 @@ func (i *interactorImpl) SaveStep(
 	name string,
 	step *models.ScriptStep,
 ) bool {
+	name = strings.TrimSpace(name)
 	if step == nil || serial == "" || name == "" {
 		return false
 	}
@@ -98,6 +100,11 @@ func (i *interactorImpl) FindText(
 	text string,
 	locale string,
 ) []cv.OCRResult {
+	text = strings.TrimSpace(text)
+	if text == "" {
+		return []cv.OCRResult{}
+	}
+
 	dir := i.filesDB.CreateLogsDir(serial, filesdb.TesseractDir)
 	if dir == "" {
 		return []cv.OCRResult{}
@@ -148,6 +155,7 @@ func (i *interactorImpl) GetScriptNames(serial string) ([]string, error) {
 }
 
 func (i *interactorImpl) GetScript(serial string, scriptName string) (*models.Script, error) {
+	scriptName = strings.TrimSpace(scriptName)
 	if serial == "" {
 		return &models.Script{}, errors.New(SerialIsEmptyError)
 	}
@@ -171,6 +179,7 @@ func (i *interactorImpl) GetScript(serial string, scriptName string) (*models.Sc
 }
 
 func (i *interactorImpl) DeleteScript(serial string, scriptName string) error {
+	scriptName = strings.TrimSpace(scriptName)
 	if serial == "" {
 		return errors.New(SerialIsEmptyError)
 	}

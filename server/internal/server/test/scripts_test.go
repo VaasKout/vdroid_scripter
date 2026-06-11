@@ -109,7 +109,7 @@ func TestSaveStep(t *testing.T) {
 		Step   models.ScriptStep `json:"step"`
 	}{
 		Serial: TestSerial,
-		Name:   TestScript,
+		Name:   TestScript + " ",
 		Step: models.ScriptStep{
 			Text: "test",
 		},
