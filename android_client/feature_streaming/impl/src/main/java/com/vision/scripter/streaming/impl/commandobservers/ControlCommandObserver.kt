@@ -34,6 +34,10 @@ internal fun StreamingCommandObserver(
                     Toast.LENGTH_SHORT
                 ).show()
             }
+
+            is StreamingUiCommand.ExitCommand -> {
+                navController.popBackStack()
+            }
         }
     }
 }

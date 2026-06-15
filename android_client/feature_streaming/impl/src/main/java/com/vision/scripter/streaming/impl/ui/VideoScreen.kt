@@ -55,6 +55,7 @@ fun VideoScreen(
                     onCvModeClick = uiStateHolder::onCvModeClicked,
                     onTextModeClick = uiStateHolder::onTextModeClicked,
                     onExpandClick = uiStateHolder::onExpandClicked,
+                    onExitClick = uiStateHolder::exit,
                 )
             }
 

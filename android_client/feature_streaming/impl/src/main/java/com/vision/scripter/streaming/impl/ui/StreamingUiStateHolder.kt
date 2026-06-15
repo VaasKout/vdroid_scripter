@@ -32,6 +32,7 @@ interface StreamingUiStateHolder {
     fun onSaveClicked()
     fun onExpandClicked()
     fun onCancelClicked()
+    fun exit()
 
     fun onSavedRecordName(name: String)
     fun onSaveLocale(locale: String)

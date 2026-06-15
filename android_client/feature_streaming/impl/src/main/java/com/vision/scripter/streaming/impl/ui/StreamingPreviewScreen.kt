@@ -48,6 +48,7 @@ internal class StreamingPreviewScreenUiStateHolder(state: StreamingUiState) :
     override fun onSaveClicked() {}
     override fun onExpandClicked() {}
     override fun onCancelClicked() {}
+    override fun exit() {}
     override fun onSavedRecordName(name: String) {}
     override fun onSaveLocale(locale: String) {}
     override fun onDialogDismissed() {}

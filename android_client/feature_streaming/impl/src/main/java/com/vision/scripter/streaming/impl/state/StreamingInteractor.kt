@@ -302,6 +302,10 @@ class StreamingInteractor @Inject constructor(
         menuInteractor.onExpandClicked()
     }
 
+    override fun exit() {
+        uiCommandsFlow.tryEmit(StreamingUiCommand.ExitCommand)
+    }
+
     override fun onRecordingClicked() {
         menuInteractor.onRecordingClicked()
     }

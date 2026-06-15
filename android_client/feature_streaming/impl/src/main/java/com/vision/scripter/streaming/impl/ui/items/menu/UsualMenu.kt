@@ -9,6 +9,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -35,6 +36,7 @@ fun UsualMenu(
     onCvModeClick: () -> Unit,
     onTextModeClick: () -> Unit,
     onExpandClick: () -> Unit,
+    onExitClick: () -> Unit,
 ) {
     if (menuState.expanded) {
         Column(
@@ -63,6 +65,15 @@ fun UsualMenu(
                 onCvModeClick = onCvModeClick,
                 onTextClick = onTextModeClick,
                 onKeyboardClick = onKeyboardClick,
+            )
+
+            Icon(
+                modifier = Modifier
+                    .size(32.dp)
+                    .customClickable(onClick = onExitClick),
+                imageVector = Icons.AutoMirrored.Filled.Logout,
+                tint = MaterialTheme.colorScheme.onSurface,
+                contentDescription = ""
             )
 
             Icon(
@@ -109,6 +120,7 @@ private fun UsualMenuPreview() {
         onCvModeClick = {},
         onTextModeClick = {},
         onExpandClick = {},
+        onExitClick = {},
     )
 }
 
@@ -122,6 +134,7 @@ private fun UsualExpandedMenuPreview() {
         onCvModeClick = {},
         onTextModeClick = {},
         onExpandClick = {},
+        onExitClick = {},
     )
 }
 
@@ -139,5 +152,6 @@ private fun UsualExpandedHighlightedTextPreview() {
         onCvModeClick = {},
         onTextModeClick = {},
         onExpandClick = {},
+        onExitClick = {},
     )
 }
