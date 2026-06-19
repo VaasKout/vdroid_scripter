@@ -3,6 +3,7 @@ package models
 import (
 	"encoding/json"
 	"fmt"
+	"time"
 )
 
 // Script flags
@@ -15,6 +16,8 @@ const (
 	ClassIsVisible    = 1 << 5
 	TypeText          = 1 << 6
 )
+
+const DefaultTimeout int = 15
 
 // Script ...
 type Script struct {
@@ -41,6 +44,14 @@ type ScriptStep struct {
 	Label   string  `json:"label,omitempty"`
 	Locale  string  `json:"locale,omitempty"`
 	Command string  `json:"command,omitempty"`
+	Timeout int     `json:"timeout,omitempty"`
+}
+
+func (s *ScriptStep) GetTimeout() time.Duration {
+	if s == nil || s.Timeout <= 0 {
+		return time.Duration(DefaultTimeout) * time.Second
+	}
+	return time.Duration(s.Timeout) * time.Second
 }
 
 func (s *ScriptStep) HasEventFlag() bool {

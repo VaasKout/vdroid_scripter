@@ -83,6 +83,10 @@ func (i *interactorImpl) SaveStep(
 	var id = len(script.Steps) + 1
 	step.ID = id
 
+	if step.Timeout <= 0 {
+		step.Timeout = models.DefaultTimeout
+	}
+
 	if step.Flags&models.EventOnTemplate != 0 || step.Flags&models.TemplateIsVisible != 0 {
 		scriptDir := i.getScriptDir(serial, name)
 		tmpImg := i.filesDB.FindFileInDBDir(serial, filesdb.TmpZone)

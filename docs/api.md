@@ -142,7 +142,8 @@ Appends a step to the named script.
     "step": { /* ScriptStep, see models */ }
   }
   ```
-  `serial` and `name` are required.
+  `serial` and `name` are required. `step.timeout` is optional (seconds to keep
+  locating the step's target before failing; defaults to `15` when omitted or `<= 0`).
 - **Response `200`:** `{ "status": "ok" }`
 - **Errors:** `400` on invalid JSON or empty `serial`/`name`, `500` if not saved.
 
@@ -297,6 +298,7 @@ ports.
 | Label | `label` | string | omitempty; YOLO class name for `EventOnClass`/`ClassIsVisible` |
 | Locale | `locale` | string | omitempty |
 | Command | `command` | string | omitempty |
+| Timeout | `timeout` | int | omitempty; seconds to locate the target before failing (default `15`) |
 
 ### Event
 

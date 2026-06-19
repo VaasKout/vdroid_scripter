@@ -18,10 +18,6 @@ import (
 	"gocv.io/x/gocv"
 )
 
-const (
-	Timeout = 15
-)
-
 func (i *interactorImpl) RunScript(serial string, scriptName string, basePort int) error {
 	if serial == "" {
 		return errors.New(SerialIsEmptyError)
@@ -145,7 +141,8 @@ func (i *interactorImpl) findRectangle(
 	scriptDir string,
 ) (*image.Rectangle, error) {
 	var foundRect *image.Rectangle
-	deadline := time.Now().Add(Timeout * time.Second)
+	var timeout = step.GetTimeout()
+	deadline := time.Now().Add(timeout)
 	for time.Now().Before(deadline) {
 		mat, err := i.scrcpy.GetMatFromLastFrame(serial, true)
 		if err != nil {
@@ -236,7 +233,8 @@ func (i *interactorImpl) typeText(
 		return fmt.Errorf("nothing to type")
 	}
 
-	deadline := time.Now().Add(Timeout * time.Second)
+	var timeout = step.GetTimeout()
+	deadline := time.Now().Add(timeout)
 attemptsLoop:
 	for time.Now().Before(deadline) {
 		keyboardKeys, err := i.getKeyboardKeys(serial, step)
