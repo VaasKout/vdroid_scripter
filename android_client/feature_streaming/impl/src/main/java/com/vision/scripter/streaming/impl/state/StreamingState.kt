@@ -19,6 +19,8 @@ const val NUMBERS = "numbers"
 const val PHONE = "phone"
 const val SPACE_KEY = "space"
 
+const val DEFAULT_TIMEOUT = 15
+
 val locales = listOf(
     ENG,
     RUS,
@@ -52,6 +54,7 @@ data class StreamingState(
         val label: String = "",
         val locale: String = "",
         val flags: Int = 0,
+        val timeout: Int = DEFAULT_TIMEOUT,
     ) {
         fun clearStep() = Record(recordName = recordName)
     }
@@ -70,6 +73,7 @@ sealed interface MenuState {
 
     data class Recording(
         val controlRecording: Boolean = false,
+        val customTimeout: Boolean = false,
         val flags: Int = 0,
     ) : MenuState
 

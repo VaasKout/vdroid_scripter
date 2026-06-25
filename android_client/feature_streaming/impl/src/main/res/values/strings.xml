@@ -6,4 +6,5 @@
     <string name="write_the_word">Write the word to find</string>
     <string name="choose_locale">Choose locale</string>
     <string name="set_button">Set button</string>
+    <string name="insert_timeout">Insert timeout</string>
 </resources>

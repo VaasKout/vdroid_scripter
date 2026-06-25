@@ -34,6 +34,9 @@ interface StreamingUiStateHolder {
     fun onCancelClicked()
     fun exit()
 
+    fun onTimeoutClicked()
+    fun onTimeoutSaved(timeout: Int)
+
     fun onSavedRecordName(name: String)
     fun onSaveLocale(locale: String)
     fun onDialogDismissed()

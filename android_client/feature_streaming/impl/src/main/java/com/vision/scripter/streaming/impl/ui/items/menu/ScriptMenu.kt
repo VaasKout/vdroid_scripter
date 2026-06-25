@@ -10,6 +10,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.RadioButtonChecked
+import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
@@ -34,6 +35,7 @@ fun ScriptMenu(
     onCvModeClick: () -> Unit,
     onTextModeClick: () -> Unit,
     onKeyboardClick: () -> Unit,
+    onTimeoutClick: () -> Unit,
     onSaveClick: () -> Unit,
     onCancelClick: () -> Unit,
 ) {
@@ -70,6 +72,17 @@ fun ScriptMenu(
         Icon(
             modifier = Modifier
                 .size(32.dp)
+                .customClickable(onClick = onTimeoutClick),
+            imageVector = Icons.Filled.Timer,
+            tint =
+                if (menuState.customTimeout) Color.Red
+                else MaterialTheme.colorScheme.onSurface,
+            contentDescription = ""
+        )
+
+        Icon(
+            modifier = Modifier
+                .size(32.dp)
                 .customClickable(onClick = onCancelClick),
             imageVector = Icons.Filled.Close,
             tint = MaterialTheme.colorScheme.onSurface,
@@ -98,6 +111,7 @@ private fun ScriptMenuDefaultPreview() {
         onCvModeClick = {},
         onTextModeClick = {},
         onKeyboardClick = {},
+        onTimeoutClick = {},
         onSaveClick = {},
         onCancelClick = {},
     )
@@ -110,11 +124,13 @@ private fun ScriptMenuRecordingPreview() {
         menuState = MenuState.Recording(
             controlRecording = true,
             flags = TEMPLATE_IS_VISIBLE or EVENT_ON_TEXT or TYPE_TEXT,
+            customTimeout = true,
         ),
         onRecordingClick = {},
         onCvModeClick = {},
         onTextModeClick = {},
         onKeyboardClick = {},
+        onTimeoutClick = {},
         onSaveClick = {},
         onCancelClick = {},
     )

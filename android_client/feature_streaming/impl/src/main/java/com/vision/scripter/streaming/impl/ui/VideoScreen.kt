@@ -15,6 +15,7 @@ import com.vision.scripter.streaming.impl.ui.items.KeyboardDialog
 import com.vision.scripter.streaming.impl.ui.items.RecordDialog
 import com.vision.scripter.streaming.impl.ui.items.RectanglesCanvas
 import com.vision.scripter.streaming.impl.ui.items.TextToFindDialog
+import com.vision.scripter.streaming.impl.ui.items.TimeoutDialog
 import com.vision.scripter.streaming.impl.ui.items.VideoSurface
 import com.vision.scripter.streaming.impl.ui.items.menu.KeyboardMenu
 import com.vision.scripter.streaming.impl.ui.items.menu.ScriptMenu
@@ -93,6 +94,7 @@ fun VideoScreen(
                     onCvModeClick = uiStateHolder::onCvModeClicked,
                     onTextModeClick = uiStateHolder::onTextModeClicked,
                     onKeyboardClick = uiStateHolder::onKeyboardClicked,
+                    onTimeoutClick = uiStateHolder::onTimeoutClicked,
                     onSaveClick = uiStateHolder::onSaveClicked,
                     onCancelClick = uiStateHolder::onCancelClicked,
                 )
@@ -141,6 +143,14 @@ fun VideoScreen(
                 EditKeyboardDialog(
                     oldKey = (state.menuState as? MenuState.Keyboard)?.oldKey.orEmpty(),
                     onSave = uiStateHolder::onEditKeyboardButtonSaved,
+                    onDismiss = uiStateHolder::onDialogDismissed,
+                )
+            }
+
+            DialogState.TIMEOUT -> {
+                TimeoutDialog(
+                    initialTimeout = state.recordTimeout,
+                    onSave = uiStateHolder::onTimeoutSaved,
                     onDismiss = uiStateHolder::onDialogDismissed,
                 )
             }

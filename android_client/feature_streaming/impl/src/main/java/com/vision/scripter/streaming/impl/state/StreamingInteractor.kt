@@ -298,6 +298,20 @@ class StreamingInteractor @Inject constructor(
         menuInteractor.onScriptModeClicked()
     }
 
+    override fun onTimeoutClicked() {
+        menuInteractor.onTimeoutClicked()
+    }
+
+    override fun onTimeoutSaved(timeout: Int) {
+        _stateFlow.update {
+            it.copy(
+                record = it.record.copy(timeout = timeout),
+            )
+        }
+        menuInteractor.updateTimeoutState(timeout > 0)
+        menuInteractor.hideDialog()
+    }
+
     override fun onExpandClicked() {
         menuInteractor.onExpandClicked()
     }
@@ -438,6 +452,7 @@ class StreamingInteractor @Inject constructor(
                 text = record.text,
                 label = record.label,
                 locale = record.locale,
+                timeout = record.timeout,
             ),
         )
         if (!success) return

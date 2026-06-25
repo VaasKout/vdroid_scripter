@@ -21,6 +21,10 @@ class MenuInteractor @Inject constructor() {
         _dialogState.update { DialogState.RECORD }
     }
 
+    fun onTimeoutClicked() {
+        _dialogState.update { DialogState.TIMEOUT }
+    }
+
     fun onExpandClicked() {
         val state = _menuState.value
         if (state is MenuState.Usual) {
@@ -241,6 +245,15 @@ class MenuInteractor @Inject constructor() {
         }
     }
 
+    fun updateTimeoutState(customTimeout: Boolean) {
+        val menuState = _menuState.value
+        if (menuState is MenuState.Recording) {
+            _menuState.update {
+                menuState.copy(customTimeout = customTimeout)
+            }
+        }
+    }
+
     fun onEditKeyboardRectangleSelected() {
         _dialogState.update { DialogState.EDIT_KEYBOARD }
     }
@@ -277,7 +290,8 @@ enum class DialogState {
     RECORD,
     TEXT,
     KEYBOARD,
-    EDIT_KEYBOARD;
+    EDIT_KEYBOARD,
+    TIMEOUT;
 }
 
 sealed interface KeyboardEditTransition {

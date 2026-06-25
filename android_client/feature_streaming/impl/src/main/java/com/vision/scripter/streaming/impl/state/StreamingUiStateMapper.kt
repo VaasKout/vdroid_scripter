@@ -29,6 +29,7 @@ class StreamingUiStateMapper @Inject constructor() {
             keyboardButtons = keyboardButtons,
             menuState = menuState,
             dialogState = dialogState,
+            recordTimeout = state.record.timeout,
         )
     }
 }

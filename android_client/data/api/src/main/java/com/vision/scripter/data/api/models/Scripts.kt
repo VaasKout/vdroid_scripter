@@ -45,6 +45,8 @@ data class ScriptStep(
     val locale: String = "",
     @SerialName("command")
     val command: String = "",
+    @SerialName("timeout")
+    val timeout: Int = 0,
 )
 
 fun ScriptStep.isEmpty(): Boolean {
