@@ -17,7 +17,7 @@ import com.vision.scripter.streaming.impl.screen.main.state.textFlag
 import com.vision.scripter.streaming.impl.screen.main.state.withFlag
 import com.vision.scripter.streaming.impl.usecases.CvUseCase
 import com.vision.scripter.ui.CommandFlow
-import dagger.hilt.android.scopes.ViewModelScoped
+import dagger.hilt.android.scopes.ActivityRetainedScoped
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -29,7 +29,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-@ViewModelScoped
+@ActivityRetainedScoped
 class MenuInteractor @Inject constructor(
     coroutineScopeFactory: CoroutineScopeFactory,
     private val cvUseCase: CvUseCase,
@@ -47,7 +47,7 @@ class MenuInteractor @Inject constructor(
     private val _dialogState = MutableStateFlow(DialogState.NONE)
     fun observeDialogState(): StateFlow<DialogState> = _dialogState.asStateFlow()
 
-    private val _events = MutableSharedFlow<MenuEvent>(extraBufferCapacity = 16)
+    private val _events = MutableSharedFlow<MenuEvent>(replay = 1)
     fun observeEvents(): SharedFlow<MenuEvent> = _events.asSharedFlow()
 
     private var recordingFlags = 0
@@ -253,13 +253,11 @@ class MenuInteractor @Inject constructor(
         }
     }
 
-    fun onStepSaved() {
+    suspend fun onStepSaved() {
         recordingFlags = 0
         _menuState.update { MenuState.Recording() }
-        coroutineScope.launch {
-            cvUseCase.nextCvMode(CVMode.NO_CV)
-            cvUseCase.clearAllRectangles()
-        }
+        cvUseCase.nextCvMode(CVMode.NO_CV)
+        cvUseCase.clearAllRectangles()
     }
 
     override fun onCancelClicked() {

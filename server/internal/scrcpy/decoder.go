@@ -194,7 +194,7 @@ func (s *scrcpyImpl) frameToMat(data *DecoderData, rgb bool) *gocv.Mat {
 	}
 
 	var frameData = data.DrawFrame.Data()
-	if frameData == nil {
+	if frameData == nil || data.YcbCrImg == nil {
 		return nil
 	}
 
