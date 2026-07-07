@@ -17,10 +17,8 @@ import com.vision.scripter.data.api.models.contains
 import com.vision.scripter.data.api.models.extractPressEvent
 import com.vision.scripter.network.api.ApiResponse
 import com.vision.scripter.prefs.api.DataStoreRepository
-import com.vision.scripter.streaming.impl.blocks.menu.state.KeyboardEditTransition
+import com.vision.scripter.streaming.impl.blocks.menu.state.MenuEvent
 import com.vision.scripter.streaming.impl.blocks.menu.state.MenuInteractor
-import com.vision.scripter.streaming.impl.blocks.menu.state.SaveAction
-import com.vision.scripter.streaming.impl.blocks.menu.state.TextModeAction
 import com.vision.scripter.streaming.impl.screen.main.ui.StreamingUiCommand
 import com.vision.scripter.streaming.impl.screen.main.ui.StreamingUiState
 import com.vision.scripter.streaming.impl.screen.main.ui.StreamingUiStateHolder
@@ -106,6 +104,117 @@ class StreamingInteractor @Inject constructor(
                 it.copy(selectedRectangles = selected)
             }
         }.launchIn(coroutineScope)
+
+        menuInteractor.observeEvents().onEach(::handleMenuEvent).launchIn(coroutineScope)
+    }
+
+    private suspend fun handleMenuEvent(event: MenuEvent) {
+        when (event) {
+            is MenuEvent.SaveTemplate -> {
+                val label =
+                    cvUseCase.observeSelectedRectangles().value.firstOrNull()?.label.orEmpty()
+                _stateFlow.update {
+                    it.copy(record = it.record.copy(flags = event.flags, label = label))
+                }
+                if (event.flags.templateFlag() != 0) {
+                    val screenSizes = videoUseCase.observeScreenSizes().value ?: return
+                    cvUseCase.saveSelectedRectangle(
+                        serial = currentState.serial,
+                        screenSizes = screenSizes,
+                    )
+                }
+            }
+
+            is MenuEvent.SaveText -> _stateFlow.update {
+                it.copy(
+                    record = it.record.copy(
+                        text = event.text,
+                        locale = event.locale,
+                        flags = event.flags,
+                    )
+                )
+            }
+
+            is MenuEvent.SaveTyping -> {
+                val pressEvent = currentState.record.stepEvents.extractPressEvent()
+                _stateFlow.update {
+                    it.copy(
+                        record = it.record.copy(
+                            text = event.text,
+                            flags = event.flags,
+                            stepEvents = pressEvent,
+                        )
+                    )
+                }
+            }
+
+            MenuEvent.SaveStep -> saveStep()
+
+            MenuEvent.RecordCancelled -> _stateFlow.update {
+                it.copy(record = StreamingState.Record())
+            }
+
+            is MenuEvent.FindText -> {
+                val screenSizes = videoUseCase.observeScreenSizes().value ?: return
+                val found = cvUseCase.findTextRectangles(
+                    serial = currentState.serial,
+                    text = event.text,
+                    locale = event.locale,
+                    screenSizes = screenSizes,
+                )
+                if (!found) {
+                    uiCommandsFlow.tryEmit(StreamingUiCommand.ShowNetworkError)
+                    return
+                }
+                menuInteractor.onTextSearchSuccess(text = event.text, locale = event.locale)
+            }
+
+            MenuEvent.KeyboardInit -> {
+                val result = scripterRepository.resetKeyboard(
+                    serial = currentState.serial,
+                    locale = currentState.record.locale,
+                )
+                if (result is ApiResponse.Success) {
+                    setupKeyboardRects(result.data)
+                }
+            }
+
+            is MenuEvent.EditKeyboardButton -> {
+                val menuState = menuInteractor.observeMenuState().value
+                val oldName = (menuState as? MenuState.Keyboard)?.oldKey.orEmpty()
+                val screenSizes = videoUseCase.observeScreenSizes().value ?: return
+                val success = cvUseCase.editKeyboardSelectedRectangle(
+                    serial = currentState.serial,
+                    locale = currentState.record.locale,
+                    oldName = oldName,
+                    newName = event.name,
+                    screenSizes = screenSizes,
+                )
+                menuInteractor.hideDialog()
+                cvUseCase.clearSelectedRectangles()
+                if (success) {
+                    menuInteractor.setKeyboardLoadingState(true)
+                    getOrResetKeyboard()
+                    return
+                }
+                uiCommandsFlow.tryEmit(StreamingUiCommand.ShowNetworkError)
+            }
+
+            is MenuEvent.SaveLocale -> {
+                _stateFlow.update {
+                    it.copy(record = it.record.copy(locale = event.locale))
+                }
+                getOrResetKeyboard()
+            }
+
+            is MenuEvent.SaveRecordName -> _stateFlow.update {
+                it.copy(record = it.record.copy(recordName = event.name))
+            }
+
+            is MenuEvent.TimeoutSaved -> _stateFlow.update {
+                it.copy(record = it.record.copy(timeout = event.timeout))
+            }
+        }
     }
 
     override fun onLoadData(onStart: Boolean) {
@@ -298,153 +407,6 @@ class StreamingInteractor @Inject constructor(
         }
     }
 
-    override fun onScriptModeClicked() {
-        menuInteractor.onScriptModeClicked()
-    }
-
-    override fun onTimeoutClicked() {
-        menuInteractor.onTimeoutClicked()
-    }
-
-    override fun onTimeoutSaved(timeout: Int) {
-        _stateFlow.update {
-            it.copy(
-                record = it.record.copy(timeout = timeout),
-            )
-        }
-        menuInteractor.updateTimeoutState(timeout > 0)
-        menuInteractor.hideDialog()
-    }
-
-    override fun onExpandClicked() {
-        menuInteractor.onExpandClicked()
-    }
-
-    override fun exit() {
-        uiCommandsFlow.tryEmit(StreamingUiCommand.ExitCommand)
-    }
-
-    override fun onRecordingClicked() {
-        menuInteractor.onRecordingClicked()
-    }
-
-    override fun onKeyboardClicked() {
-        menuInteractor.onKeyboardClicked()
-    }
-
-    override fun onDialogDismissed() {
-        if (menuInteractor.observeMenuState().value is MenuState.Keyboard) {
-            cvUseCase.clearSelectedRectangles()
-        }
-        menuInteractor.onDialogDismissed(currentState.record)
-    }
-
-    override fun onCvModeClicked() {
-        coroutineScope.launch {
-            val enteringSelection = menuInteractor.observeMenuState().value is MenuState.Recording
-            val action = menuInteractor.onCvModeClicked() ?: return@launch
-            if (enteringSelection) {
-                cvUseCase.snapshotSelectedRectangles()
-            }
-            cvUseCase.nextCvMode(action.newCvMode)
-            if (action.disableSelection) {
-                cvUseCase.clearSelectedRectangles()
-            }
-        }
-    }
-
-    override fun onTextModeClicked() {
-        coroutineScope.launch {
-            when (menuInteractor.onTextModeClicked()) {
-                TextModeAction.ClearRectangles -> cvUseCase.clearAllRectangles()
-                TextModeAction.None -> Unit
-            }
-        }
-    }
-
-    override fun onTryToFindText(text: String, locale: String) {
-        coroutineScope.launch {
-            menuInteractor.hideDialog()
-
-            val screenSizes = videoUseCase.observeScreenSizes().value ?: return@launch
-            val trimmed = text.trim()
-            if (menuInteractor.observeMenuState().value is MenuState.Recording) {
-                cvUseCase.snapshotSelectedRectangles()
-            }
-            val found = cvUseCase.findTextRectangles(
-                serial = currentState.serial,
-                text = trimmed,
-                locale = locale,
-                screenSizes = screenSizes,
-            )
-
-            if (!found) {
-                uiCommandsFlow.tryEmit(StreamingUiCommand.ShowNetworkError)
-                return@launch
-            }
-            menuInteractor.onTextSearchSuccess(text = trimmed, locale = locale)
-        }
-    }
-
-    override fun onSaveClicked() {
-        coroutineScope.launch {
-            when (val action = menuInteractor.onSaveClicked(currentState.record)) {
-                is SaveAction.SaveTemplate -> {
-                    val label = cvUseCase.observeSelectedRectangles()
-                        .value.firstOrNull()?.label.orEmpty()
-                    _stateFlow.update {
-                        it.copy(
-                            record = it.record.copy(
-                                flags = action.flags,
-                                label = label,
-                            )
-                        )
-                    }
-                    if (action.flags.templateFlag() != 0) {
-                        val screenSizes = videoUseCase.observeScreenSizes().value ?: return@launch
-                        cvUseCase.saveSelectedRectangle(
-                            serial = currentState.serial,
-                            screenSizes = screenSizes,
-                        )
-                    }
-                    cvUseCase.nextCvMode(CVMode.NO_CV)
-                }
-
-                is SaveAction.SaveTextSelection -> {
-                    _stateFlow.update {
-                        it.copy(
-                            record = it.record.copy(
-                                text = action.text,
-                                locale = action.locale,
-                                flags = action.flags,
-                            )
-                        )
-                    }
-                    if (action.flags.textFlag() == 0) {
-                        cvUseCase.clearSelectedRectangles()
-                    }
-                    cvUseCase.nextCvMode(CVMode.NO_CV)
-                }
-
-                is SaveAction.SaveTyping -> {
-                    val pressEvent = currentState.record.stepEvents.extractPressEvent()
-                    _stateFlow.update {
-                        it.copy(
-                            record = it.record.copy(
-                                text = action.text,
-                                flags = action.flags,
-                                stepEvents = pressEvent,
-                            )
-                        )
-                    }
-                    cvUseCase.nextCvMode(CVMode.NO_CV)
-                }
-
-                SaveAction.SaveStep -> saveStep()
-            }
-        }
-    }
-
     private suspend fun saveStep() {
         val record = currentState.record
         val success = scripterRepository.saveScriptStep(
@@ -463,106 +425,9 @@ class StreamingInteractor @Inject constructor(
 
         uiCommandsFlow.tryEmit(StreamingUiCommand.ShowStepSavedSnackbar)
         startRecordingTime = 0L
-        cvUseCase.nextCvMode(CVMode.NO_CV)
-        cvUseCase.clearAllRectangles()
         menuInteractor.onStepSaved()
         _stateFlow.update {
             it.copy(record = it.record.clearStep())
-        }
-    }
-
-    override fun onCancelClicked() {
-        coroutineScope.launch {
-            val previousMenu = menuInteractor.observeMenuState().value
-            val wasRecording = menuInteractor.onCancelClicked(currentState.record)
-            cvUseCase.nextCvMode(CVMode.NO_CV)
-
-            if (wasRecording) {
-                cvUseCase.clearSelectedRectangles()
-                _stateFlow.update { it.copy(record = StreamingState.Record()) }
-                return@launch
-            }
-
-            if (previousMenu is MenuState.SelectingCV || previousMenu is MenuState.SelectingText) {
-                cvUseCase.restoreSelectedRectangles()
-            }
-        }
-    }
-
-    override fun onSavedRecordName(name: String) {
-        coroutineScope.launch {
-            _stateFlow.update {
-                it.copy(record = it.record.copy(recordName = name))
-            }
-            menuInteractor.onSavedRecordName()
-            cvUseCase.nextCvMode(CVMode.NO_CV)
-        }
-    }
-
-    override fun onSaveLocale(locale: String) {
-        coroutineScope.launch {
-            _stateFlow.update {
-                it.copy(record = it.record.copy(locale = locale))
-            }
-            menuInteractor.onSaveLocale()
-            getOrResetKeyboard()
-        }
-    }
-
-    override fun onKeyboardInitClicked() {
-        coroutineScope.launch {
-            menuInteractor.setKeyboardLoadingState(true)
-
-            val result = scripterRepository.resetKeyboard(
-                serial = currentState.serial,
-                locale = currentState.record.locale,
-            )
-
-            if (result is ApiResponse.Success) {
-                setupKeyboardRects(result.data)
-            }
-        }
-    }
-
-    override fun onKeyboardEdited(addNew: Boolean) {
-        coroutineScope.launch {
-            val transition = menuInteractor.onKeyboardEdited(addNew)
-            when (transition) {
-                KeyboardEditTransition.ShowCvRectangles -> {
-                    cvUseCase.clearSelectedRectangles()
-                    cvUseCase.nextCvMode(CVMode.CV_RECTS)
-                }
-
-                KeyboardEditTransition.ShowKeyboardButtons -> {
-                    cvUseCase.nextCvMode(CVMode.NO_CV)
-                    cvUseCase.clearSelectedRectangles()
-                }
-
-                KeyboardEditTransition.None -> Unit
-            }
-        }
-    }
-
-    override fun onEditKeyboardButtonSaved(name: String) {
-        coroutineScope.launch {
-            val menuState = menuInteractor.observeMenuState().value
-            val oldName = (menuState as? MenuState.Keyboard)?.oldKey.orEmpty()
-            val screenSizes = videoUseCase.observeScreenSizes().value ?: return@launch
-            val success = cvUseCase.editKeyboardSelectedRectangle(
-                serial = currentState.serial,
-                locale = currentState.record.locale,
-                oldName = oldName,
-                newName = name,
-                screenSizes = screenSizes,
-            )
-            menuInteractor.hideDialog()
-            cvUseCase.clearSelectedRectangles()
-            if (success) {
-                menuInteractor.setKeyboardLoadingState(true)
-                getOrResetKeyboard()
-                return@launch
-            }
-            uiCommandsFlow.tryEmit(StreamingUiCommand.ShowNetworkError)
         }
     }
 

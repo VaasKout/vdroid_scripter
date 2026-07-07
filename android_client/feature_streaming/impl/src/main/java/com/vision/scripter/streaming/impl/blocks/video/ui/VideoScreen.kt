@@ -9,6 +9,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.vision.scripter.streaming.impl.blocks.menu.state.DialogState
+import com.vision.scripter.streaming.impl.blocks.menu.state.MenuUiStateHolder
 import com.vision.scripter.streaming.impl.blocks.menu.ui.dialogs.EditKeyboardDialog
 import com.vision.scripter.streaming.impl.blocks.menu.ui.dialogs.KeyboardDialog
 import com.vision.scripter.streaming.impl.blocks.menu.ui.dialogs.RecordDialog
@@ -20,6 +21,7 @@ import com.vision.scripter.streaming.impl.blocks.menu.ui.menu.SelectingTemplateM
 import com.vision.scripter.streaming.impl.blocks.menu.ui.menu.SelectingTextMenu
 import com.vision.scripter.streaming.impl.blocks.menu.ui.menu.UsualMenu
 import com.vision.scripter.streaming.impl.screen.main.state.MenuState
+import com.vision.scripter.streaming.impl.screen.main.ui.StreamingPreviewMenuUiStateHolder
 import com.vision.scripter.streaming.impl.screen.main.ui.StreamingPreviewScreenUiStateHolder
 import com.vision.scripter.streaming.impl.screen.main.ui.StreamingUiState
 import com.vision.scripter.streaming.impl.screen.main.ui.StreamingUiStateHolder
@@ -30,6 +32,7 @@ fun VideoScreen(
     modifier: Modifier = Modifier,
     state: StreamingUiState,
     uiStateHolder: StreamingUiStateHolder,
+    menuUiStateHolder: MenuUiStateHolder,
 ) {
     Box(modifier = modifier) {
         VideoSurface(
@@ -53,12 +56,12 @@ fun VideoScreen(
                         .align(Alignment.TopEnd)
                         .padding(top = 128.dp),
                     menuState = state.menuState,
-                    onScriptModeClick = uiStateHolder::onScriptModeClicked,
-                    onKeyboardClick = uiStateHolder::onKeyboardClicked,
-                    onCvModeClick = uiStateHolder::onCvModeClicked,
-                    onTextModeClick = uiStateHolder::onTextModeClicked,
-                    onExpandClick = uiStateHolder::onExpandClicked,
-                    onExitClick = uiStateHolder::exit,
+                    onScriptModeClick = menuUiStateHolder::onScriptModeClicked,
+                    onKeyboardClick = menuUiStateHolder::onKeyboardClicked,
+                    onCvModeClick = menuUiStateHolder::onCvModeClicked,
+                    onTextModeClick = menuUiStateHolder::onTextModeClicked,
+                    onExpandClick = menuUiStateHolder::onExpandClicked,
+                    onExitClick = menuUiStateHolder::onExitClicked,
                 )
             }
 
@@ -68,9 +71,9 @@ fun VideoScreen(
                         .align(Alignment.TopEnd)
                         .padding(top = 128.dp),
                     flags = state.menuState.flags,
-                    onCvModeClick = uiStateHolder::onCvModeClicked,
-                    onSaveClick = uiStateHolder::onSaveClicked,
-                    onBackClick = uiStateHolder::onCancelClicked,
+                    onCvModeClick = menuUiStateHolder::onCvModeClicked,
+                    onSaveClick = menuUiStateHolder::onSaveClicked,
+                    onBackClick = menuUiStateHolder::onCancelClicked,
                 )
             }
 
@@ -80,9 +83,9 @@ fun VideoScreen(
                         .align(Alignment.TopEnd)
                         .padding(top = 128.dp),
                     flags = state.menuState.flags,
-                    onTextModeClick = uiStateHolder::onTextModeClicked,
-                    onSaveClick = uiStateHolder::onSaveClicked,
-                    onBackClick = uiStateHolder::onCancelClicked,
+                    onTextModeClick = menuUiStateHolder::onTextModeClicked,
+                    onSaveClick = menuUiStateHolder::onSaveClicked,
+                    onBackClick = menuUiStateHolder::onCancelClicked,
                 )
             }
 
@@ -92,13 +95,13 @@ fun VideoScreen(
                         .align(Alignment.TopEnd)
                         .padding(top = 128.dp),
                     menuState = state.menuState,
-                    onRecordingClick = uiStateHolder::onRecordingClicked,
-                    onCvModeClick = uiStateHolder::onCvModeClicked,
-                    onTextModeClick = uiStateHolder::onTextModeClicked,
-                    onKeyboardClick = uiStateHolder::onKeyboardClicked,
-                    onTimeoutClick = uiStateHolder::onTimeoutClicked,
-                    onSaveClick = uiStateHolder::onSaveClicked,
-                    onCancelClick = uiStateHolder::onCancelClicked,
+                    onRecordingClick = menuUiStateHolder::onRecordingClicked,
+                    onCvModeClick = menuUiStateHolder::onCvModeClicked,
+                    onTextModeClick = menuUiStateHolder::onTextModeClicked,
+                    onKeyboardClick = menuUiStateHolder::onKeyboardClicked,
+                    onTimeoutClick = menuUiStateHolder::onTimeoutClicked,
+                    onSaveClick = menuUiStateHolder::onSaveClicked,
+                    onCancelClick = menuUiStateHolder::onCancelClicked,
                 )
             }
 
@@ -108,11 +111,11 @@ fun VideoScreen(
                         .align(Alignment.TopEnd)
                         .padding(top = 128.dp),
                     menuState = state.menuState,
-                    onKeyboardInitClick = uiStateHolder::onKeyboardInitClicked,
-                    onKeyboardRecordingClick = uiStateHolder::onRecordingClicked,
-                    onKeyboardEdit = uiStateHolder::onKeyboardEdited,
-                    onSaveClick = uiStateHolder::onSaveClicked,
-                    onCancelClick = uiStateHolder::onCancelClicked,
+                    onKeyboardInitClick = menuUiStateHolder::onKeyboardInitClicked,
+                    onKeyboardRecordingClick = menuUiStateHolder::onRecordingClicked,
+                    onKeyboardEdit = menuUiStateHolder::onKeyboardEdited,
+                    onSaveClick = menuUiStateHolder::onSaveClicked,
+                    onCancelClick = menuUiStateHolder::onCancelClicked,
                 )
             }
         }
@@ -122,38 +125,38 @@ fun VideoScreen(
 
             DialogState.RECORD -> {
                 RecordDialog(
-                    onSaveRecordName = uiStateHolder::onSavedRecordName,
-                    onDismiss = uiStateHolder::onDialogDismissed,
+                    onSaveRecordName = menuUiStateHolder::onSavedRecordName,
+                    onDismiss = menuUiStateHolder::onDialogDismissed,
                 )
             }
 
             DialogState.TEXT -> {
                 TextToFindDialog(
-                    onTryToFindText = uiStateHolder::onTryToFindText,
-                    onDismiss = uiStateHolder::onDialogDismissed,
+                    onTryToFindText = menuUiStateHolder::onTryToFindText,
+                    onDismiss = menuUiStateHolder::onDialogDismissed,
                 )
             }
 
             DialogState.KEYBOARD -> {
                 KeyboardDialog(
-                    onSaveLocale = uiStateHolder::onSaveLocale,
-                    onDismiss = uiStateHolder::onDialogDismissed,
+                    onSaveLocale = menuUiStateHolder::onSaveLocale,
+                    onDismiss = menuUiStateHolder::onDialogDismissed,
                 )
             }
 
             DialogState.EDIT_KEYBOARD -> {
                 EditKeyboardDialog(
                     oldKey = (state.menuState as? MenuState.Keyboard)?.oldKey.orEmpty(),
-                    onSave = uiStateHolder::onEditKeyboardButtonSaved,
-                    onDismiss = uiStateHolder::onDialogDismissed,
+                    onSave = menuUiStateHolder::onEditKeyboardButtonSaved,
+                    onDismiss = menuUiStateHolder::onDialogDismissed,
                 )
             }
 
             DialogState.TIMEOUT -> {
                 TimeoutDialog(
                     initialTimeout = state.recordTimeout,
-                    onSave = uiStateHolder::onTimeoutSaved,
-                    onDismiss = uiStateHolder::onDialogDismissed,
+                    onSave = menuUiStateHolder::onTimeoutSaved,
+                    onDismiss = menuUiStateHolder::onDialogDismissed,
                 )
             }
         }
@@ -166,5 +169,6 @@ private fun VideoScreenPreview() {
     VideoScreen(
         state = streamingPreviewState,
         uiStateHolder = StreamingPreviewScreenUiStateHolder(streamingPreviewState),
+        menuUiStateHolder = StreamingPreviewMenuUiStateHolder(),
     )
 }

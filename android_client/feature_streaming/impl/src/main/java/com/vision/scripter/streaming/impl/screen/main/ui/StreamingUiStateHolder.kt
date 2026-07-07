@@ -16,28 +16,4 @@ interface StreamingUiStateHolder {
     fun onVideoSurfaceCreated(surfaceWidth: Int, surfaceHeight: Int, newSurface: Surface)
     fun onVideoSurfaceDestroyed()
     fun onTouchEvent(viewWidth: Int, viewHeight: Int, event: MotionEvent?)
-
-    fun onScriptModeClicked()
-    fun onCvModeClicked()
-
-    fun onTextModeClicked()
-    fun onTryToFindText(text: String, locale: String)
-
-    fun onKeyboardClicked()
-    fun onKeyboardInitClicked()
-    fun onKeyboardEdited(addNew: Boolean)
-    fun onEditKeyboardButtonSaved(name: String)
-
-    fun onRecordingClicked()
-    fun onSaveClicked()
-    fun onExpandClicked()
-    fun onCancelClicked()
-    fun exit()
-
-    fun onTimeoutClicked()
-    fun onTimeoutSaved(timeout: Int)
-
-    fun onSavedRecordName(name: String)
-    fun onSaveLocale(locale: String)
-    fun onDialogDismissed()
 }

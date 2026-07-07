@@ -1,6 +1,5 @@
 package com.vision.scripter.streaming.impl.blocks.menu.ui.menu
 
-import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Camera
@@ -27,7 +26,7 @@ import com.vision.scripter.streaming.impl.screen.main.state.templateFlag
 import com.vision.scripter.ui.customClickable
 
 @Composable
-fun ColumnScope.BaseMenuIcons(
+fun BaseMenuIcons(
     flags: Int,
     onCvModeClick: () -> Unit,
     onTextClick: () -> Unit,

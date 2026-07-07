@@ -15,6 +15,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.vision.scripter.streaming.impl.R
+import com.vision.scripter.streaming.impl.blocks.menu.state.MenuUiStateHolder
 import com.vision.scripter.streaming.impl.blocks.video.ui.VideoScreen
 import com.vision.scripter.ui.CustomButton
 import com.vision.scripter.ui.ProvideSnackbarHost
@@ -23,6 +24,7 @@ import com.vision.scripter.ui.ProvideSnackbarHost
 internal fun StreamingScreen(
     serial: String,
     uiStateHolder: StreamingUiStateHolder,
+    menuUiStateHolder: MenuUiStateHolder,
     snackbarHostState: SnackbarHostState,
 ) {
     val state = uiStateHolder.uiStateFlow.collectAsStateWithLifecycle(
@@ -39,6 +41,7 @@ internal fun StreamingScreen(
             modifier = Modifier.fillMaxSize(),
             state = state,
             uiStateHolder = uiStateHolder,
+            menuUiStateHolder = menuUiStateHolder,
         )
         return
     }

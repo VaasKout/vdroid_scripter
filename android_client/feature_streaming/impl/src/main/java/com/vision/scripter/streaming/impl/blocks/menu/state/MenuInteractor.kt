@@ -1,10 +1,10 @@
 package com.vision.scripter.streaming.impl.blocks.menu.state
 
+import com.vision.scripter.coroutines.api.CoroutineScopeFactory
 import com.vision.scripter.data.api.models.TYPE_TEXT
 import com.vision.scripter.streaming.impl.screen.main.state.CVMode
 import com.vision.scripter.streaming.impl.screen.main.state.MenuState
 import com.vision.scripter.streaming.impl.screen.main.state.SPACE_KEY
-import com.vision.scripter.streaming.impl.screen.main.state.StreamingState
 import com.vision.scripter.streaming.impl.screen.main.state.classFlag
 import com.vision.scripter.streaming.impl.screen.main.state.combineDetection
 import com.vision.scripter.streaming.impl.screen.main.state.combineText
@@ -15,15 +15,31 @@ import com.vision.scripter.streaming.impl.screen.main.state.nextText
 import com.vision.scripter.streaming.impl.screen.main.state.templateFlag
 import com.vision.scripter.streaming.impl.screen.main.state.textFlag
 import com.vision.scripter.streaming.impl.screen.main.state.withFlag
+import com.vision.scripter.streaming.impl.usecases.CvUseCase
+import com.vision.scripter.ui.CommandFlow
 import dagger.hilt.android.scopes.ViewModelScoped
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @ViewModelScoped
-class MenuInteractor @Inject constructor() {
+class MenuInteractor @Inject constructor(
+    coroutineScopeFactory: CoroutineScopeFactory,
+    private val cvUseCase: CvUseCase,
+) : MenuUiStateHolder {
+
+    private val coroutineScope: CoroutineScope =
+        coroutineScopeFactory.createBackgroundScope("menu_interactor")
+
+    override val uiCommandsFlow: CommandFlow<MenuUiCommand> =
+        CommandFlow(coroutineScope)
 
     private val _menuState = MutableStateFlow<MenuState>(MenuState.Usual())
     fun observeMenuState(): StateFlow<MenuState> = _menuState.asStateFlow()
@@ -31,22 +47,31 @@ class MenuInteractor @Inject constructor() {
     private val _dialogState = MutableStateFlow(DialogState.NONE)
     fun observeDialogState(): StateFlow<DialogState> = _dialogState.asStateFlow()
 
-    fun onScriptModeClicked() {
+    private val _events = MutableSharedFlow<MenuEvent>(extraBufferCapacity = 16)
+    fun observeEvents(): SharedFlow<MenuEvent> = _events.asSharedFlow()
+
+    private var recordingFlags = 0
+
+    override fun onScriptModeClicked() {
         _dialogState.update { DialogState.RECORD }
     }
 
-    fun onTimeoutClicked() {
+    override fun onTimeoutClicked() {
         _dialogState.update { DialogState.TIMEOUT }
     }
 
-    fun onExpandClicked() {
+    override fun onKeyboardClicked() {
+        _dialogState.update { DialogState.KEYBOARD }
+    }
+
+    override fun onExpandClicked() {
         val state = _menuState.value
         if (state is MenuState.Usual) {
             _menuState.update { state.copy(expanded = !state.expanded) }
         }
     }
 
-    fun onRecordingClicked() {
+    override fun onRecordingClicked() {
         when (val state = _menuState.value) {
             is MenuState.Recording -> _menuState.update {
                 state.copy(controlRecording = !state.controlRecording)
@@ -63,78 +88,86 @@ class MenuInteractor @Inject constructor() {
         }
     }
 
-    fun onKeyboardClicked() {
-        _dialogState.update { DialogState.KEYBOARD }
-    }
-
-    fun onCvModeClicked(): CvModeAction? {
-        return when (val state = _menuState.value) {
-            is MenuState.Recording -> {
-                val template = state.flags.templateFlag().nextTemplateActive()
-                _menuState.update { MenuState.SelectingCV(flags = template) }
-                CvModeAction(newCvMode = CVMode.CV_RECTS)
-            }
-
-            is MenuState.SelectingCV -> {
-                val detection = state.flags.nextDetection()
-                val cvMode = when {
-                    detection.templateFlag() != 0 -> CVMode.CV_RECTS
-                    detection.classFlag() != 0 -> CVMode.YOLO
-                    else -> CVMode.NO_CV
+    override fun onCvModeClicked() {
+        coroutineScope.launch {
+            when (val state = _menuState.value) {
+                is MenuState.Recording -> {
+                    val template = state.flags.templateFlag().nextTemplateActive()
+                    recordingFlags = state.flags
+                    _menuState.update { MenuState.SelectingCV(flags = template) }
+                    cvUseCase.snapshotSelectedRectangles()
+                    cvUseCase.nextCvMode(CVMode.CV_RECTS)
                 }
-                val sourceChanged =
-                    (state.flags.classFlag() != 0) != (detection.classFlag() != 0)
-                _menuState.update { state.copy(flags = detection) }
-                CvModeAction(
-                    newCvMode = cvMode,
-                    disableSelection = detection == 0 || sourceChanged,
-                )
-            }
 
-            is MenuState.Usual -> {
-                val newCVMode = state.cvMode.increment()
-                _menuState.update { state.copy(cvMode = newCVMode) }
-                CvModeAction(newCvMode = newCVMode)
-            }
+                is MenuState.SelectingCV -> {
+                    val detection = state.flags.nextDetection()
+                    val cvMode = when {
+                        detection.templateFlag() != 0 -> CVMode.CV_RECTS
+                        detection.classFlag() != 0 -> CVMode.YOLO
+                        else -> CVMode.NO_CV
+                    }
+                    val sourceChanged =
+                        (state.flags.classFlag() != 0) != (detection.classFlag() != 0)
+                    _menuState.update { state.copy(flags = detection) }
+                    cvUseCase.nextCvMode(cvMode)
+                    if (detection == 0 || sourceChanged) {
+                        cvUseCase.clearSelectedRectangles()
+                    }
+                }
 
-            else -> null
+                is MenuState.Usual -> {
+                    val newCvMode = state.cvMode.increment()
+                    _menuState.update { state.copy(cvMode = newCvMode) }
+                    cvUseCase.nextCvMode(newCvMode)
+                }
+
+                else -> Unit
+            }
         }
     }
 
-    fun onTextModeClicked(): TextModeAction {
-        return when (val state = _menuState.value) {
-            is MenuState.Recording -> {
-                _dialogState.update { DialogState.TEXT }
-                TextModeAction.None
-            }
+    override fun onTextModeClicked() {
+        when (val state = _menuState.value) {
+            is MenuState.Recording -> _dialogState.update { DialogState.TEXT }
 
-            is MenuState.SelectingText -> {
-                val text = state.flags.nextText()
-                _menuState.update { state.copy(flags = text) }
-                TextModeAction.None
+            is MenuState.SelectingText -> _menuState.update {
+                state.copy(flags = state.flags.nextText())
             }
 
             is MenuState.Usual -> {
                 if (state.textHighlighted) {
                     _menuState.update { state.copy(textHighlighted = false) }
-                    return TextModeAction.ClearRectangles
+                    cvUseCase.clearAllRectangles()
+                    return
                 }
                 _dialogState.update { DialogState.TEXT }
-                TextModeAction.None
             }
 
-            else -> TextModeAction.None
+            else -> Unit
+        }
+    }
+
+    override fun onTryToFindText(text: String, locale: String) {
+        coroutineScope.launch {
+            hideDialog()
+            if (_menuState.value is MenuState.Recording) {
+                cvUseCase.snapshotSelectedRectangles()
+            }
+            _events.tryEmit(MenuEvent.FindText(text = text.trim(), locale = locale))
         }
     }
 
     fun onTextSearchSuccess(text: String, locale: String) {
         when (val state = _menuState.value) {
-            is MenuState.Recording -> _menuState.update {
-                MenuState.SelectingText(
-                    flags = state.flags.textFlag().nextText(),
-                    text = text,
-                    locale = locale,
-                )
+            is MenuState.Recording -> {
+                recordingFlags = state.flags
+                _menuState.update {
+                    MenuState.SelectingText(
+                        flags = state.flags.textFlag().nextText(),
+                        text = text,
+                        locale = locale,
+                    )
+                }
             }
 
             is MenuState.Usual -> _menuState.update {
@@ -148,73 +181,171 @@ class MenuInteractor @Inject constructor() {
         }
     }
 
-    fun onSaveClicked(record: StreamingState.Record): SaveAction {
-        return when (val state = _menuState.value) {
-            is MenuState.SelectingCV -> {
-                val flags = record.flags.combineDetection(state.flags)
-                _menuState.update { MenuState.Recording(flags = flags) }
-                SaveAction.SaveTemplate(flags = flags)
-            }
+    override fun onKeyboardInitClicked() {
+        setKeyboardLoadingState(true)
+        _events.tryEmit(MenuEvent.KeyboardInit)
+    }
 
-            is MenuState.SelectingText -> {
-                val flags = record.flags.combineText(state.flags)
-                _menuState.update { MenuState.Recording(flags = flags) }
-                val hasText = state.flags != 0
-                SaveAction.SaveTextSelection(
-                    text = if (hasText) state.text else "",
-                    locale = if (hasText) state.locale else "",
-                    flags = flags,
-                )
+    override fun onKeyboardEdited(addNew: Boolean) {
+        coroutineScope.launch {
+            val state = _menuState.value
+            if (state !is MenuState.Keyboard) return@launch
+            val newState = when {
+                !addNew -> state.copy(editing = !state.editing)
+                else -> state.copy(showCvRectangles = !state.showCvRectangles)
             }
+            _menuState.update { newState }
 
-            is MenuState.Keyboard -> {
-                val flags = record.flags.withFlag(TYPE_TEXT, state.typeText.isNotEmpty())
-                _menuState.update { MenuState.Recording(flags = flags) }
-                SaveAction.SaveTyping(text = state.typeText, flags = flags)
+            if (newState.showCvRectangles) {
+                cvUseCase.clearSelectedRectangles()
+                cvUseCase.nextCvMode(CVMode.CV_RECTS)
             }
+            if (newState.editing) {
+                cvUseCase.nextCvMode(CVMode.NO_CV)
+                cvUseCase.clearSelectedRectangles()
+            }
+        }
+    }
 
-            else -> SaveAction.SaveStep
+    override fun onEditKeyboardButtonSaved(name: String) {
+        _events.tryEmit(MenuEvent.EditKeyboardButton(name))
+    }
+
+    override fun onSaveClicked() {
+        coroutineScope.launch {
+            when (val state = _menuState.value) {
+                is MenuState.SelectingCV -> {
+                    val flags = recordingFlags.combineDetection(state.flags)
+                    recordingFlags = flags
+                    _menuState.update { MenuState.Recording(flags = flags) }
+                    cvUseCase.nextCvMode(CVMode.NO_CV)
+                    _events.tryEmit(MenuEvent.SaveTemplate(flags = flags))
+                }
+
+                is MenuState.SelectingText -> {
+                    val flags = recordingFlags.combineText(state.flags)
+                    recordingFlags = flags
+                    _menuState.update { MenuState.Recording(flags = flags) }
+                    if (flags.textFlag() == 0) {
+                        cvUseCase.clearSelectedRectangles()
+                    }
+                    cvUseCase.nextCvMode(CVMode.NO_CV)
+                    val hasText = state.flags != 0
+                    _events.tryEmit(
+                        MenuEvent.SaveText(
+                            text = if (hasText) state.text else "",
+                            locale = if (hasText) state.locale else "",
+                            flags = flags,
+                        )
+                    )
+                }
+
+                is MenuState.Keyboard -> {
+                    val flags = recordingFlags.withFlag(TYPE_TEXT, state.typeText.isNotEmpty())
+                    recordingFlags = flags
+                    _menuState.update { MenuState.Recording(flags = flags) }
+                    cvUseCase.nextCvMode(CVMode.NO_CV)
+                    _events.tryEmit(MenuEvent.SaveTyping(text = state.typeText, flags = flags))
+                }
+
+                else -> _events.tryEmit(MenuEvent.SaveStep)
+            }
         }
     }
 
     fun onStepSaved() {
+        recordingFlags = 0
         _menuState.update { MenuState.Recording() }
-    }
-
-    fun onCancelClicked(record: StreamingState.Record): Boolean {
-        val state = _menuState.value
-        val wasRecording = state is MenuState.Recording
-        val backToUsual = wasRecording ||
-                (state is MenuState.Keyboard && state.fromUsual)
-
-        if (backToUsual) {
-            _menuState.update { MenuState.Usual(expanded = true) }
-        } else {
-            _menuState.update { MenuState.Recording(flags = record.flags) }
+        coroutineScope.launch {
+            cvUseCase.nextCvMode(CVMode.NO_CV)
+            cvUseCase.clearAllRectangles()
         }
-        return wasRecording
     }
 
-    fun onSavedRecordName() {
+    override fun onCancelClicked() {
+        coroutineScope.launch {
+            when (val state = _menuState.value) {
+                is MenuState.Recording -> {
+                    recordingFlags = 0
+                    _menuState.update { MenuState.Usual(expanded = true) }
+                    cvUseCase.nextCvMode(CVMode.NO_CV)
+                    cvUseCase.clearSelectedRectangles()
+                    _events.tryEmit(MenuEvent.RecordCancelled)
+                }
+
+                is MenuState.Keyboard -> {
+                    cvUseCase.nextCvMode(CVMode.NO_CV)
+                    if (state.fromUsual) {
+                        recordingFlags = 0
+                        _menuState.update { MenuState.Usual(expanded = true) }
+                        return@launch
+                    }
+                    _menuState.update { MenuState.Recording(flags = recordingFlags) }
+                }
+
+                is MenuState.SelectingCV -> {
+                    _menuState.update { MenuState.Recording(flags = recordingFlags) }
+                    cvUseCase.nextCvMode(CVMode.NO_CV)
+                    cvUseCase.restoreSelectedRectangles()
+                }
+
+                is MenuState.SelectingText -> {
+                    _menuState.update { MenuState.Recording(flags = recordingFlags) }
+                    cvUseCase.nextCvMode(CVMode.NO_CV)
+                    cvUseCase.restoreSelectedRectangles()
+                }
+
+                else -> Unit
+            }
+        }
+    }
+
+    override fun onExitClicked() {
+        uiCommandsFlow.tryEmit(MenuUiCommand.ExitCommand)
+    }
+
+    override fun onTimeoutSaved(timeout: Int) {
+        updateTimeoutState(timeout > 0)
         hideDialog()
-        _menuState.update { MenuState.Recording() }
+        _events.tryEmit(MenuEvent.TimeoutSaved(timeout))
     }
 
-    fun onSaveLocale() {
+    override fun onSavedRecordName(name: String) {
+        coroutineScope.launch {
+            hideDialog()
+            recordingFlags = 0
+            _menuState.update { MenuState.Recording() }
+            cvUseCase.nextCvMode(CVMode.NO_CV)
+            _events.tryEmit(MenuEvent.SaveRecordName(name))
+        }
+    }
+
+    override fun onSaveLocale(locale: String) {
         hideDialog()
         val updated = when (val state = _menuState.value) {
-            is MenuState.Recording -> MenuState.Keyboard()
-            is MenuState.Usual -> MenuState.Keyboard(fromUsual = true)
+            is MenuState.Recording -> {
+                recordingFlags = state.flags
+                MenuState.Keyboard()
+            }
+
+            is MenuState.Usual -> {
+                recordingFlags = 0
+                MenuState.Keyboard(fromUsual = true)
+            }
+
             else -> state
         }
         _menuState.update { updated }
+        _events.tryEmit(MenuEvent.SaveLocale(locale))
     }
 
-    fun onDialogDismissed(record: StreamingState.Record) {
-        val state = _menuState.value
+    override fun onDialogDismissed() {
+        if (_menuState.value is MenuState.Keyboard) {
+            cvUseCase.clearSelectedRectangles()
+        }
         hideDialog()
-        if (state is MenuState.Recording) {
-            _menuState.update { MenuState.Recording(flags = record.flags) }
+        if (_menuState.value is MenuState.Recording) {
+            _menuState.update { MenuState.Recording(flags = recordingFlags) }
         }
     }
 
@@ -236,21 +367,6 @@ class MenuInteractor @Inject constructor() {
         _menuState.update { state.copy(typeText = updatedTypeText) }
     }
 
-    fun onKeyboardEdited(addNew: Boolean): KeyboardEditTransition {
-        val state = _menuState.value
-        if (state !is MenuState.Keyboard) return KeyboardEditTransition.None
-        val newState = when {
-            !addNew -> state.copy(editing = !state.editing)
-            else -> state.copy(showCvRectangles = !state.showCvRectangles)
-        }
-        _menuState.update { newState }
-        return when {
-            newState.showCvRectangles -> KeyboardEditTransition.ShowCvRectangles
-            newState.editing -> KeyboardEditTransition.ShowKeyboardButtons
-            else -> KeyboardEditTransition.None
-        }
-    }
-
     fun setKeyboardOldKey(oldKey: String) {
         val state = _menuState.value
         if (state !is MenuState.Keyboard) return
@@ -259,7 +375,7 @@ class MenuInteractor @Inject constructor() {
         }
     }
 
-    fun updateTimeoutState(customTimeout: Boolean) {
+    private fun updateTimeoutState(customTimeout: Boolean) {
         val menuState = _menuState.value
         if (menuState is MenuState.Recording) {
             _menuState.update {
@@ -277,28 +393,6 @@ class MenuInteractor @Inject constructor() {
     }
 }
 
-data class CvModeAction(
-    val newCvMode: CVMode,
-    val disableSelection: Boolean = false,
-)
-
-sealed interface TextModeAction {
-    data object None : TextModeAction
-    data object ClearRectangles : TextModeAction
-}
-
-sealed interface SaveAction {
-    data class SaveTemplate(val flags: Int) : SaveAction
-    data class SaveTextSelection(
-        val text: String,
-        val locale: String,
-        val flags: Int,
-    ) : SaveAction
-
-    data class SaveTyping(val text: String, val flags: Int) : SaveAction
-    data object SaveStep : SaveAction
-}
-
 enum class DialogState {
     NONE,
     RECORD,
@@ -306,10 +400,4 @@ enum class DialogState {
     KEYBOARD,
     EDIT_KEYBOARD,
     TIMEOUT;
-}
-
-sealed interface KeyboardEditTransition {
-    data object None : KeyboardEditTransition
-    data object ShowKeyboardButtons : KeyboardEditTransition
-    data object ShowCvRectangles : KeyboardEditTransition
 }

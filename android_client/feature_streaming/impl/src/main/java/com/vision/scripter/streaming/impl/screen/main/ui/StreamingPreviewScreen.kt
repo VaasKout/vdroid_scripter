@@ -2,6 +2,8 @@ package com.vision.scripter.streaming.impl.screen.main.ui
 
 import android.view.MotionEvent
 import android.view.Surface
+import com.vision.scripter.streaming.impl.blocks.menu.state.MenuUiCommand
+import com.vision.scripter.streaming.impl.blocks.menu.state.MenuUiStateHolder
 import com.vision.scripter.ui.CommandFlow
 import kotlinx.coroutines.flow.SharedFlow
 
@@ -33,22 +35,25 @@ internal class StreamingPreviewScreenUiStateHolder(state: StreamingUiState) :
         event: MotionEvent?
     ) {
     }
+}
+
+internal class StreamingPreviewMenuUiStateHolder : MenuUiStateHolder {
+    override val uiCommandsFlow: CommandFlow<MenuUiCommand>
+        get() = throw UnsupportedOperationException()
 
     override fun onScriptModeClicked() {}
-
     override fun onCvModeClicked() {}
     override fun onTextModeClicked() {}
+    override fun onTryToFindText(text: String, locale: String) {}
     override fun onKeyboardClicked() {}
     override fun onKeyboardInitClicked() {}
     override fun onKeyboardEdited(addNew: Boolean) {}
     override fun onEditKeyboardButtonSaved(name: String) {}
-    override fun onTryToFindText(text: String, locale: String) {}
-
     override fun onRecordingClicked() {}
     override fun onSaveClicked() {}
     override fun onExpandClicked() {}
     override fun onCancelClicked() {}
-    override fun exit() {}
+    override fun onExitClicked() {}
     override fun onTimeoutClicked() {}
     override fun onTimeoutSaved(timeout: Int) {}
     override fun onSavedRecordName(name: String) {}

@@ -5,7 +5,6 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.navigation.NavController
 import com.vision.scripter.streaming.impl.R
 import com.vision.scripter.streaming.impl.screen.main.ui.StreamingUiCommand
 import com.vision.scripter.streaming.impl.screen.main.ui.StreamingUiStateHolder
@@ -15,7 +14,6 @@ import com.vision.scripter.ui.R as CommonR
 @Composable
 internal fun StreamingCommandObserver(
     uiStateHolder: StreamingUiStateHolder,
-    navController: NavController,
     snackbarHostState: SnackbarHostState,
 ) {
     val ctx = LocalContext.current
@@ -33,10 +31,6 @@ internal fun StreamingCommandObserver(
                     stepSavedMessage,
                     Toast.LENGTH_SHORT
                 ).show()
-            }
-
-            is StreamingUiCommand.ExitCommand -> {
-                navController.popBackStack()
             }
         }
     }
