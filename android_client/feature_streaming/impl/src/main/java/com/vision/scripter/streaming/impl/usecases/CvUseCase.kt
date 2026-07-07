@@ -9,7 +9,7 @@ import com.vision.scripter.data.api.models.adjustToServer
 import com.vision.scripter.data.api.models.isEmpty
 import com.vision.scripter.data.api.models.smallestBy
 import com.vision.scripter.network.api.ApiResponse
-import com.vision.scripter.streaming.impl.state.CVMode
+import com.vision.scripter.streaming.impl.screen.main.state.CVMode
 import dagger.hilt.android.scopes.ViewModelScoped
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
