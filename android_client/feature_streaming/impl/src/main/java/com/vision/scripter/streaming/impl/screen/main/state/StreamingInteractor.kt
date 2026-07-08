@@ -32,11 +32,12 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
-import kotlinx.coroutines.flow.shareIn
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -52,7 +53,7 @@ class StreamingInteractor @Inject constructor(
     private val videoUseCase: VideoUseCase,
     private val controlStreamer: ControlStreamer,
     private val cvUseCase: CvUseCase,
-    private val menuInteractor: MenuInteractor,
+    val menuInteractor: MenuInteractor,
 ) : StreamingUiStateHolder {
 
     private val coroutineScope: CoroutineScope =
@@ -64,7 +65,7 @@ class StreamingInteractor @Inject constructor(
     private val currentState: StreamingState
         get() = _stateFlow.value
 
-    override val uiStateFlow: SharedFlow<StreamingUiState>
+    override val uiStateFlow: StateFlow<StreamingUiState?>
         get() = combine(
             stateFlow,
             menuInteractor.observeMenuState(),
@@ -75,7 +76,7 @@ class StreamingInteractor @Inject constructor(
                 menuState = menuState,
                 dialogState = dialogState,
             )
-        }.shareIn(coroutineScope, SharingStarted.WhileSubscribed(), replay = 1)
+        }.stateIn(coroutineScope, SharingStarted.Eagerly, null)
 
     override val uiCommandsFlow: CommandFlow<StreamingUiCommand> = CommandFlow(coroutineScope)
 
@@ -288,15 +289,13 @@ class StreamingInteractor @Inject constructor(
     }
 
     fun closeStreams() {
-        coroutineScope.launch {
-            if (streamJob?.isActive == true) {
-                streamJob?.cancel()
-                streamJob = null
-            }
-            videoUseCase.stop()
-            controlStreamer.close()
-            cvUseCase.close()
+        if (streamJob?.isActive == true) {
+            streamJob?.cancel()
+            streamJob = null
         }
+        videoUseCase.stop()
+        controlStreamer.close()
+        cvUseCase.close()
     }
 
     override fun onTouchEvent(

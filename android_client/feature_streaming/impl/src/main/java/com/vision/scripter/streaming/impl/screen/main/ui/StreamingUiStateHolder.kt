@@ -4,11 +4,11 @@ import android.view.MotionEvent
 import android.view.Surface
 import androidx.compose.runtime.Stable
 import com.vision.scripter.ui.CommandFlow
-import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.StateFlow
 
 @Stable
 interface StreamingUiStateHolder {
-    val uiStateFlow: SharedFlow<StreamingUiState>
+    val uiStateFlow: StateFlow<StreamingUiState?>
     val uiCommandsFlow: CommandFlow<StreamingUiCommand>
 
     fun initArgs(serial: String)

@@ -29,7 +29,7 @@ internal fun StreamingScreen(
 ) {
     val state = uiStateHolder.uiStateFlow.collectAsStateWithLifecycle(
         initialValue = StreamingUiState(),
-    ).value
+    ).value ?: StreamingUiState()
 
     LaunchedEffect(Unit) {
         uiStateHolder.initArgs(serial = serial)

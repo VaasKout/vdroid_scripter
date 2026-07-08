@@ -10,7 +10,7 @@ import com.vision.scripter.data.api.models.isEmpty
 import com.vision.scripter.data.api.models.smallestBy
 import com.vision.scripter.network.api.ApiResponse
 import com.vision.scripter.streaming.impl.screen.main.state.CVMode
-import dagger.hilt.android.scopes.ActivityRetainedScoped
+import dagger.hilt.android.scopes.ViewModelScoped
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -24,7 +24,7 @@ import kotlinx.serialization.json.Json
 import java.util.concurrent.atomic.AtomicReference
 import javax.inject.Inject
 
-@ActivityRetainedScoped
+@ViewModelScoped
 class CvUseCase @Inject constructor(
     private val cvStreamer: CvStreamer,
     private val scripterRepository: ScripterRepository,

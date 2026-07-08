@@ -17,7 +17,7 @@ import com.vision.scripter.streaming.impl.screen.main.state.textFlag
 import com.vision.scripter.streaming.impl.screen.main.state.withFlag
 import com.vision.scripter.streaming.impl.usecases.CvUseCase
 import com.vision.scripter.ui.CommandFlow
-import dagger.hilt.android.scopes.ActivityRetainedScoped
+import dagger.hilt.android.scopes.ViewModelScoped
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -29,7 +29,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-@ActivityRetainedScoped
+@ViewModelScoped
 class MenuInteractor @Inject constructor(
     coroutineScopeFactory: CoroutineScopeFactory,
     private val cvUseCase: CvUseCase,

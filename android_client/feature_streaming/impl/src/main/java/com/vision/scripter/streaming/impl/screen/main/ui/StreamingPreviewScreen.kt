@@ -5,13 +5,13 @@ import android.view.Surface
 import com.vision.scripter.streaming.impl.blocks.menu.state.MenuUiCommand
 import com.vision.scripter.streaming.impl.blocks.menu.state.MenuUiStateHolder
 import com.vision.scripter.ui.CommandFlow
-import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.StateFlow
 
 internal val streamingPreviewState = StreamingUiState()
 
 internal class StreamingPreviewScreenUiStateHolder(state: StreamingUiState) :
     StreamingUiStateHolder {
-    override val uiStateFlow: SharedFlow<StreamingUiState>
+    override val uiStateFlow: StateFlow<StreamingUiState?>
         get() = throw UnsupportedOperationException()
     override val uiCommandsFlow: CommandFlow<StreamingUiCommand>
         get() = throw UnsupportedOperationException()

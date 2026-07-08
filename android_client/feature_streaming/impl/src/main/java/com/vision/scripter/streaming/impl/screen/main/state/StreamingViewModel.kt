@@ -9,6 +9,9 @@ import javax.inject.Inject
 class StreamingViewModel @Inject constructor(
     private val streamingInteractor: StreamingInteractor,
 ) : ViewModel(), StreamingUiStateHolder by streamingInteractor {
+
+    val menuInteractor = streamingInteractor.menuInteractor
+
     override fun onCleared() {
         super.onCleared()
         streamingInteractor.closeStreams()
