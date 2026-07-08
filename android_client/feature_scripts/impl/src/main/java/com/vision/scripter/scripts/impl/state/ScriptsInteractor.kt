@@ -7,6 +7,7 @@ import com.vision.scripter.ui.CommandFlow
 import com.vision.scripter.ui.states.LoadingState
 import dagger.hilt.android.scopes.ViewModelScoped
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -110,5 +111,9 @@ internal class ScriptsInteractor @Inject constructor(
             onDismissDeleteDialog()
             onLoadData(onStart = false)
         }
+    }
+
+    fun clear() {
+        coroutineScope.cancel()
     }
 }

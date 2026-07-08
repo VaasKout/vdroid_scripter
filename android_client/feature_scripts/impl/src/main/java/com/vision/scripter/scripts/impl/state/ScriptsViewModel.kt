@@ -7,4 +7,10 @@ import javax.inject.Inject
 @HiltViewModel
 internal class ScriptsViewModel @Inject constructor(
     private val scriptsInteractor: ScriptsInteractor,
-) : ViewModel(), ScriptsUiStateHolder by scriptsInteractor
+) : ViewModel(), ScriptsUiStateHolder by scriptsInteractor {
+
+    override fun onCleared() {
+        super.onCleared()
+        scriptsInteractor.clear()
+    }
+}

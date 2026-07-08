@@ -14,6 +14,7 @@ class StreamingViewModel @Inject constructor(
 
     override fun onCleared() {
         super.onCleared()
-        streamingInteractor.closeStreams()
+        streamingInteractor.clear()
+        menuInteractor.clear()
     }
 }

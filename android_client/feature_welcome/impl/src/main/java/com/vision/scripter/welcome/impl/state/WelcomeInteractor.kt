@@ -10,6 +10,7 @@ import com.vision.scripter.welcome.impl.ui.WelcomeUiState
 import com.vision.scripter.welcome.impl.ui.WelcomeUiStateHolder
 import dagger.hilt.android.scopes.ViewModelScoped
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -95,5 +96,9 @@ class WelcomeInteractor @Inject constructor(
             }
             uiCommandsFlow.tryEmit(WelcomeUiCommand.NavigateToMain)
         }
+    }
+
+    fun clear() {
+        coroutineScope.cancel()
     }
 }

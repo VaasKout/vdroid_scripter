@@ -104,11 +104,18 @@ class CvStreamerImpl @Inject constructor(
         }
 
         try {
+            output?.close()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+
+        try {
             socket?.close()
         } catch (e: Exception) {
             e.printStackTrace()
         }
         input = null
+        output = null
         socket = null
     }
 }

@@ -156,10 +156,14 @@ class VideoUseCase @Inject constructor(
     fun stop() {
         try {
             mediaCodec?.stop()
-            mediaCodec?.release()
-            mediaCodec = null
         } catch (_: Exception) {
         }
+
+        try {
+            mediaCodec?.release()
+        } catch (_: Exception) {
+        }
+        mediaCodec = null
 
         try {
             videoStreamer.close()

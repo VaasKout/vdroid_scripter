@@ -29,6 +29,7 @@ import com.vision.scripter.ui.states.LoadingState
 import dagger.hilt.android.scopes.ViewModelScoped
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -65,18 +66,17 @@ class StreamingInteractor @Inject constructor(
     private val currentState: StreamingState
         get() = _stateFlow.value
 
-    override val uiStateFlow: StateFlow<StreamingUiState?>
-        get() = combine(
-            stateFlow,
-            menuInteractor.observeMenuState(),
-            menuInteractor.observeDialogState(),
-        ) { streamingState, menuState, dialogState ->
-            uiStateMapper.map(
-                state = streamingState,
-                menuState = menuState,
-                dialogState = dialogState,
-            )
-        }.stateIn(coroutineScope, SharingStarted.Eagerly, null)
+    override val uiStateFlow: StateFlow<StreamingUiState?> = combine(
+        stateFlow,
+        menuInteractor.observeMenuState(),
+        menuInteractor.observeDialogState(),
+    ) { streamingState, menuState, dialogState ->
+        uiStateMapper.map(
+            state = streamingState,
+            menuState = menuState,
+            dialogState = dialogState,
+        )
+    }.stateIn(coroutineScope, SharingStarted.Eagerly, null)
 
     override val uiCommandsFlow: CommandFlow<StreamingUiCommand> = CommandFlow(coroutineScope)
 
@@ -298,6 +298,10 @@ class StreamingInteractor @Inject constructor(
         cvUseCase.close()
     }
 
+    fun clear() {
+        coroutineScope.cancel()
+    }
+
     override fun onTouchEvent(
         viewWidth: Int,
         viewHeight: Int,
@@ -306,34 +310,39 @@ class StreamingInteractor @Inject constructor(
         if (event == null) return
         coroutineScope.launch {
             mutex.withLock {
-                val menuState = menuInteractor.observeMenuState().value
-                if (menuState is MenuState.SelectingCV) {
-                    if (event.action == ACTION_DOWN) {
-                        cvUseCase.selectRectangle(x = event.x.toInt(), y = event.y.toInt())
+                try {
+                    val menuState = menuInteractor.observeMenuState().value
+                    if (menuState is MenuState.SelectingCV) {
+                        if (event.action == ACTION_DOWN) {
+                            cvUseCase.selectRectangle(x = event.x.toInt(), y = event.y.toInt())
+                        }
+                        return@launch
                     }
-                    return@launch
+
+                    selectExistingKeyboardButton(event)
+                    selectNewKeyboardButton(event)
+                    if (openEditKeyboardDialog()) return@launch
+
+                    if (menuState is MenuState.Keyboard && menuState.recordingKeyboard) {
+                        val letter = currentState.keyboard.buttons.firstOrNull {
+                            it.contains(x = event.x.toInt(), y = event.y.toInt())
+                        }?.text ?: return@launch
+
+                        if (letter.isEmpty()) return@launch
+                        if (event.action == ACTION_UP) menuInteractor.appendTypedLetter(letter)
+                    }
+
+                    val screenSizes = videoUseCase.observeScreenSizes().value ?: return@launch
+                    val bytesArray = controlStreamer.sendControlData(
+                        screenSizes = screenSizes,
+                        event = event,
+                    )
+
+                    recordBytes(bytesArray)
+
+                } finally {
+                    event.recycle()
                 }
-
-                selectExistingKeyboardButton(event)
-                selectNewKeyboardButton(event)
-                if (openEditKeyboardDialog()) return@launch
-
-                if (menuState is MenuState.Keyboard && menuState.recordingKeyboard) {
-                    val letter = currentState.keyboard.buttons.firstOrNull {
-                        it.contains(x = event.x.toInt(), y = event.y.toInt())
-                    }?.text ?: return@launch
-
-                    if (letter.isEmpty()) return@launch
-                    if (event.action == ACTION_UP) menuInteractor.appendTypedLetter(letter)
-                }
-
-                val screenSizes = videoUseCase.observeScreenSizes().value ?: return@launch
-                val bytesArray = controlStreamer.sendControlData(
-                    screenSizes = screenSizes,
-                    event = event,
-                )
-
-                recordBytes(bytesArray)
             }
         }
     }

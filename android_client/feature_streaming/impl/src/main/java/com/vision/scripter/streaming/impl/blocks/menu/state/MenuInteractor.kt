@@ -19,6 +19,7 @@ import com.vision.scripter.streaming.impl.usecases.CvUseCase
 import com.vision.scripter.ui.CommandFlow
 import dagger.hilt.android.scopes.ViewModelScoped
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -47,7 +48,7 @@ class MenuInteractor @Inject constructor(
     private val _dialogState = MutableStateFlow(DialogState.NONE)
     fun observeDialogState(): StateFlow<DialogState> = _dialogState.asStateFlow()
 
-    private val _events = MutableSharedFlow<MenuEvent>(replay = 1)
+    private val _events = MutableSharedFlow<MenuEvent>(extraBufferCapacity = 16)
     fun observeEvents(): SharedFlow<MenuEvent> = _events.asSharedFlow()
 
     private var recordingFlags = 0
@@ -388,6 +389,10 @@ class MenuInteractor @Inject constructor(
 
     fun hideDialog() {
         _dialogState.update { DialogState.NONE }
+    }
+
+    fun clear() {
+        coroutineScope.cancel()
     }
 }
 

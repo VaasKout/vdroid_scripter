@@ -8,4 +8,10 @@ import javax.inject.Inject
 @HiltViewModel
 class MainViewModel @Inject constructor(
     private val mainInteractor: MainInteractor,
-) : ViewModel(), MainUiStateHolder by mainInteractor
+) : ViewModel(), MainUiStateHolder by mainInteractor {
+
+    override fun onCleared() {
+        super.onCleared()
+        mainInteractor.clear()
+    }
+}
