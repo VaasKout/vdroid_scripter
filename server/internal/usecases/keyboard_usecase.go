@@ -44,7 +44,7 @@ func (i *interactorImpl) GetKeyboardKeys(
 		return []cv.OCRResult{}
 	}
 
-	keyboardDir := i.filesDB.CreateDBDir(modelOs, filesdb.Keyboards, locale)
+	keyboardDir := i.filesDB.CreateKeyboardDir(modelOs, locale)
 	keyboardButtons := i.filesDB.GetFiles(keyboardDir)
 	if len(keyboardButtons) == 0 {
 		return []cv.OCRResult{}
@@ -74,7 +74,7 @@ func (i *interactorImpl) EditKeyboardKey(
 	}
 
 	var imgRect = rectangle.ToImageRectangle()
-	keyboardDir := i.filesDB.CreateDBDir(modelOs, filesdb.Keyboards, locale)
+	keyboardDir := i.filesDB.CreateKeyboardDir(modelOs, locale)
 	var keyboardKeyPath = filepath.Join(keyboardDir, fmt.Sprintf("%s.png", name))
 	i.cv.CutZone(screenshot, keyboardKeyPath, imgRect)
 
@@ -97,8 +97,8 @@ func (i *interactorImpl) ResetKeyboardKeys(
 		return []cv.OCRResult{}
 	}
 
-	i.filesDB.DeletePathInDBDir(modelOs, filesdb.Keyboards, locale)
-	keyboardDir := i.filesDB.CreateDBDir(modelOs, filesdb.Keyboards, locale)
+	i.filesDB.DeletePathInKeyboardDir(modelOs, locale)
+	keyboardDir := i.filesDB.CreateKeyboardDir(modelOs, locale)
 	tesseractDir := i.filesDB.CreateLogsDir(serial, filesdb.TesseractDir)
 
 	return i.cv.ResetKeyboardKeys(
@@ -119,5 +119,5 @@ func (i *interactorImpl) DeleteButton(
 		return false
 	}
 
-	return i.filesDB.DeletePathInDBDir(modelOs, filesdb.Keyboards, locale, fmt.Sprintf("%s.png", name))
+	return i.filesDB.DeletePathInKeyboardDir(modelOs, locale, fmt.Sprintf("%s.png", name))
 }

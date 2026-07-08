@@ -14,7 +14,6 @@ type Read interface {
 	GetDirs(dir string) []string
 	FindFileByName(dir string, name string) string
 	FindDirByName(dir string, name string) string
-	FindFileInDBDir(root string, fileName string) string
 }
 
 func (f *filesDBImpl) GetFiles(dir string) []string {
@@ -58,8 +57,8 @@ func (f *filesDBImpl) FindFileByName(dir string, name string) string {
 	return ""
 }
 
-func (f *filesDBImpl) FindFileInDBDir(root string, fileName string) string {
-	var filePath = filepath.Join(f.filesProps.ScriptsDB, root, fileName)
+func (f *filesDBImpl) FindFileInScriptDir(fileName string) string {
+	var filePath = filepath.Join(f.filesProps.Scripts, fileName)
 	if ok := file.Exists(filePath); !ok {
 		return ""
 	}

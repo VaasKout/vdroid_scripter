@@ -9,7 +9,8 @@ import (
 // Create ...
 type Create interface {
 	CreateLogsDir(args ...string) string
-	CreateDBDir(args ...string) string
+	CreateScriptDir(args ...string) string
+	CreateKeyboardDir(args ...string) string
 	CreateScrcpyDir(args ...string) string
 	CreateOnnxDir(args ...string) string
 }
@@ -44,9 +45,19 @@ func (f *filesDBImpl) CreateOnnxDir(args ...string) string {
 	return dirName
 }
 
-// CreateDBDir ...
-func (f *filesDBImpl) CreateDBDir(args ...string) string {
-	var dirName = filepath.Join(f.filesProps.ScriptsDB, filepath.Join(args...))
+// CreateScriptDir ...
+func (f *filesDBImpl) CreateScriptDir(args ...string) string {
+	var dirName = filepath.Join(f.filesProps.Scripts, filepath.Join(args...))
+	if ok := file.CreateDirIfNotExist(dirName); !ok {
+		fmt.Printf("couldn't create dir %s\n", dirName)
+		return ""
+	}
+	return dirName
+}
+
+// CreateKeyboardDir ...
+func (f *filesDBImpl) CreateKeyboardDir(args ...string) string {
+	var dirName = filepath.Join(f.filesProps.Keyboards, filepath.Join(args...))
 	if ok := file.CreateDirIfNotExist(dirName); !ok {
 		fmt.Printf("couldn't create dir %s\n", dirName)
 		return ""

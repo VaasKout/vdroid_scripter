@@ -8,14 +8,26 @@ import (
 
 // Delete ...
 type Delete interface {
-	DeletePathInDBDir(root string, args ...string) bool
+	DeletePathInScriptDir(args ...string) bool
+	DeletePathInKeyboardDir(args ...string) bool
 	DeleteFileByName(dir string, name string) bool
 	DeleteDirByName(dir string, name string) bool
 }
 
 // DeletePathInDBDir ...
-func (f *filesDBImpl) DeletePathInDBDir(root string, args ...string) bool {
-	var filePath = filepath.Join(f.filesProps.ScriptsDB, root, filepath.Join(args...))
+func (f *filesDBImpl) DeletePathInScriptDir(args ...string) bool {
+	var filePath = filepath.Join(f.filesProps.Scripts, filepath.Join(args...))
+	err := os.RemoveAll(filePath)
+	if err != nil {
+		fmt.Printf("Couldn't delete file %s - %s\n", filePath, err.Error())
+		return false
+	}
+	return true
+}
+
+// DeletePathInDBDir ...
+func (f *filesDBImpl) DeletePathInKeyboardDir(args ...string) bool {
+	var filePath = filepath.Join(f.filesProps.Keyboards, filepath.Join(args...))
 	err := os.RemoveAll(filePath)
 	if err != nil {
 		fmt.Printf("Couldn't delete file %s - %s\n", filePath, err.Error())

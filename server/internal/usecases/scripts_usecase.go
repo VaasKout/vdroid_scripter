@@ -20,12 +20,6 @@ const (
 	ScriptNameIsEmpty = "script name is empty"
 )
 
-// Themes
-const (
-	WhiteTheme = "white"
-	BlackTheme = "black"
-)
-
 // ScriptsUseCase ...
 type ScriptsUseCase interface {
 	GetScriptNames(serial string) ([]string, error)
@@ -46,8 +40,8 @@ func (i *interactorImpl) SaveZone(serial string, zone *models.Rectangle) bool {
 	if zone.IsEmpty() {
 		return false
 	}
-	var dbDir = i.filesDB.CreateDBDir(serial)
-	var tmpImg = filepath.Join(dbDir, filesdb.TmpZone)
+	var tmpDir = i.filesDB.CreateScriptDir(filesdb.TmpDir)
+	var tmpImg = filepath.Join(tmpDir, filesdb.TmpZone)
 	created := file.CreateFileIfNotExist(tmpImg)
 	if !created {
 		return false
@@ -72,13 +66,14 @@ func (i *interactorImpl) SaveStep(
 		return false
 	}
 
-	runnerPath := i.getScriptRunner(serial, name)
+	runnerPath := i.getScriptRunner(name)
 	if runnerPath == "" {
 		return false
 	}
 
 	script := i.getScriptFromFile(runnerPath)
 	script.Name = name
+	script.Device = i.GetDevice(serial).ToModelOs()
 
 	var id = len(script.Steps) + 1
 	step.ID = id
@@ -88,17 +83,20 @@ func (i *interactorImpl) SaveStep(
 	}
 
 	if step.Flags&models.EventOnTemplate != 0 || step.Flags&models.TemplateIsVisible != 0 {
-		scriptDir := i.getScriptDir(serial, name)
-		tmpImg := i.filesDB.FindFileInDBDir(serial, filesdb.TmpZone)
+		scriptDir := i.filesDB.CreateScriptDir(name)
+		tmpDir := i.filesDB.CreateScriptDir(filesdb.TmpDir)
+		tmpImg := filepath.Join(tmpDir, filesdb.TmpZone)
 		if tmpImg != "" {
 			newImagePath := filepath.Join(scriptDir, fmt.Sprintf("%d.png", step.ID))
 			os.Rename(tmpImg, newImagePath)
 		}
+		i.filesDB.DeletePathInScriptDir(filesdb.TmpDir)
 	}
 
 	script.Steps = append(script.Steps, *step)
 	return i.saveScriptInFile(script, runnerPath)
 }
+
 func (i *interactorImpl) FindText(
 	serial string,
 	text string,
@@ -149,7 +147,7 @@ func (i *interactorImpl) GetScriptNames(serial string) ([]string, error) {
 	if modelOS == "" {
 		return []string{}, errors.New(DeviceNotFoundError)
 	}
-	scriptsDir := i.filesDB.CreateDBDir(modelOS, filesdb.ScriptsDir)
+	scriptsDir := i.filesDB.CreateScriptDir()
 	dirs := i.filesDB.GetDirs(scriptsDir)
 	names := make([]string, len(dirs))
 	for index, script := range dirs {
@@ -167,7 +165,7 @@ func (i *interactorImpl) GetScript(serial string, scriptName string) (*models.Sc
 		return &models.Script{}, errors.New(ScriptNameIsEmpty)
 	}
 
-	runnerPath := i.getScriptRunner(serial, scriptName)
+	runnerPath := i.getScriptRunner(scriptName)
 	if runnerPath == "" {
 		var errStr = fmt.Sprintf("unable to create json runner %s for %s", scriptName, serial)
 		return &models.Script{}, errors.New(errStr)
@@ -196,16 +194,15 @@ func (i *interactorImpl) DeleteScript(serial string, scriptName string) error {
 		return errors.New(DeviceNotFoundError)
 	}
 
-	scriptsDir := i.filesDB.CreateDBDir(modelOS, filesdb.ScriptsDir)
+	scriptsDir := i.filesDB.CreateScriptDir()
 	i.filesDB.DeleteDirByName(scriptsDir, scriptName)
 	return nil
 }
 
 func (i *interactorImpl) getScriptRunner(
-	serial string,
 	scriptName string,
 ) string {
-	scriptDir := i.getScriptDir(serial, scriptName)
+	scriptDir := i.filesDB.CreateScriptDir(scriptName)
 	if scriptDir == "" {
 		return ""
 	}
@@ -215,19 +212,6 @@ func (i *interactorImpl) getScriptRunner(
 		return ""
 	}
 	return runJSON
-}
-
-func (i *interactorImpl) getScriptDir(serial string, name string) string {
-	if name == "" || serial == "" {
-		return ""
-	}
-	var device = i.GetDevice(serial)
-	var modelOS = device.ToModelOs()
-	if modelOS == "" {
-		return ""
-	}
-
-	return i.filesDB.CreateDBDir(modelOS, filesdb.ScriptsDir, name)
 }
 
 func (i *interactorImpl) getScriptFromFile(filePath string) *models.Script {

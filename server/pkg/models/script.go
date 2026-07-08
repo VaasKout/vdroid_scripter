@@ -21,8 +21,9 @@ const DefaultTimeout int = 15
 
 // Script ...
 type Script struct {
-	Name  string       `json:"name"`
-	Steps []ScriptStep `json:"steps"`
+	Name   string       `json:"name"`
+	Device string       `json:"device"`
+	Steps  []ScriptStep `json:"steps"`
 }
 
 // ToJSON ...

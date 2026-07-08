@@ -3,30 +3,19 @@ package filesdb
 
 import (
 	"android_vision_scripter/config"
-	"regexp"
 )
-
-var eventRegex = regexp.MustCompile(`\[\s*(\d+\.\d+)]\s+(/dev/input/event\d+)\s+([0-9A-Fa-f]{4})\s+([0-9A-Fa-f]{4})\s+([0-9A-Fa-f]{8})`)
 
 // Basic directories for phone data
 const (
 	ScreenshotDir = "screenshot"
-	RecordsDir    = "records"
-	ScriptsDir    = "scripts"
 	TesseractDir  = "tesseract"
-	Keyboards     = "keyboards"
+	TmpDir        = "tmp"
 )
 
 // Script JSONs
 const (
 	RunJSON = "run.json"
 	TmpZone = "tmp.png"
-)
-
-// X and Y keys in hex format
-const (
-	HexXKey = "0035"
-	HexYKey = "0036"
 )
 
 // FilesDB ...

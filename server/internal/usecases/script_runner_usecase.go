@@ -26,7 +26,7 @@ func (i *interactorImpl) RunScript(serial string, scriptName string, basePort in
 		return errors.New(ScriptNameIsEmpty)
 	}
 
-	path := i.getScriptRunner(serial, scriptName)
+	path := i.getScriptRunner(scriptName)
 	if path == "" {
 		return errors.New("script not found")
 	}
@@ -86,7 +86,7 @@ func (i *interactorImpl) executeScript(
 		return
 	}
 
-	scriptDir := i.getScriptDir(serial, script.Name)
+	scriptDir := i.filesDB.CreateScriptDir(script.Name)
 	if scriptDir == "" {
 		i.logger.Error(fmt.Sprintf("scriptDir not found %s", script.Name))
 		return
@@ -294,7 +294,7 @@ func (i *interactorImpl) getKeyboardKeys(
 	}
 
 	modelOs := i.GetDevice(serial).ToModelOs()
-	keyboardDir := i.filesDB.CreateDBDir(modelOs, filesdb.Keyboards, step.Locale)
+	keyboardDir := i.filesDB.CreateKeyboardDir(modelOs, step.Locale)
 	keyboardButtons := i.filesDB.GetFiles(keyboardDir)
 
 	chars := strutils.GetUniqueChars(step.Text)
