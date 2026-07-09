@@ -1,4 +1,0 @@
-<resources>
-    <string name="script_delete_dialog_title">Confirmation</string>
-    <string name="script_delete_dialog_text">Delete script %1s?</string>
-</resources>

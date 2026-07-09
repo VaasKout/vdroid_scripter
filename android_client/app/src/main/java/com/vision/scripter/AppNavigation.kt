@@ -8,7 +8,6 @@ import androidx.compose.ui.Modifier
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.rememberNavController
 import com.vision.scripter.main.api.FeatureMain
-import com.vision.scripter.scripts.api.FeatureScripts
 import com.vision.scripter.streaming.api.FeatureStreaming
 import com.vision.scripter.welcome.api.FeatureWelcome
 import com.vision.scripter.welcome.api.WelcomeRoute
@@ -19,7 +18,6 @@ fun AppNavigation(
     featureWelcome: Lazy<FeatureWelcome>,
     featureMain: Lazy<FeatureMain>,
     featureStreaming: Lazy<FeatureStreaming>,
-    featureScripts: Lazy<FeatureScripts>,
 ) {
     val navController = rememberNavController()
     NavHost(
@@ -38,10 +36,6 @@ fun AppNavigation(
             navController = navController,
         )
         featureStreaming.get().register(
-            navGraphBuilder = this,
-            navController = navController,
-        )
-        featureScripts.get().register(
             navGraphBuilder = this,
             navController = navController,
         )

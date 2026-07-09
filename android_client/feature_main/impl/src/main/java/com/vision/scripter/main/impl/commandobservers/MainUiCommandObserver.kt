@@ -6,7 +6,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.navigation.NavController
 import com.vision.scripter.main.impl.ui.MainUiCommand
 import com.vision.scripter.main.impl.ui.MainUiStateHolder
-import com.vision.scripter.scripts.api.ScriptsRoute
 import com.vision.scripter.streaming.api.StreamingRoute
 import com.vision.scripter.ui.observe
 import com.vision.scripter.ui.R as CommonR
@@ -22,10 +21,6 @@ internal fun MainUiCommandObserver(
         when (it) {
             is MainUiCommand.ShowNetworkError -> {
                 snackbarHostState.showSnackbar(commonNetworkError)
-            }
-
-            is MainUiCommand.NavigateToScripts -> {
-                navController.navigate(ScriptsRoute)
             }
 
             is MainUiCommand.NavigateToStreaming -> {

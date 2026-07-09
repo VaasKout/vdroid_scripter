@@ -28,7 +28,7 @@ import com.vision.scripter.ui.customClickable
 fun ScriptItem(
     modifier: Modifier = Modifier,
     name: String,
-    onPlayClick: (String) -> Unit,
+    onPlayClick: (serial: String, name: String) -> Unit,
     onDeleteClick: (String) -> Unit,
 ) {
     Box(
@@ -63,7 +63,11 @@ fun ScriptItem(
             Icon(
                 modifier = Modifier
                     .size(32.dp)
-                    .customClickable(onClick = { onPlayClick(name) }),
+                    .customClickable(
+                        onClick = {
+                            onPlayClick("", name)
+                        },
+                    ),
                 imageVector = Icons.Filled.PlayArrow,
                 tint = Color.Green,
                 contentDescription = ""
@@ -78,7 +82,7 @@ private fun ScriptItemPreview() {
     ScriptItem(
         modifier = Modifier.fillMaxWidth(),
         name = "test_1",
-        onPlayClick = {},
+        onPlayClick = { _, _ -> },
         onDeleteClick = {},
     )
 }

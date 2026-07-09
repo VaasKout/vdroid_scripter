@@ -69,9 +69,9 @@ internal class ScriptsInteractor @Inject constructor(
         }
     }
 
-    override fun onPlayScript(name: String) {
+    override fun onPlayScript(serial: String, name: String) {
         coroutineScope.launch {
-            val started = scripterRepository.runScript(name = name)
+            val started = scripterRepository.runScript(serial = serial, name = name)
             if (!started) uiCommandsFlow.tryEmit(ScriptsUiCommand.ShowNetworkError)
         }
     }

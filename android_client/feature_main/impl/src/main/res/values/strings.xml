@@ -1,8 +1,12 @@
 <resources>
     <string name="devices_not_found">Devices not found</string>
 
+    <string name="home">Home</string>
     <string name="scripts">Scripts</string>
     <string name="streaming">Streaming</string>
+
+    <string name="script_delete_dialog_title">Confirmation</string>
+    <string name="script_delete_dialog_text">Delete script %1s?</string>
 
     <string name="serial_key">Serial</string>
     <string name="brand_key">Brand</string>

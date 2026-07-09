@@ -78,6 +78,5 @@ dependencies {
     implementation(project(":core:network:api"))
     implementation(project(":data:api"))
     implementation(project(":feature_main:api"))
-    implementation(project(":feature_scripts:api"))
     implementation(project(":feature_streaming:api"))
 }

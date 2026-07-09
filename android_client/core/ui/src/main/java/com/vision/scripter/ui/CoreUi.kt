@@ -235,7 +235,7 @@ fun DeleteDialog(
 fun TopBar(
     modifier: Modifier = Modifier,
     startContent: @Composable () -> Unit = {},
-    endContent: @Composable () -> Unit
+    endContent: @Composable () -> Unit = {},
 ) {
     Box(
         modifier = modifier

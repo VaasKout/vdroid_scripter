@@ -152,8 +152,8 @@ class ScripterRepositoryImpl @Inject constructor(
         }
     }
 
-    override suspend fun runScript(name: String): Boolean {
-        return when (val result = networkClient.get("/scripts/$name/run")) {
+    override suspend fun runScript(serial: String, name: String): Boolean {
+        return when (val result = networkClient.get("/devices/$serial/scripts/$name/run")) {
             is ApiResponse.Success -> result.data.isNotEmpty()
             is ApiResponse.Error -> false
         }

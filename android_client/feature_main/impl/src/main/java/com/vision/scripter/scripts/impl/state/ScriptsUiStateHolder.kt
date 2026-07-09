@@ -11,7 +11,7 @@ interface ScriptsUiStateHolder {
 
     fun onLoadData(onStart: Boolean)
 
-    fun onPlayScript(name: String)
+    fun onPlayScript(serial: String, name: String)
     fun onDeleteScript(name: String)
 
     fun onDismissDeleteDialog()

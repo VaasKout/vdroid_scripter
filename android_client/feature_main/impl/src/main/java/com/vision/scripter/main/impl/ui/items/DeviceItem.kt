@@ -40,7 +40,6 @@ internal fun DeviceItem(
     modifier: Modifier = Modifier,
     uiDevice: UiDevice,
     onStreamingClick: () -> Unit,
-    onScriptsClick: () -> Unit,
 ) {
     Box(
         modifier = modifier
@@ -106,10 +105,6 @@ internal fun DeviceItem(
                 text = stringResource(R.string.streaming),
                 onClick = onStreamingClick,
             )
-            DeviceItemButton(
-                text = stringResource(R.string.scripts),
-                onClick = onScriptsClick,
-            )
         }
     }
 }
@@ -161,7 +156,6 @@ private fun DeviceItemPreview() {
                     R.string.model_key to "Samsung",
                 ),
             ),
-            onScriptsClick = {},
             onStreamingClick = {},
         )
     }

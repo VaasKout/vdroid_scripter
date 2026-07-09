@@ -35,7 +35,7 @@ interface ScripterRepository {
     suspend fun getScripts(): ApiResponse<List<String>>
     suspend fun getScriptInfo(name: String): ApiResponse<Script>
     suspend fun deleteScript(name: String): Boolean
-    suspend fun runScript(name: String): Boolean
+    suspend fun runScript(serial: String, name: String): Boolean
     suspend fun resetKeyboard(serial: String, locale: String): ApiResponse<List<RectangleWithText>>
     suspend fun getKeyboard(serial: String, locale: String): ApiResponse<List<RectangleWithText>>
 
