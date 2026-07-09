@@ -87,7 +87,7 @@ internal fun MainUiScreen(
                         },
                         onScriptsClick = {
                             uiStateHolder.uiCommandsFlow.tryEmit(
-                                MainUiCommand.NavigateToScripts(it.serial)
+                                MainUiCommand.NavigateToScripts
                             )
                         }
                     )

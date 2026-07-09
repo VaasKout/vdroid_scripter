@@ -5,12 +5,9 @@ import androidx.compose.runtime.remember
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.navigation.NavController
 import androidx.navigation.NavGraphBuilder
-import androidx.navigation.NavType
 import androidx.navigation.compose.composable
-import androidx.navigation.navArgument
 import com.vision.scripter.scripts.api.FeatureScripts
-import com.vision.scripter.scripts.api.ScriptsRouteWithArg
-import com.vision.scripter.scripts.api.SerialArg
+import com.vision.scripter.scripts.api.ScriptsRoute
 import com.vision.scripter.scripts.impl.commandobservers.ScriptsCommandObserver
 import com.vision.scripter.scripts.impl.state.ScriptsViewModel
 import com.vision.scripter.scripts.impl.ui.ScriptsScreen
@@ -24,11 +21,7 @@ class FeatureScriptsImpl @Inject constructor() : FeatureScripts {
         navGraphBuilder: NavGraphBuilder,
         navController: NavController
     ) {
-        navGraphBuilder.composable(
-            route = ScriptsRouteWithArg,
-            arguments = listOf(navArgument(SerialArg) { type = NavType.StringType })
-        ) { backStackEntry ->
-            val serial = backStackEntry.arguments?.getString(SerialArg).orEmpty()
+        navGraphBuilder.composable(route = ScriptsRoute) {
             val snackbarHostState = remember { SnackbarHostState() }
             val scriptsViewModel = hiltViewModel<ScriptsViewModel>()
             ScriptsCommandObserver(
@@ -38,7 +31,6 @@ class FeatureScriptsImpl @Inject constructor() : FeatureScripts {
             )
 
             ScriptsScreen(
-                serial = serial,
                 uiStateHolder = scriptsViewModel,
                 snackbarHostState = snackbarHostState,
             )

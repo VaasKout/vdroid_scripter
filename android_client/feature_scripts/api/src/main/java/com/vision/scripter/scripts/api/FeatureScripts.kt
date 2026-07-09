@@ -4,8 +4,6 @@ import androidx.navigation.NavController
 import androidx.navigation.NavGraphBuilder
 
 const val ScriptsRoute = "scripts"
-const val ScriptsRouteWithArg = "scripts/{serial}"
-const val SerialArg = "serial"
 
 interface FeatureScripts {
 

@@ -9,7 +9,6 @@ interface ScriptsUiStateHolder {
     val uiStateFlow: SharedFlow<ScriptsUiState>
     val uiCommandsFlow: CommandFlow<ScriptsUiCommand>
 
-    fun initArgs(serial: String)
     fun onLoadData(onStart: Boolean)
 
     fun onPlayScript(name: String)

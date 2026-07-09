@@ -119,8 +119,8 @@ class ScripterRepositoryImpl @Inject constructor(
         }
     }
 
-    override suspend fun getScripts(serial: String): ApiResponse<List<String>> {
-        return when (val result = networkClient.get("/devices/$serial/scripts")) {
+    override suspend fun getScripts(): ApiResponse<List<String>> {
+        return when (val result = networkClient.get("/scripts")) {
             is ApiResponse.Success -> {
                 val json = result.data
                 val streamingData = if (json.isEmpty()) listOf()
@@ -132,8 +132,8 @@ class ScripterRepositoryImpl @Inject constructor(
         }
     }
 
-    override suspend fun getScriptInfo(serial: String, name: String): ApiResponse<Script> {
-        return when (val result = networkClient.get("/devices/$serial/scripts/$name")) {
+    override suspend fun getScriptInfo(name: String): ApiResponse<Script> {
+        return when (val result = networkClient.get("/scripts/$name")) {
             is ApiResponse.Success -> {
                 val json = result.data
                 val streamingData = if (json.isEmpty()) Script()
@@ -145,15 +145,15 @@ class ScripterRepositoryImpl @Inject constructor(
         }
     }
 
-    override suspend fun deleteScript(serial: String, name: String): Boolean {
-        return when (val result = networkClient.delete("/devices/$serial/scripts/$name")) {
+    override suspend fun deleteScript(name: String): Boolean {
+        return when (val result = networkClient.delete("/scripts/$name")) {
             is ApiResponse.Success -> result.data.isNotEmpty()
             is ApiResponse.Error -> false
         }
     }
 
-    override suspend fun runScript(serial: String, name: String): Boolean {
-        return when (val result = networkClient.get("/devices/$serial/scripts/$name/run")) {
+    override suspend fun runScript(name: String): Boolean {
+        return when (val result = networkClient.get("/scripts/$name/run")) {
             is ApiResponse.Success -> result.data.isNotEmpty()
             is ApiResponse.Error -> false
         }

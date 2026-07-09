@@ -21,7 +21,6 @@ internal class ScriptsScreenUiStateHolderPreview(state: ScriptsUiState) : Script
     override val uiCommandsFlow: CommandFlow<ScriptsUiCommand>
         get() = throw UnsupportedOperationException()
 
-    override fun initArgs(serial: String) {}
     override fun onLoadData(onStart: Boolean) {}
     override fun onPlayScript(name: String) {}
     override fun onDeleteScript(name: String) {}

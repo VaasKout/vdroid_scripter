@@ -30,7 +30,6 @@ import com.vision.scripter.ui.ProvideSnackbarHost
 
 @Composable
 internal fun ScriptsScreen(
-    serial: String,
     uiStateHolder: ScriptsUiStateHolder,
     snackbarHostState: SnackbarHostState,
 ) {
@@ -39,7 +38,6 @@ internal fun ScriptsScreen(
     ).value
 
     LaunchedEffect(Unit) {
-        uiStateHolder.initArgs(serial = serial)
         uiStateHolder.onLoadData(onStart = true)
     }
 
@@ -110,7 +108,6 @@ internal fun ScriptsScreen(
 @Composable
 private fun MainUiLoadingScreenPreview() {
     ScriptsScreen(
-        serial = "",
         uiStateHolder = ScriptsScreenUiStateHolderPreview(scriptsUiStatePreview),
         snackbarHostState = remember { SnackbarHostState() }
     )

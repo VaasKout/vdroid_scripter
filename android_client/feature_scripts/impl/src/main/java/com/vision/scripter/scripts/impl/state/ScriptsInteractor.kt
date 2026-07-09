@@ -41,12 +41,6 @@ internal class ScriptsInteractor @Inject constructor(
 
     override val uiCommandsFlow: CommandFlow<ScriptsUiCommand> = CommandFlow(coroutineScope)
 
-    override fun initArgs(serial: String) {
-        _stateFlow.update {
-            it.copy(serial = serial)
-        }
-    }
-
     override fun onLoadData(onStart: Boolean) {
         coroutineScope.launch {
             _stateFlow.update {
@@ -56,7 +50,7 @@ internal class ScriptsInteractor @Inject constructor(
                 )
             }
 
-            when (val result = scripterRepository.getScripts(currentState.serial)) {
+            when (val result = scripterRepository.getScripts()) {
                 is ApiResponse.Success -> {
                     _stateFlow.update { it.copy(scripts = result.data) }
                 }
@@ -77,10 +71,7 @@ internal class ScriptsInteractor @Inject constructor(
 
     override fun onPlayScript(name: String) {
         coroutineScope.launch {
-            val started = scripterRepository.runScript(
-                serial = currentState.serial,
-                name = name,
-            )
+            val started = scripterRepository.runScript(name = name)
             if (!started) uiCommandsFlow.tryEmit(ScriptsUiCommand.ShowNetworkError)
         }
     }
@@ -103,10 +94,7 @@ internal class ScriptsInteractor @Inject constructor(
 
     override fun onConfirmDeleteScript() {
         coroutineScope.launch {
-            val deleted = scripterRepository.deleteScript(
-                serial = currentState.serial,
-                name = currentState.scriptNameToDelete,
-            )
+            val deleted = scripterRepository.deleteScript(name = currentState.scriptNameToDelete)
             if (!deleted) uiCommandsFlow.tryEmit(ScriptsUiCommand.ShowNetworkError)
             onDismissDeleteDialog()
             onLoadData(onStart = false)

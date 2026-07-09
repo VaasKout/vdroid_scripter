@@ -25,7 +25,7 @@ internal fun MainUiCommandObserver(
             }
 
             is MainUiCommand.NavigateToScripts -> {
-                navController.navigate(ScriptsRoute + "/${it.serial}")
+                navController.navigate(ScriptsRoute)
             }
 
             is MainUiCommand.NavigateToStreaming -> {
