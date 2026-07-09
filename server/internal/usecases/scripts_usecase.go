@@ -22,9 +22,9 @@ const (
 
 // ScriptsUseCase ...
 type ScriptsUseCase interface {
-	GetScriptNames(serial string) ([]string, error)
-	GetScript(serial string, scriptName string) (*models.Script, error)
-	DeleteScript(serial string, scriptName string) error
+	GetScriptNames() ([]string, error)
+	GetScript(scriptName string) (*models.Script, error)
+	DeleteScript(scriptName string) error
 	RunScript(serial string, scriptName string, basePort int) error
 
 	SaveZone(serial string, zone *models.Rectangle) bool
@@ -138,15 +138,7 @@ func (i *interactorImpl) FindText(
 	return result
 }
 
-func (i *interactorImpl) GetScriptNames(serial string) ([]string, error) {
-	if serial == "" {
-		return []string{}, errors.New(SerialIsEmptyError)
-	}
-	var device = i.GetDevice(serial)
-	var modelOS = device.ToModelOs()
-	if modelOS == "" {
-		return []string{}, errors.New(DeviceNotFoundError)
-	}
+func (i *interactorImpl) GetScriptNames() ([]string, error) {
 	scriptsDir := i.filesDB.CreateScriptDir()
 	dirs := i.filesDB.GetDirs(scriptsDir)
 	names := make([]string, len(dirs))
@@ -156,18 +148,15 @@ func (i *interactorImpl) GetScriptNames(serial string) ([]string, error) {
 	return names, nil
 }
 
-func (i *interactorImpl) GetScript(serial string, scriptName string) (*models.Script, error) {
+func (i *interactorImpl) GetScript(scriptName string) (*models.Script, error) {
 	scriptName = strings.TrimSpace(scriptName)
-	if serial == "" {
-		return &models.Script{}, errors.New(SerialIsEmptyError)
-	}
 	if scriptName == "" {
 		return &models.Script{}, errors.New(ScriptNameIsEmpty)
 	}
 
 	runnerPath := i.getScriptRunner(scriptName)
 	if runnerPath == "" {
-		var errStr = fmt.Sprintf("unable to create json runner %s for %s", scriptName, serial)
+		var errStr = fmt.Sprintf("unable to create json runner for %s", scriptName)
 		return &models.Script{}, errors.New(errStr)
 	}
 
@@ -180,18 +169,10 @@ func (i *interactorImpl) GetScript(serial string, scriptName string) (*models.Sc
 	return script, nil
 }
 
-func (i *interactorImpl) DeleteScript(serial string, scriptName string) error {
+func (i *interactorImpl) DeleteScript(scriptName string) error {
 	scriptName = strings.TrimSpace(scriptName)
-	if serial == "" {
-		return errors.New(SerialIsEmptyError)
-	}
 	if scriptName == "" {
 		return errors.New(ScriptNameIsEmpty)
-	}
-	var device = i.GetDevice(serial)
-	var modelOS = device.ToModelOs()
-	if modelOS == "" {
-		return errors.New(DeviceNotFoundError)
 	}
 
 	scriptsDir := i.filesDB.CreateScriptDir()

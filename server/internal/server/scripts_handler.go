@@ -8,9 +8,9 @@ import (
 
 // Script patterns...
 const (
-	Scripts       = "/devices/{" + SerialKey + "}/scripts"
+	Scripts       = "/scripts"
 	ScriptsByName = Scripts + "/{" + NameKey + "}"
-	RunScript     = ScriptsByName + "/run"
+	RunScript     = "/devices/{" + SerialKey + "}" + ScriptsByName + "/run"
 
 	SaveStep      = "/save_step"
 	SaveRectangle = "/save_rectangle"
@@ -83,12 +83,7 @@ func (s *serverImpl) handleScriptsFunctions() {
 }
 
 func (s *serverImpl) handleGetScriptList(w http.ResponseWriter, r *http.Request) {
-	var serial = r.PathValue(SerialKey)
-	if serial == "" {
-		http.Error(w, `"serial" query needed`, http.StatusBadRequest)
-		return
-	}
-	names, err := s.interactor.GetScriptNames(serial)
+	names, err := s.interactor.GetScriptNames()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -99,18 +94,13 @@ func (s *serverImpl) handleGetScriptList(w http.ResponseWriter, r *http.Request)
 }
 
 func (s *serverImpl) handleGetScript(w http.ResponseWriter, r *http.Request) {
-	var serial = r.PathValue(SerialKey)
-	if serial == "" {
-		http.Error(w, `"serial" query needed`, http.StatusBadRequest)
-		return
-	}
 	var name = r.PathValue(NameKey)
 	if name == "" {
 		http.Error(w, `"name" query needed`, http.StatusBadRequest)
 		return
 	}
 
-	script, err := s.interactor.GetScript(serial, name)
+	script, err := s.interactor.GetScript(name)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -121,13 +111,12 @@ func (s *serverImpl) handleGetScript(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *serverImpl) handleDeleteScript(w http.ResponseWriter, r *http.Request) {
-	var serial = r.PathValue(SerialKey)
 	var name = r.PathValue(NameKey)
-	if serial == "" || name == "" {
+	if name == "" {
 		http.Error(w, `"serial" and "name" queries needed`, http.StatusBadRequest)
 		return
 	}
-	s.interactor.DeleteScript(serial, name)
+	s.interactor.DeleteScript(name)
 	s.sendStatusOk(w)
 }
 
