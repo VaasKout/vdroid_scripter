@@ -22,7 +22,10 @@ internal class ScriptsScreenUiStateHolderPreview(state: ScriptsUiState) : Script
         get() = throw UnsupportedOperationException()
 
     override fun onLoadData(onStart: Boolean) {}
-    override fun onPlayScript(serial: String, name: String) {}
+    override fun onPlayScript(name: String) {}
+    override fun onSelectDevice(serial: String) {}
+    override fun onConfirmRunScript() {}
+    override fun onDismissDevicePicker() {}
     override fun onDeleteScript(name: String) {}
     override fun onDismissDeleteDialog() {}
     override fun onConfirmDeleteScript() {}

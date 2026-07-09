@@ -69,17 +69,67 @@ internal class ScriptsInteractor @Inject constructor(
         }
     }
 
-    override fun onPlayScript(serial: String, name: String) {
+    override fun onPlayScript(name: String) {
+        _stateFlow.update {
+            it.copy(
+                scriptToRun = name,
+                selectedSerial = "",
+                devices = listOf(),
+                isDevicesLoading = true,
+            )
+        }
+
+        coroutineScope.launch {
+            when (val result = scripterRepository.getDevices()) {
+                is ApiResponse.Success -> {
+                    _stateFlow.update {
+                        it.copy(
+                            devices = result.data,
+                            selectedSerial = result.data.firstOrNull()?.serial ?: "",
+                            isDevicesLoading = false,
+                        )
+                    }
+                }
+
+                is ApiResponse.Error -> {
+                    uiCommandsFlow.tryEmit(ScriptsUiCommand.ShowNetworkError)
+                    _stateFlow.update { it.copy(isDevicesLoading = false) }
+                }
+            }
+        }
+    }
+
+    override fun onSelectDevice(serial: String) {
+        _stateFlow.update { it.copy(selectedSerial = serial) }
+    }
+
+    override fun onConfirmRunScript() {
+        val serial = currentState.selectedSerial
+        val name = currentState.scriptToRun
+        if (serial.isEmpty() || name.isEmpty()) return
+
         coroutineScope.launch {
             val started = scripterRepository.runScript(serial = serial, name = name)
             if (!started) uiCommandsFlow.tryEmit(ScriptsUiCommand.ShowNetworkError)
+        }
+        onDismissDevicePicker()
+    }
+
+    override fun onDismissDevicePicker() {
+        _stateFlow.update {
+            it.copy(
+                scriptToRun = "",
+                selectedSerial = "",
+                devices = listOf(),
+                isDevicesLoading = false,
+            )
         }
     }
 
     override fun onDeleteScript(name: String) {
         _stateFlow.update {
             it.copy(
-                scriptNameToDelete = name,
+                scriptToDelete = name,
             )
         }
     }
@@ -87,14 +137,14 @@ internal class ScriptsInteractor @Inject constructor(
     override fun onDismissDeleteDialog() {
         _stateFlow.update {
             it.copy(
-                scriptNameToDelete = "",
+                scriptToDelete = "",
             )
         }
     }
 
     override fun onConfirmDeleteScript() {
         coroutineScope.launch {
-            val deleted = scripterRepository.deleteScript(name = currentState.scriptNameToDelete)
+            val deleted = scripterRepository.deleteScript(name = currentState.scriptToDelete)
             if (!deleted) uiCommandsFlow.tryEmit(ScriptsUiCommand.ShowNetworkError)
             onDismissDeleteDialog()
             onLoadData(onStart = false)

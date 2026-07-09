@@ -1,5 +1,6 @@
 package com.vision.scripter.scripts.impl.state
 
+import com.vision.scripter.data.api.models.AdbDevice
 import com.vision.scripter.ui.states.LoadingState
 import dagger.hilt.android.scopes.ViewModelScoped
 import kotlinx.collections.immutable.toImmutableList
@@ -12,7 +13,24 @@ class ScriptsUiStateMapper @Inject constructor() {
             isLoading = state.loadingState == LoadingState.LoadingOnStart,
             isRefreshing = state.loadingState == LoadingState.RefreshLoading,
             scripts = state.scripts.toImmutableList(),
-            scriptNameToDelete = state.scriptNameToDelete,
+            scriptNameToDelete = state.scriptToDelete,
+            devicePickerData = DevicePickerBottomSheetData(
+                showDevicePicker = state.scriptToRun.isNotEmpty(),
+                isDevicesLoading = state.isDevicesLoading,
+                devices = state.devices.map {
+                    UiScriptDevice(
+                        serial = it.serial,
+                        title = it.pickerTitle(),
+                    )
+                }.toImmutableList(),
+                selectedSerial = state.selectedSerial,
+            ),
         )
     }
+}
+
+private fun AdbDevice.pickerTitle(): String {
+    val name = listOf(brand, model).filter { it.isNotBlank() }.joinToString(" ")
+    if (name.isBlank()) return serial
+    return "$name ($serial)"
 }

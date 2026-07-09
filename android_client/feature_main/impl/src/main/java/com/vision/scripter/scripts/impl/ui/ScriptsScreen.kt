@@ -86,13 +86,24 @@ internal fun ScriptsScreen(
             onConfirm = uiStateHolder::onConfirmDeleteScript,
         )
     }
+
+    if (state.devicePickerData.showDevicePicker) {
+        DevicePickerSheet(
+            isLoading = state.devicePickerData.isDevicesLoading,
+            devices = state.devicePickerData.devices,
+            selectedSerial = state.devicePickerData.selectedSerial,
+            onSelect = uiStateHolder::onSelectDevice,
+            onConfirm = uiStateHolder::onConfirmRunScript,
+            onDismiss = uiStateHolder::onDismissDevicePicker,
+        )
+    }
 }
 
 @Preview
 @Composable
 private fun MainUiLoadingScreenPreview() {
-        ScriptsScreen(
-            uiStateHolder = ScriptsScreenUiStateHolderPreview(scriptsUiStatePreview),
-            paddingValues = PaddingValues(0.dp)
-        )
+    ScriptsScreen(
+        uiStateHolder = ScriptsScreenUiStateHolderPreview(scriptsUiStatePreview),
+        paddingValues = PaddingValues(0.dp)
+    )
 }
