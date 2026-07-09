@@ -1,11 +1,16 @@
 package com.vision.scripter.ui
 
+import androidx.compose.foundation.Indication
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.unit.dp
 
 @Composable
 fun Modifier.conditional(
@@ -18,11 +23,15 @@ fun Modifier.conditional(
 
 @Composable
 fun Modifier.customClickable(
-    onClick: () -> Unit
+    shape: Shape = RoundedCornerShape(16.dp),
+    indication: Indication? = ripple(bounded = true),
+    onClick: () -> Unit,
 ): Modifier {
-    return this.clickable(
-        indication = ripple(bounded = false),
-        interactionSource = remember { MutableInteractionSource() },
-        onClick = onClick,
-    )
+    return this
+        .clip(shape)
+        .clickable(
+            indication = indication,
+            interactionSource = remember { MutableInteractionSource() },
+            onClick = onClick,
+        )
 }

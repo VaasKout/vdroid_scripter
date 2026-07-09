@@ -115,7 +115,7 @@ private fun DeviceRow(
     ) {
         RadioButton(
             selected = selected,
-            onClick = onSelect,
+            onClick = null,
         )
         Text(
             text = device.title,
