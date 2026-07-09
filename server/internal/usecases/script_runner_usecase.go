@@ -292,6 +292,7 @@ func (i *interactorImpl) getKeyboardKeys(
 	if mat == nil {
 		return []cv.OCRResult{}, fmt.Errorf("mat is nil")
 	}
+	defer mat.Close()
 
 	modelOs := i.GetDevice(serial).ToModelOs()
 	keyboardDir := i.filesDB.CreateKeyboardDir(modelOs, step.Locale)

@@ -33,10 +33,10 @@ func (i *interactorImpl) GetKeyboardKeys(
 	}
 
 	img := gocv.IMRead(screenshot, gocv.IMReadColor)
+	defer img.Close()
 	if img.Empty() {
 		return []cv.OCRResult{}
 	}
-	defer img.Close()
 
 	var device = i.GetDevice(serial)
 	var modelOs = device.ToModelOs()

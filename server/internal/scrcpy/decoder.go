@@ -56,6 +56,11 @@ func (d *DecoderData) Free() {
 	d.DrawFrame.Free()
 	d.Pkt.Free()
 	d.CodecContext.Free()
+	d.Frame = nil
+	d.PendingFrame = nil
+	d.DrawFrame = nil
+	d.Pkt = nil
+	d.CodecContext = nil
 	d.HeaderBuf = []byte{}
 	d.ConfigFrameBuf = []byte{}
 	d.Buf = []byte{}
@@ -63,7 +68,6 @@ func (d *DecoderData) Free() {
 	d.YcbCrImg = nil
 	d.pktMu.Unlock()
 	d.frameMu.Unlock()
-	d = nil
 }
 
 // Allocate ...
@@ -112,6 +116,9 @@ func (s *scrcpyImpl) handlePackets(data *DecoderData) error {
 	data.pktMu.Lock()
 	defer data.pktMu.Unlock()
 
+	if data.CodecContext == nil || data.Pkt == nil {
+		return fmt.Errorf("decoder is freed")
+	}
 	if len(data.HeaderBuf) < HeaderSize {
 		return fmt.Errorf("data is empty")
 	}
@@ -183,9 +190,13 @@ func receiveFrames(data *DecoderData) {
 
 func (s *scrcpyImpl) frameToMat(data *DecoderData, rgb bool) *gocv.Mat {
 	data.frameMu.Lock()
+	defer data.frameMu.Unlock()
+
+	if data.DrawFrame == nil || data.PendingFrame == nil {
+		return nil
+	}
 	data.DrawFrame.Unref()
 	data.DrawFrame.MoveRef(data.PendingFrame)
-	data.frameMu.Unlock()
 
 	var width = data.DrawFrame.Width()
 	var height = data.DrawFrame.Height()

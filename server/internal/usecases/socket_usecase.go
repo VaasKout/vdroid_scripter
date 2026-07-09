@@ -30,9 +30,14 @@ func (i *interactorImpl) acceptListenerWithTimeout(
 
 	go func() {
 		conn, err := listener.Accept()
-		if err == nil {
-			resultCh <- conn
+		if err != nil {
+			return
 		}
+		if timeoutCtx.Err() != nil {
+			conn.Close()
+			return
+		}
+		resultCh <- conn
 	}()
 
 	select {

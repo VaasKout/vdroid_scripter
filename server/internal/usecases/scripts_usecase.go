@@ -118,10 +118,10 @@ func (i *interactorImpl) FindText(
 	}
 
 	img := gocv.IMRead(screenshot, gocv.IMReadColor)
+	defer img.Close()
 	if img.Empty() {
 		return []cv.OCRResult{}
 	}
-	defer img.Close()
 
 	var ocrParams = cv.InitOcrParams(
 		text,

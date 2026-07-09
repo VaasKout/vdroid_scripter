@@ -34,7 +34,7 @@ func TestGetTextFromImage(t *testing.T) {
 	var cmdRunner = bashcmd.New(filesDB, logAPI)
 	var cvAPI = cv.New(cmdRunner, logAPI)
 
-	dir := filesDB.CreateDBDir(fileProps.Logs, TestSerial, "tesseract")
+	dir := filesDB.CreateLogsDir(TestSerial, filesdb.TesseractDir)
 	testImage := TestTextFile
 
 	img := gocv.IMRead(testImage, gocv.IMReadColor)
