@@ -29,11 +29,9 @@ const (
 var scriptData = make([]byte, 32)
 
 func TestGetScripts(t *testing.T) {
-	var serialPath = fmt.Sprintf("{%s}", server.SerialKey)
-	var url = strings.ReplaceAll(ScriptsPath, serialPath, TestSerial)
 	var data = ""
 	makeHTTPRequest(
-		url,
+		ScriptsPath,
 		http.MethodGet,
 		[]byte{},
 		&data,
@@ -42,10 +40,8 @@ func TestGetScripts(t *testing.T) {
 }
 
 func TestGetScriptByName(t *testing.T) {
-	var serialPath = fmt.Sprintf("{%s}", server.SerialKey)
 	var namePath = fmt.Sprintf("{%s}", server.NameKey)
-	var url = strings.ReplaceAll(ScriptsByNamePath, serialPath, TestSerial)
-	url = strings.ReplaceAll(url, namePath, TestScript)
+	var url = strings.ReplaceAll(ScriptsByNamePath, namePath, TestScript)
 
 	var data = ""
 	makeHTTPRequest(
@@ -58,10 +54,8 @@ func TestGetScriptByName(t *testing.T) {
 }
 
 func TestDeleteScript(t *testing.T) {
-	var serialPath = fmt.Sprintf("{%s}", server.SerialKey)
 	var namePath = fmt.Sprintf("{%s}", server.NameKey)
-	var url = strings.ReplaceAll(ScriptsByNamePath, serialPath, TestSerial)
-	url = strings.ReplaceAll(url, namePath, TestScript)
+	var url = strings.ReplaceAll(ScriptsByNamePath, namePath, TestScript)
 
 	var data = ""
 	makeHTTPRequest(
