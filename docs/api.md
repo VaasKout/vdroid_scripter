@@ -31,10 +31,10 @@ This document describes every HTTP endpoint exposed by the server, defined in
 | ------ | ---- | ----------- |
 | GET | `/ping` | Health check |
 | GET | `/devices` | List connected ADB devices |
-| GET | `/devices/{serial}/scripts` | List script names for a device |
-| GET | `/devices/{serial}/scripts/{name}` | Get a single script |
-| DELETE | `/devices/{serial}/scripts/{name}` | Delete a script |
-| GET | `/devices/{serial}/scripts/{name}/run` | Run a script |
+| GET | `/scripts` | List all saved script names |
+| GET | `/scripts/{name}` | Get a single script |
+| DELETE | `/scripts/{name}` | Delete a script |
+| GET | `/devices/{serial}/scripts/{name}/run` | Run a script on a device |
 | POST | `/save_rectangle` | Save a selected zone (rectangle) |
 | POST | `/save_step` | Append a step to a script |
 | GET | `/devices/{serial}/find_text` | OCR: locate text on the current screen |
@@ -78,42 +78,44 @@ Returns all ADB devices currently visible to the server.
 
 ## Scripts
 
-### `GET /devices/{serial}/scripts`
+Scripts are stored server-wide: listing, fetching, and deleting
+are device-independent. Only running a script targets a specific device.
 
-Lists the names of all saved scripts for the device.
+### `GET /scripts`
 
-- **Path params:** `serial` — device serial (required).
+Lists the names of all saved scripts.
+
 - **Response `200`:** array of strings.
   ```json
   ["login_flow", "open_chat"]
   ```
-- **Errors:** `400` if `serial` is empty, `500` on read failure.
+- **Errors:** `500` on read failure.
 
-### `GET /devices/{serial}/scripts/{name}`
+### `GET /scripts/{name}`
 
 Returns a single script and its steps.
 
-- **Path params:** `serial`, `name` (both required).
+- **Path params:** `name` (required).
 - **Response `200`:** a [`Script`](#script) object.
-- **Errors:** `400` if `serial` or `name` is empty, `500` on read failure.
+- **Errors:** `400` if `name` is empty, `500` on read failure.
 
-### `DELETE /devices/{serial}/scripts/{name}`
+### `DELETE /scripts/{name}`
 
 Deletes a script.
 
-- **Path params:** `serial`, `name` (both required).
+- **Path params:** `name` (required).
 - **Response `200`:** `{ "status": "ok" }`
-- **Errors:** `400` if `serial` or `name` is empty.
+- **Errors:** `400` if `name` is empty.
 
 ### `GET /devices/{serial}/scripts/{name}/run`
 
-Executes the named script on the device. The script replays its recorded
+Executes the named script on the given device. The script replays its recorded
 control events over the scrcpy control socket (using the server's configured
 socket port).
 
-- **Path params:** `serial`, `name`.
+- **Path params:** `serial`, `name` (both required).
 - **Response `200`:** `{ "status": "ok" }`
-- **Errors:** `500` if execution fails.
+- **Errors:** `500` if `serial`/`name` is empty or execution fails.
 
 ### `POST /save_rectangle`
 
