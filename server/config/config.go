@@ -12,7 +12,6 @@ const (
 	BasePath       = "android_vision_scripter"
 	LogsDir        = "logs"
 	ScriptsDir     = "scripts"
-	ScreenNodesDir = "screen_nodes"
 	KeyboardDir    = "keyboards"
 	ScrcpyDir      = "scrcpy"
 	YoloDir        = "yolo"
@@ -36,12 +35,11 @@ type ServerProps struct {
 
 // FilesProps ...
 type FilesProps struct {
-	Logs        string
-	Scripts     string
-	ScreenNodes string
-	Keyboards   string
-	Scrcpy      string
-	Yolo        string
+	Logs      string
+	Scripts   string
+	Keyboards string
+	Scrcpy    string
+	Yolo      string
 }
 
 // ScrcpyProps ...
@@ -85,11 +83,6 @@ func New() *Config {
 		scriptsDir = ScriptsDir
 	}
 
-	screenNodesDir := os.Getenv("SCREEN_NODES_DIR")
-	if screenNodesDir == "" {
-		screenNodesDir = ScreenNodesDir
-	}
-
 	keyboardsDir := os.Getenv("KEYBOARDS_DIR")
 	if keyboardsDir == "" {
 		keyboardsDir = KeyboardDir
@@ -116,12 +109,11 @@ func New() *Config {
 			SocketPort: baseSocketPort,
 		},
 		FilesProps: &FilesProps{
-			Logs:        filepath.Join(cachePath, logsDir),
-			Scripts:     filepath.Join(cachePath, scriptsDir),
-			ScreenNodes: filepath.Join(cachePath, screenNodesDir),
-			Keyboards:   filepath.Join(cachePath, keyboardsDir),
-			Scrcpy:      filepath.Join(cachePath, scrcpyDir),
-			Yolo:        filepath.Join(cachePath, yoloDir),
+			Logs:      filepath.Join(cachePath, logsDir),
+			Scripts:   filepath.Join(cachePath, scriptsDir),
+			Keyboards: filepath.Join(cachePath, keyboardsDir),
+			Scrcpy:    filepath.Join(cachePath, scrcpyDir),
+			Yolo:      filepath.Join(cachePath, yoloDir),
 		},
 		ScrcpyProps: &ScrcpyProps{
 			ScrcpyVersion: scrcpyVersion,

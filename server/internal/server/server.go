@@ -53,7 +53,6 @@ func New(
 func (s *serverImpl) ListenAndServe() {
 	s.handleDeviceFunctions()
 	s.handleScriptsFunctions()
-	s.handleNodesFunctions()
 	s.handleKeyboardFunctions()
 	s.handleSocketFunctions()
 

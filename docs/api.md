@@ -38,10 +38,6 @@ This document describes every HTTP endpoint exposed by the server, defined in
 | POST | `/save_rectangle` | Save a selected zone (rectangle) |
 | POST | `/save_step` | Append a step to a script |
 | GET | `/devices/{serial}/find_text` | OCR: locate text on the current screen |
-| GET | `/screen_nodes` | List all saved screen node names |
-| POST | `/screen_nodes` | Create or replace a screen node |
-| GET | `/screen_nodes/{name}` | Get a single screen node |
-| DELETE | `/screen_nodes/{name}` | Delete a screen node |
 | GET | `/devices/{serial}/keyboard` | Detect on-screen keyboard keys |
 | POST | `/devices/{serial}/edit_keyboard` | Override a keyboard key's rectangle |
 | GET | `/devices/{serial}/reset_keyboard` | Reset keyboard keys to defaults |
@@ -166,56 +162,6 @@ Takes a screenshot and runs OCR to locate matching text on the current screen.
   [{ "text": "Login", "rectangle": { "left_x": 40, "right_x": 220, "top_y": 900, "bottom_y": 980 } }]
   ```
 - **Errors:** `400` if `serial` is empty.
-
-## Screen Nodes
-
-Screen nodes describe a screen in a navigation graph: a set of **anchors** that
-identify the screen and a list of **actions** (each runs a script and may lead to a
-`next_node`). Nodes are stored server-wide as JSON, keyed by `name`.
-
-### `GET /screen_nodes`
-
-Lists the names of all saved screen nodes.
-
-- **Response `200`:** array of strings.
-  ```json
-  ["home_screen", "settings"]
-  ```
-
-### `POST /screen_nodes`
-
-Creates a new screen node or replaces an existing one with the same `name`. The
-node's `device` is resolved from the given `serial`.
-
-- **Request body:**
-  ```json
-  {
-    "serial": "ABCD1234",
-    "name": "home_screen",
-    "anchors": { "ocr_text": "Settings", "yolo_label": "button", "template": "1.png" },
-    "actions": [ { "next_node": "settings", "script": "open_settings" } ]
-  }
-  ```
-  `serial` and `name` are required; `anchors` and `actions` are optional. `anchors`
-  keys are `ocr_text`, `yolo_label`, `template`.
-- **Response `200`:** `{ "status": "ok" }`
-- **Errors:** `400` on invalid JSON or empty `serial`/`name`, `500` if not saved.
-
-### `GET /screen_nodes/{name}`
-
-Returns a single screen node.
-
-- **Path params:** `name` (required).
-- **Response `200`:** a [`ScreenNode`](#screennode) object.
-- **Errors:** `400` if `name` is empty, `500` on read failure.
-
-### `DELETE /screen_nodes/{name}`
-
-Deletes a screen node.
-
-- **Path params:** `name` (required).
-- **Response `200`:** `{ "status": "ok" }`
-- **Errors:** `400` if `name` is empty.
 
 ## Keyboard
 
