@@ -19,6 +19,7 @@ import (
 const (
 	SerialKey = "serial"
 	NameKey   = "name"
+	NodeKey   = "node"
 )
 
 // Multipart consts

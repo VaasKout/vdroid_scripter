@@ -14,9 +14,8 @@ const (
 
 // Script JSONs
 const (
-	RunJSON  = "run.json"
-	TmpZone  = "tmp.png"
-	NodeJSON = "node.json"
+	RunJSON    = "run.json"
+	TmpZone    = "tmp.png"
 )
 
 // FilesDB ...

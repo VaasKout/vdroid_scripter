@@ -6,24 +6,51 @@ import (
 	"time"
 )
 
-// Script flags
+// Type consts
 const (
-	EventOnTemplate   = 1 << 0
-	EventOnText       = 1 << 1
-	EventOnClass      = 1 << 2
-	TemplateIsVisible = 1 << 3
-	TextIsVisible     = 1 << 4
-	ClassIsVisible    = 1 << 5
-	TypeText          = 1 << 6
+	Template  = "template"
+	Text      = "text"
+	TypeText  = "type_text"
+	YoloClass = "yolo_class"
+	Command   = "command"
 )
 
+// Type of strategies
+const (
+	OnSuccess = "on_success"
+	OnFailure = "on_failure"
+)
+
+// Hardcoded names of actions
+const (
+	InitialAction = "init"
+)
+
+// DefaultTimeout ...
 const DefaultTimeout int = 15
 
 // Script ...
 type Script struct {
-	Name   string       `json:"name"`
-	Device string       `json:"device"`
-	Steps  []ScriptStep `json:"steps"`
+	Name     string      `json:"name"`
+	Node     string      `json:"node"`
+	NextNode string      `json:"next_node,omitempty"`
+	Params   []Parameter `json:"params"`
+	Events   []Event     `json:"events,omitempty"`
+	Timeout  int         `json:"timeout"`
+}
+
+// Parameter ...
+type Parameter struct {
+	ID     int    `json:"id"`
+	Type   string `json:"type"`
+	Value  string `json:"value"`
+	Locale string `json:"locale,omitempty"`
+}
+
+// Event ...
+type Event struct {
+	Time int64        `json:"time"`
+	Data ControlBytes `json:"data"`
 }
 
 // ToJSON ...
@@ -36,53 +63,10 @@ func (s *Script) ToJSON() []byte {
 	return result
 }
 
-// ScriptStep ...
-type ScriptStep struct {
-	ID      int     `json:"id,omitempty"`
-	Events  []Event `json:"events,omitempty"`
-	Flags   int     `json:"flags,omitempty"`
-	Text    string  `json:"text,omitempty"`
-	Label   string  `json:"label,omitempty"`
-	Locale  string  `json:"locale,omitempty"`
-	Command string  `json:"command,omitempty"`
-	Timeout int     `json:"timeout,omitempty"`
-}
-
-func (s *ScriptStep) GetTimeout() time.Duration {
+// GetTimeout ...
+func (s *Script) GetTimeout() time.Duration {
 	if s == nil || s.Timeout <= 0 {
 		return time.Duration(DefaultTimeout) * time.Second
 	}
 	return time.Duration(s.Timeout) * time.Second
-}
-
-func (s *ScriptStep) HasEventFlag() bool {
-	return s != nil &&
-		(s.HasFlag(EventOnTemplate) || s.HasFlag(EventOnText) || s.HasFlag(EventOnClass))
-}
-
-func (s *ScriptStep) HasVisibleFlag() bool {
-	return s != nil &&
-		(s.HasFlag(TemplateIsVisible) || s.HasFlag(TextIsVisible) || s.HasFlag(ClassIsVisible))
-}
-
-func (s *ScriptStep) HasAnyTemplateFlags() bool {
-	return s != nil && (s.HasFlag(EventOnTemplate) || s.HasFlag(TemplateIsVisible))
-}
-
-func (s *ScriptStep) HasAnyTextFlags() bool {
-	return s != nil && (s.HasFlag(EventOnText) || s.HasFlag(TextIsVisible))
-}
-
-func (s *ScriptStep) HasAnyYoloFlags() bool {
-	return s != nil && (s.HasFlag(EventOnClass) || s.HasFlag(ClassIsVisible))
-}
-
-func (s *ScriptStep) HasFlag(flag int) bool {
-	return s != nil && s.Flags&flag != 0
-}
-
-// Event ...
-type Event struct {
-	Time int64        `json:"time"`
-	Data ControlBytes `json:"data"`
 }

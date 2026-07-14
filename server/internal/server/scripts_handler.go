@@ -9,10 +9,10 @@ import (
 // Script patterns...
 const (
 	Scripts       = "/scripts"
-	ScriptsByName = Scripts + "/{" + NameKey + "}"
+	ScriptsByName = Scripts + "/{" + NodeKey + "}" + "/{" + NameKey + "}"
 	RunScript     = "/devices/{" + SerialKey + "}" + ScriptsByName + "/run"
 
-	SaveStep      = "/save_step"
+	SaveScript    = "/save_script"
 	SaveRectangle = "/save_rectangle"
 	FindText      = "/devices/{" + SerialKey + "}/find_text"
 )
@@ -63,10 +63,10 @@ func (s *serverImpl) handleScriptsFunctions() {
 		http.Error(w, "use POST method", http.StatusMethodNotAllowed)
 	})
 
-	http.HandleFunc(SaveStep, func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc(SaveScript, func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPost {
 			s.logURL(r)
-			s.handleSaveStep(w, r)
+			s.handleSaveScript(w, r)
 			return
 		}
 		http.Error(w, "use POST method", http.StatusMethodNotAllowed)
@@ -94,13 +94,18 @@ func (s *serverImpl) handleGetScriptList(w http.ResponseWriter, r *http.Request)
 }
 
 func (s *serverImpl) handleGetScript(w http.ResponseWriter, r *http.Request) {
+	var node = r.PathValue(NodeKey)
+	if node == "" {
+		http.Error(w, `"node" query needed`, http.StatusBadRequest)
+		return
+	}
 	var name = r.PathValue(NameKey)
 	if name == "" {
 		http.Error(w, `"name" query needed`, http.StatusBadRequest)
 		return
 	}
 
-	script, err := s.interactor.GetScript(name)
+	script, err := s.interactor.GetScript(node, name)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -111,19 +116,26 @@ func (s *serverImpl) handleGetScript(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *serverImpl) handleDeleteScript(w http.ResponseWriter, r *http.Request) {
+	var node = r.PathValue(NodeKey)
+	if node == "" {
+		http.Error(w, `"node" query needed`, http.StatusBadRequest)
+		return
+	}
 	var name = r.PathValue(NameKey)
 	if name == "" {
 		http.Error(w, `"serial" and "name" queries needed`, http.StatusBadRequest)
 		return
 	}
-	s.interactor.DeleteScript(name)
+	s.interactor.DeleteScript(node, name)
 	s.sendStatusOk(w)
 }
 
 func (s *serverImpl) handleRunScript(w http.ResponseWriter, r *http.Request) {
 	var serial = r.PathValue(SerialKey)
+	var node = r.PathValue(NodeKey)
 	var name = r.PathValue(NameKey)
-	err := s.interactor.RunScript(serial, name, s.serverProps.SocketPort)
+
+	err := s.interactor.RunScript(serial, node, name, s.serverProps.SocketPort)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -153,21 +165,17 @@ func (s *serverImpl) handleSaveRectangle(w http.ResponseWriter, r *http.Request)
 	http.Error(w, "Something went wrong", http.StatusInternalServerError)
 }
 
-func (s *serverImpl) handleSaveStep(w http.ResponseWriter, r *http.Request) {
+func (s *serverImpl) handleSaveScript(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 
-	var data struct {
-		Serial string            `json:"serial"`
-		Name   string            `json:"name"`
-		Step   models.ScriptStep `json:"step"`
-	}
+	var data = &models.Script{}
 	err := json.NewDecoder(r.Body).Decode(&data)
-	if err != nil || data.Serial == "" || data.Name == "" {
+	if err != nil || data.Node == "" || data.Name == "" {
 		http.Error(w, "Invalid JSON", http.StatusBadRequest)
 		return
 	}
 
-	saved := s.interactor.SaveStep(data.Serial, data.Name, &data.Step)
+	saved := s.interactor.SaveScript(data)
 	if saved {
 		s.sendStatusOk(w)
 		return

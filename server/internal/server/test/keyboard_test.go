@@ -52,18 +52,16 @@ var testTapEvent = []models.Event{
 }
 
 func TestSaveDefaultKeyboardScript(t *testing.T) {
-	var body = struct {
-		Serial string            `json:"serial"`
-		Name   string            `json:"name"`
-		Step   models.ScriptStep `json:"step"`
-	}{
-		Serial: TestSerial,
-		Name:   TestScript,
-		Step: models.ScriptStep{
-			Text:   "hello",
-			Flags:  models.TypeText,
-			Events: testTapEvent,
+	var body = models.Script{
+		Name: TestScript,
+		Node: "main_screen",
+		Params: []models.Parameter{
+			{
+				Type:  models.Text,
+				Value: "hello",
+			},
 		},
+		Events: testTapEvent,
 	}
 
 	bytes, err := json.Marshal(body)

@@ -7,9 +7,11 @@ import (
 	"android_vision_scripter/pkg/core/numutils"
 	"android_vision_scripter/pkg/core/strutils"
 	"android_vision_scripter/pkg/models"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"image"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -18,7 +20,12 @@ import (
 	"gocv.io/x/gocv"
 )
 
-func (i *interactorImpl) RunScript(serial string, scriptName string, basePort int) error {
+func (i *interactorImpl) RunScript(
+	serial string,
+	node string,
+	scriptName string,
+	basePort int,
+) error {
 	if serial == "" {
 		return errors.New(SerialIsEmptyError)
 	}
@@ -26,14 +33,14 @@ func (i *interactorImpl) RunScript(serial string, scriptName string, basePort in
 		return errors.New(ScriptNameIsEmpty)
 	}
 
-	path := i.getScriptRunner(scriptName)
+	path := i.getScriptRunner(node, scriptName)
 	if path == "" {
 		return errors.New("script not found")
 	}
 
 	script := i.getScriptFromFile(path)
-	if script == nil || len(script.Steps) == 0 {
-		return errors.New("script steps are empty")
+	if script == nil || script.Name == "" {
+		return errors.New("script is empty")
 	}
 
 	var newConnection = false
@@ -96,14 +103,17 @@ func (i *interactorImpl) executeScript(
 		go i.scrcpy.ReadVideoStream(serial, nil)
 	}
 
-	for _, step := range script.Steps {
-		i.logger.Info(fmt.Sprintf("running step %d... ⏳", step.ID))
-		if step.Flags == 0 {
-			i.playEvent(serial, nil, &step)
-		}
+	i.logger.Info(fmt.Sprintf("running script %s... ⏳", script.Name))
 
-		if step.HasVisibleFlag() {
-			foundRect, err := i.findRectangle(serial, &step, scriptDir)
+	if len(script.Params) == 0 && len(script.Events) > 0 {
+		i.playEvent(serial, nil, script.Events)
+		time.Sleep(300 * time.Millisecond) //animation delay
+	}
+
+	var timeout = script.GetTimeout()
+	for index, param := range script.Params {
+		if index < len(script.Params) || len(script.Events) == 0 {
+			foundRect, err := i.findRectangle(serial, &param, timeout, scriptDir)
 			if err != nil {
 				i.logger.Error(err.Error())
 				return
@@ -113,16 +123,17 @@ func (i *interactorImpl) executeScript(
 			}
 		}
 
-		if step.HasEventFlag() {
-			foundRect, err := i.findRectangle(serial, &step, scriptDir)
+		if len(script.Events) > 0 && index == len(script.Params)-1 {
+			foundRect, err := i.findRectangle(serial, &param, timeout, scriptDir)
 			if err != nil {
 				i.logger.Error(err.Error())
 				return
 			}
-			i.playEvent(serial, foundRect, &step)
+			i.playEvent(serial, foundRect, script.Events)
 		}
-		if step.HasFlag(models.TypeText) {
-			err := i.typeText(serial, &step)
+
+		if param.Type == models.TypeText {
+			err := i.typeText(serial, timeout, &param, script.Events)
 			if err != nil {
 				i.logger.Error(err.Error())
 				return
@@ -137,11 +148,11 @@ func (i *interactorImpl) executeScript(
 
 func (i *interactorImpl) findRectangle(
 	serial string,
-	step *models.ScriptStep,
+	param *models.Parameter,
+	timeout time.Duration,
 	scriptDir string,
 ) (*image.Rectangle, error) {
 	var foundRect *image.Rectangle
-	var timeout = step.GetTimeout()
 	deadline := time.Now().Add(timeout)
 	for time.Now().Before(deadline) {
 		mat, err := i.scrcpy.GetMatFromLastFrame(serial, true)
@@ -155,7 +166,7 @@ func (i *interactorImpl) findRectangle(
 			continue
 		}
 
-		foundRect, err = i.findRectByFlag(serial, mat, step, scriptDir)
+		foundRect, err = i.findRectByFlag(serial, mat, param, scriptDir)
 		mat.Close()
 
 		if err != nil {
@@ -171,7 +182,7 @@ func (i *interactorImpl) findRectangle(
 	}
 
 	if models.ImageRectIsEmpty(foundRect) {
-		return nil, fmt.Errorf("rectangle for step %d not found", step.ID)
+		return nil, fmt.Errorf("rectangle for step %d not found", param.ID)
 	}
 
 	return foundRect, nil
@@ -180,25 +191,26 @@ func (i *interactorImpl) findRectangle(
 func (i *interactorImpl) findRectByFlag(
 	serial string,
 	mat *gocv.Mat,
-	step *models.ScriptStep,
+	param *models.Parameter,
 	scriptDir string,
 ) (*image.Rectangle, error) {
-	if step.HasAnyTemplateFlags() {
-		tmpImage := filepath.Join(scriptDir, fmt.Sprintf("%d.png", step.ID))
+
+	if param.Type == models.Template {
+		tmpImage := filepath.Join(scriptDir, fmt.Sprintf("%d.png", param.ID))
 		if !file.Exists(tmpImage) {
 			return nil, fmt.Errorf("template file not found: %s", tmpImage)
 		}
 		return i.cv.FindImage(mat, tmpImage)
 	}
 
-	if step.HasAnyTextFlags() {
+	if param.Type == models.Text {
 		tesseractDir := i.filesDB.CreateLogsDir(serial, filesdb.TesseractDir)
 		if tesseractDir == "" {
 			return nil, fmt.Errorf("tesseract dir was not found")
 		}
 		var ocrParams = cv.InitOcrParams(
-			step.Text,
-			step.Locale,
+			param.Value,
+			param.Locale,
 			cv.PsmText,
 			cv.OemText,
 		)
@@ -212,38 +224,39 @@ func (i *interactorImpl) findRectByFlag(
 		return rectangles[0].Rectangle.ToImageRectangle(), nil
 	}
 
-	if step.HasAnyYoloFlags() {
+	if param.Type == models.YoloClass {
 		var labels = i.yolo.DetectLabels(*mat)
 		for _, rect := range labels {
-			if strings.EqualFold(rect.Label, step.Label) {
+			if strings.EqualFold(rect.Label, param.Value) {
 				return rect.ToImageRectangle(), nil
 			}
 		}
-		return nil, fmt.Errorf("yolo class not found: %s", step.Label)
+		return nil, fmt.Errorf("yolo class not found: %s", param.Value)
 	}
 
-	return nil, fmt.Errorf("unknown flag %d", step.Flags)
+	return nil, fmt.Errorf("unknown type %s", param.Type)
 }
 
 func (i *interactorImpl) typeText(
 	serial string,
-	step *models.ScriptStep,
+	timeout time.Duration,
+	param *models.Parameter,
+	events []models.Event,
 ) error {
-	if step == nil || step.Text == "" {
+	if param == nil || param.Value == "" {
 		return fmt.Errorf("nothing to type")
 	}
 
-	var timeout = step.GetTimeout()
 	deadline := time.Now().Add(timeout)
 attemptsLoop:
 	for time.Now().Before(deadline) {
-		keyboardKeys, err := i.getKeyboardKeys(serial, step)
+		keyboardKeys, err := i.getKeyboardKeys(serial, param)
 		if err != nil {
 			i.logger.Error(err.Error())
 			sleepUntilNextSecond()
 			continue attemptsLoop
 		}
-		chars := []rune(strings.ToLower(step.Text))
+		chars := []rune(strings.ToLower(param.Value))
 		keysToPress := make([]cv.OCRResult, len(chars))
 
 	charsLoop:
@@ -270,7 +283,7 @@ attemptsLoop:
 
 		for _, key := range keysToPress {
 			var imgRect = key.Rectangle.ToImageRectangle()
-			i.playEvent(serial, imgRect, step)
+			i.playEvent(serial, imgRect, events)
 			time.Sleep(numutils.RandDelay(100, 300) * time.Millisecond)
 		}
 
@@ -281,7 +294,7 @@ attemptsLoop:
 
 func (i *interactorImpl) getKeyboardKeys(
 	serial string,
-	step *models.ScriptStep,
+	param *models.Parameter,
 ) ([]cv.OCRResult, error) {
 	keyboardKeys := []cv.OCRResult{}
 	mat, err := i.scrcpy.GetMatFromLastFrame(serial, true)
@@ -294,11 +307,11 @@ func (i *interactorImpl) getKeyboardKeys(
 	}
 	defer mat.Close()
 
-	modelOs := i.GetDevice(serial).ToModelOs()
-	keyboardDir := i.filesDB.CreateKeyboardDir(modelOs, step.Locale)
+	modelOS := i.GetDevice(serial).ToModelOs()
+	keyboardDir := i.filesDB.CreateKeyboardDir(modelOS, param.Locale)
 	keyboardButtons := i.filesDB.GetFiles(keyboardDir)
 
-	chars := strutils.GetUniqueChars(step.Text)
+	chars := strutils.GetUniqueChars(param.Value)
 
 	filteredButtons := []string{}
 	for _, button := range keyboardButtons {
@@ -320,12 +333,12 @@ func (i *interactorImpl) getKeyboardKeys(
 func (i *interactorImpl) playEvent(
 	serial string,
 	rect *image.Rectangle,
-	step *models.ScriptStep,
+	events []models.Event,
 ) {
 	var offsetX = 0
 	var offsetY = 0
 	var lastTimeStamp int64
-	for index, event := range step.Events {
+	for index, event := range events {
 		var data = &event.Data
 		if index == 0 {
 			offsetX, offsetY = data.CountOffset(rect)
@@ -344,4 +357,14 @@ func sleepUntilNextSecond() {
 	now := time.Now()
 	next := now.Truncate(time.Second).Add(time.Second)
 	time.Sleep(next.Sub(now))
+}
+
+func (i *interactorImpl) getScriptFromFile(filePath string) *models.Script {
+	bytes, err := os.ReadFile(filePath)
+	if err != nil {
+		return &models.Script{}
+	}
+	var script = &models.Script{}
+	_ = json.Unmarshal(bytes, script)
+	return script
 }

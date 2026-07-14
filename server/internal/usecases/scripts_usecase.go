@@ -23,16 +23,12 @@ const (
 // ScriptsUseCase ...
 type ScriptsUseCase interface {
 	GetScriptNames() ([]string, error)
-	GetScript(scriptName string) (*models.Script, error)
-	DeleteScript(scriptName string) error
-	RunScript(serial string, scriptName string, basePort int) error
+	GetScript(node string, scriptName string) (*models.Script, error)
+	DeleteScript(node string, scriptName string) error
+	RunScript(serial string, node string, scriptName string, basePort int) error
 
 	SaveZone(serial string, zone *models.Rectangle) bool
-	SaveStep(
-		serial string,
-		name string,
-		step *models.ScriptStep,
-	) bool
+	SaveScript(data *models.Script) bool
 	FindText(serial string, text string, locale string) []cv.OCRResult
 }
 
@@ -56,45 +52,40 @@ func (i *interactorImpl) SaveZone(serial string, zone *models.Rectangle) bool {
 	return true
 }
 
-func (i *interactorImpl) SaveStep(
-	serial string,
-	name string,
-	step *models.ScriptStep,
-) bool {
-	name = strings.TrimSpace(name)
-	if step == nil || serial == "" || name == "" {
+func (i *interactorImpl) SaveScript(data *models.Script) bool {
+	if data == nil {
 		return false
 	}
 
-	runnerPath := i.getScriptRunner(name)
+	data.Name = strings.TrimSpace(data.Name)
+	data.Node = strings.TrimSpace(data.Node)
+	if data.Name == "" || data.Node == "" {
+		return false
+	}
+
+	runnerPath := i.getScriptRunner(data.Node, data.Name)
 	if runnerPath == "" {
 		return false
 	}
 
-	script := i.getScriptFromFile(runnerPath)
-	script.Name = name
-	script.Device = i.GetDevice(serial).ToModelOs()
-
-	var id = len(script.Steps) + 1
-	step.ID = id
-
-	if step.Timeout <= 0 {
-		step.Timeout = models.DefaultTimeout
+	var lastParam = &models.Parameter{}
+	if len(data.Params) > 0 {
+		lastParam = &data.Params[len(data.Params)-1]
+		lastParam.ID = len(data.Params)
 	}
 
-	if step.Flags&models.EventOnTemplate != 0 || step.Flags&models.TemplateIsVisible != 0 {
-		scriptDir := i.filesDB.CreateScriptDir(name)
+	if lastParam.Type == models.Template {
+		scriptDir := i.filesDB.CreateScriptDir(data.Node, data.Name)
 		tmpDir := i.filesDB.CreateScriptDir(filesdb.TmpDir)
 		tmpImg := filepath.Join(tmpDir, filesdb.TmpZone)
 		if tmpImg != "" {
-			newImagePath := filepath.Join(scriptDir, fmt.Sprintf("%d.png", step.ID))
+			newImagePath := filepath.Join(scriptDir, fmt.Sprintf("%d.png", lastParam.ID))
 			os.Rename(tmpImg, newImagePath)
 		}
 		i.filesDB.DeletePathInScriptDir(filesdb.TmpDir)
 	}
 
-	script.Steps = append(script.Steps, *step)
-	return i.saveScriptInFile(script, runnerPath)
+	return i.saveScriptInFile(data, runnerPath)
 }
 
 func (i *interactorImpl) FindText(
@@ -148,13 +139,13 @@ func (i *interactorImpl) GetScriptNames() ([]string, error) {
 	return names, nil
 }
 
-func (i *interactorImpl) GetScript(scriptName string) (*models.Script, error) {
+func (i *interactorImpl) GetScript(node string, scriptName string) (*models.Script, error) {
 	scriptName = strings.TrimSpace(scriptName)
 	if scriptName == "" {
 		return &models.Script{}, errors.New(ScriptNameIsEmpty)
 	}
 
-	runnerPath := i.getScriptRunner(scriptName)
+	runnerPath := i.getScriptRunner(node, scriptName)
 	if runnerPath == "" {
 		var errStr = fmt.Sprintf("unable to create json runner for %s", scriptName)
 		return &models.Script{}, errors.New(errStr)
@@ -169,21 +160,22 @@ func (i *interactorImpl) GetScript(scriptName string) (*models.Script, error) {
 	return script, nil
 }
 
-func (i *interactorImpl) DeleteScript(scriptName string) error {
+func (i *interactorImpl) DeleteScript(node string, scriptName string) error {
 	scriptName = strings.TrimSpace(scriptName)
 	if scriptName == "" {
 		return errors.New(ScriptNameIsEmpty)
 	}
 
-	scriptsDir := i.filesDB.CreateScriptDir()
+	scriptsDir := i.filesDB.CreateScriptDir(node)
 	i.filesDB.DeleteDirByName(scriptsDir, scriptName)
 	return nil
 }
 
 func (i *interactorImpl) getScriptRunner(
-	scriptName string,
+	node string,
+	name string,
 ) string {
-	scriptDir := i.filesDB.CreateScriptDir(scriptName)
+	scriptDir := i.filesDB.CreateScriptDir(node, name)
 	if scriptDir == "" {
 		return ""
 	}
@@ -193,16 +185,6 @@ func (i *interactorImpl) getScriptRunner(
 		return ""
 	}
 	return runJSON
-}
-
-func (i *interactorImpl) getScriptFromFile(filePath string) *models.Script {
-	bytes, err := os.ReadFile(filePath)
-	if err != nil {
-		return &models.Script{}
-	}
-	var script = &models.Script{}
-	_ = json.Unmarshal(bytes, script)
-	return script
 }
 
 func (i *interactorImpl) saveScriptInFile(script *models.Script, filePath string) bool {
