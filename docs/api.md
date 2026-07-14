@@ -8,7 +8,8 @@ This document describes every HTTP endpoint exposed by the server, defined in
 - **Base URL:** `http://<host>:8080`
   The port comes from the `SERVER_PORT` env var and defaults to `:8080`
   (`server/config/config.go`).
-- **Path parameters** use Go 1.22+ `net/http` patterns, e.g. `{serial}`, `{name}`.
+- **Path parameters** use Go 1.22+ `net/http` patterns, e.g. `{serial}`, `{node}`,
+  `{name}`.
 - **Routing is path-exact.** Each route only accepts the method(s) listed below;
   any other method returns `405 Method Not Allowed`.
 - **CORS / headers** (set on most JSON responses):
@@ -31,12 +32,12 @@ This document describes every HTTP endpoint exposed by the server, defined in
 | ------ | ---- | ----------- |
 | GET | `/ping` | Health check |
 | GET | `/devices` | List connected ADB devices |
-| GET | `/scripts` | List all saved script names |
-| GET | `/scripts/{name}` | Get a single script |
-| DELETE | `/scripts/{name}` | Delete a script |
-| GET | `/devices/{serial}/scripts/{name}/run` | Run a script on a device |
+| GET | `/scripts` | List script node (screen) names |
+| GET | `/scripts/{node}/{name}` | Get a single script |
+| DELETE | `/scripts/{node}/{name}` | Delete a script |
+| GET | `/devices/{serial}/scripts/{node}/{name}/run` | Run a script on a device |
 | POST | `/save_rectangle` | Save a selected zone (rectangle) |
-| POST | `/save_step` | Append a step to a script |
+| POST | `/save_script` | Create or replace a script |
 | GET | `/devices/{serial}/find_text` | OCR: locate text on the current screen |
 | GET | `/devices/{serial}/keyboard` | Detect on-screen keyboard keys |
 | POST | `/devices/{serial}/edit_keyboard` | Override a keyboard key's rectangle |
@@ -78,44 +79,54 @@ Returns all ADB devices currently visible to the server.
 
 ## Scripts
 
-Scripts are stored server-wide: listing, fetching, and deleting
-are device-independent. Only running a script targets a specific device.
+A script belongs to a **node** (the screen it is recorded on) and is identified by
+the `node` + `name` pair. On disk it lives at
+`scripts/<node>/<name>/run.json`, with template images stored next to it as
+`<param.id>.png`.
+
+Scripts are stored server-wide: listing, fetching, and deleting are
+device-independent. Only running a script targets a specific device.
 
 ### `GET /scripts`
 
-Lists the names of all saved scripts.
+Lists the names of the top-level script directories — i.e. the **node (screen)
+names** that have scripts saved under them.
 
 - **Response `200`:** array of strings.
   ```json
-  ["login_flow", "open_chat"]
+  ["main_screen", "profile"]
   ```
 - **Errors:** `500` on read failure.
 
-### `GET /scripts/{name}`
+### `GET /scripts/{node}/{name}`
 
-Returns a single script and its steps.
+Returns a single script.
 
-- **Path params:** `name` (required).
+- **Path params:** `node`, `name` (both required).
 - **Response `200`:** a [`Script`](#script) object.
-- **Errors:** `400` if `name` is empty, `500` on read failure.
+- **Errors:** `400` if `node` or `name` is empty, `500` on read failure.
 
-### `DELETE /scripts/{name}`
+### `DELETE /scripts/{node}/{name}`
 
-Deletes a script.
+Deletes a script (removes its whole directory, including template images).
 
-- **Path params:** `name` (required).
+- **Path params:** `node`, `name` (both required).
 - **Response `200`:** `{ "status": "ok" }`
-- **Errors:** `400` if `name` is empty.
+- **Errors:** `400` if `node` or `name` is empty.
 
-### `GET /devices/{serial}/scripts/{name}/run`
+### `GET /devices/{serial}/scripts/{node}/{name}/run`
 
-Executes the named script on the given device. The script replays its recorded
-control events over the scrcpy control socket (using the server's configured
-socket port).
+Executes the named script on the given device.
 
-- **Path params:** `serial`, `name` (both required).
+The script's `params` are matched **in order** to narrow down the interactive
+zone (e.g. first locate a text label, then the checkbox nearest to it). The
+script's `events` are then replayed over the scrcpy control socket, offset to the
+**last** matched parameter's region. If `params` is empty and `events` is not,
+the events are replayed exactly as recorded.
+
+- **Path params:** `serial`, `node`, `name` (all required).
 - **Response `200`:** `{ "status": "ok" }`
-- **Errors:** `500` if `serial`/`name` is empty or execution fails.
+- **Errors:** `500` if the script is not found/empty or execution fails.
 
 ### `POST /save_rectangle`
 
@@ -132,22 +143,34 @@ Saves a selected screen zone (rectangle) for the device.
 - **Response `200`:** `{ "status": "ok" }`
 - **Errors:** `400` on invalid JSON or empty `serial`, `500` if not saved.
 
-### `POST /save_step`
+### `POST /save_script`
 
-Appends a step to the named script.
+Creates a new script or replaces an existing one with the same `node` + `name`.
+The body is a whole [`Script`](#script) object.
 
 - **Request body:**
   ```json
   {
-    "serial": "ABCD1234",
-    "name": "login_flow",
-    "step": { /* ScriptStep, see models */ }
+    "name": "open_profile",
+    "node": "main_screen",
+    "next_node": "profile",
+    "params": [
+      { "type": "text", "value": "Profile" },
+      { "type": "template", "value": "" }
+    ],
+    "events": [ /* Event, see models */ ],
+    "timeout": 15
   }
   ```
-  `serial` and `name` are required. `step.timeout` is optional (seconds to keep
-  locating the step's target before failing; defaults to `15` when omitted or `<= 0`).
+  `name` and `node` are required. `params[].id` is assigned by the server
+  (sequentially, starting at `1`) — any value sent is overwritten. `timeout` is
+  optional (seconds to keep locating a parameter's target before failing;
+  defaults to `15` when omitted or `<= 0`).
+- **Template images:** a pending zone saved via
+  [`POST /save_rectangle`](#post-save_rectangle) is committed to the **last**
+  `template` parameter as `<param.id>.png` in the script's directory.
 - **Response `200`:** `{ "status": "ok" }`
-- **Errors:** `400` on invalid JSON or empty `serial`/`name`, `500` if not saved.
+- **Errors:** `400` on invalid JSON or empty `node`/`name`, `500` if not saved.
 
 ### `GET /devices/{serial}/find_text`
 
@@ -284,23 +307,36 @@ ports.
 
 ```json
 {
-  "name": "login_flow",
-  "steps": [ /* ScriptStep */ ]
+  "name": "open_profile",
+  "node": "main_screen",
+  "next_node": "profile",
+  "params": [ /* Parameter */ ],
+  "events": [ /* Event */ ],
+  "timeout": 15
 }
 ```
 
-### ScriptStep
+| Field | JSON | Type | Notes |
+| ----- | ---- | ---- | ----- |
+| Name | `name` | string | Script name; with `node` it forms the script's identity |
+| Node | `node` | string | The screen this script is recorded on |
+| NextNode | `next_node` | string | omitempty; the screen this script leads to |
+| Params | `params` | [Parameter](#parameter) array | Locators matched **in order** to narrow the interactive zone |
+| Events | `events` | [Event](#event) array | omitempty; replayed against the **last** matched param, or verbatim when `params` is empty |
+| Timeout | `timeout` | int | Seconds to locate a param's target before failing (default `15` when omitted or `<= 0`) |
+
+### Parameter
+
+A parameter locates an element on screen. Parameters are matched in order, each
+narrowing the zone — later params resolve to the candidate nearest the previous
+match (e.g. "the checkbox next to *this* label").
 
 | Field | JSON | Type | Notes |
 | ----- | ---- | ---- | ----- |
-| ID | `id` | int | omitempty |
-| Events | `events` | [Event](#event) array | omitempty |
-| Flags | `flags` | int | Bit flags: `EventOnTemplate=1`, `EventOnText=2`, `EventOnClass=4`, `TemplateIsVisible=8`, `TextIsVisible=16`, `ClassIsVisible=32`, `TypeText=64` |
-| Text | `text` | string | omitempty; OCR search text / text to type |
-| Label | `label` | string | omitempty; YOLO class name for `EventOnClass`/`ClassIsVisible` |
-| Locale | `locale` | string | omitempty |
-| Command | `command` | string | omitempty |
-| Timeout | `timeout` | int | omitempty; seconds to locate the target before failing (default `15`) |
+| ID | `id` | int | Assigned by the server (from `1`); template images are named `<id>.png` |
+| Type | `type` | string | One of `template`, `text`, `type_text`, `yolo_class`, `command` |
+| Value | `value` | string | OCR text for `text`, YOLO class name for `yolo_class`; unused for `template` (matched by `<id>.png`) |
+| Locale | `locale` | string | omitempty; OCR language/locale |
 
 ### Event
 
@@ -308,33 +344,6 @@ ports.
 | ----- | ---- | ---- | ----- |
 | Time | `time` | int64 | Timestamp / delay |
 | Data | `data` | ControlBytes | Serialized as an **array of ints** (one per byte), 32 bytes (`ControlBytesSize`) |
-
-### ScreenNode
-
-`server/pkg/models/screen_node.go`
-
-```json
-{
-  "name": "home_screen",
-  "device": "google_pixel_6_pro",
-  "anchors": { "ocr_text": "Settings", "yolo_label": "button", "template": "1.png" },
-  "actions": [ { "next_node": "settings", "script": "open_settings" } ]
-}
-```
-
-| Field | JSON | Type | Notes |
-| ----- | ---- | ---- | ----- |
-| Name | `name` | string | Node name, used as the storage key |
-| Device | `device` | string | Resolved from the device serial on save |
-| Anchors | `anchors` | map[string]string | omitempty; keys: `ocr_text`, `yolo_label`, `template` |
-| Actions | `actions` | [Action](#action) array | omitempty |
-
-### Action
-
-| Field | JSON | Type | Notes |
-| ----- | ---- | ---- | ----- |
-| NextNode | `next_node` | string | omitempty; node to navigate to next |
-| Script | `script` | string | Script to run for this action |
 
 ### OCRResult
 
