@@ -12,9 +12,10 @@ import (
 
 // Script Path constants...
 const (
+	NodesPath         = LocalURL + server.Nodes
 	ScriptsPath       = LocalURL + server.Scripts
 	ScriptsByNamePath = LocalURL + server.ScriptsByName
-	SaveStepPath      = LocalURL + server.SaveStep
+	SaveScriptPath    = LocalURL + server.SaveScript
 	SaveRectangle     = LocalURL + server.SaveRectangle
 	RunScriptPath     = LocalURL + server.RunScript
 	FindTextPath      = LocalURL + server.FindText
@@ -23,15 +24,49 @@ const (
 // Script params constants
 const (
 	TestScript = "test_script"
+	TestNode   = "main_screen"
 )
 
-// Script default data
-var scriptData = make([]byte, 32)
+var testScript1 = models.Script{
+	Name:     TestScript + "1",
+	Node:     TestNode,
+	NextNode: "profile",
+	Params: []models.Parameter{
+		{
+			Type:  models.Text,
+			Value: "test",
+		},
+	},
+}
 
-func TestGetScripts(t *testing.T) {
+var testScript2 = models.Script{
+	Name:     TestScript + "2",
+	Node:     TestNode,
+	NextNode: "settings",
+	Params: []models.Parameter{
+		{
+			Type:  models.Text,
+			Value: "settings",
+		},
+	},
+}
+
+var testScript3 = models.Script{
+	Name:     TestScript + "3",
+	Node:     "login",
+	NextNode: TestNode,
+	Params: []models.Parameter{
+		{
+			Type:  models.Text,
+			Value: "test",
+		},
+	},
+}
+
+func TestGetNodes(t *testing.T) {
 	var data = ""
 	makeHTTPRequest(
-		ScriptsPath,
+		NodesPath,
 		http.MethodGet,
 		[]byte{},
 		&data,
@@ -39,9 +74,9 @@ func TestGetScripts(t *testing.T) {
 	t.Log(data)
 }
 
-func TestGetScriptByName(t *testing.T) {
-	var namePath = fmt.Sprintf("{%s}", server.NameKey)
-	var url = strings.ReplaceAll(ScriptsByNamePath, namePath, TestScript)
+func TestGetScripts(t *testing.T) {
+	var nodePath = fmt.Sprintf("{%s}", server.NodeKey)
+	var url = strings.ReplaceAll(ScriptsPath, nodePath, TestNode)
 
 	var data = ""
 	makeHTTPRequest(
@@ -53,9 +88,41 @@ func TestGetScriptByName(t *testing.T) {
 	t.Log(data)
 }
 
-func TestDeleteScript(t *testing.T) {
+func TestGetScriptByName(t *testing.T) {
+	var nodePath = fmt.Sprintf("{%s}", server.NodeKey)
 	var namePath = fmt.Sprintf("{%s}", server.NameKey)
-	var url = strings.ReplaceAll(ScriptsByNamePath, namePath, TestScript)
+	var url = strings.ReplaceAll(ScriptsByNamePath, nodePath, TestNode)
+	url = strings.ReplaceAll(url, namePath, TestScript+"1")
+
+	var data = ""
+	makeHTTPRequest(
+		url,
+		http.MethodGet,
+		[]byte{},
+		&data,
+	)
+	t.Log(data)
+}
+
+func TestDeleteNode(t *testing.T) {
+	var nodePath = fmt.Sprintf("{%s}", server.NodeKey)
+	var url = strings.ReplaceAll(ScriptsPath, nodePath, TestNode)
+
+	var data = ""
+	makeHTTPRequest(
+		url,
+		http.MethodDelete,
+		[]byte{},
+		&data,
+	)
+	t.Log(data)
+}
+
+func TestDeleteScript(t *testing.T) {
+	var nodePath = fmt.Sprintf("{%s}", server.NodeKey)
+	var namePath = fmt.Sprintf("{%s}", server.NameKey)
+	var url = strings.ReplaceAll(ScriptsByNamePath, nodePath, TestNode)
+	url = strings.ReplaceAll(url, namePath, TestScript+"1")
 
 	var data = ""
 	makeHTTPRequest(
@@ -96,31 +163,27 @@ func TestAddStepZone(t *testing.T) {
 	t.Log(data)
 }
 
-func TestSaveStep(t *testing.T) {
-	var body = models.Script{
-		Name:     TestScript + " ",
-		Node:     "main_screen",
-		NextNode: "profile",
-		Params: []models.Parameter{
-			{
-				Type:  models.Text,
-				Value: "test",
-			},
-		},
+func TestSaveScript(t *testing.T) {
+	var testObjs = []models.Script{
+		testScript1, testScript2, testScript3,
 	}
-	bytes, err := json.Marshal(body)
-	if err != nil {
-		t.Fatal(err)
-	}
-	var data = ""
 
-	makeHTTPRequest(
-		SaveStepPath,
-		http.MethodPost,
-		bytes,
-		&data,
-	)
-	t.Log(data)
+	for _, body := range testObjs {
+		bytes, err := json.Marshal(body)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var data = ""
+
+		makeHTTPRequest(
+			SaveScriptPath,
+			http.MethodPost,
+			bytes,
+			&data,
+		)
+		t.Log(data)
+
+	}
 }
 
 func TestRunScript(t *testing.T) {

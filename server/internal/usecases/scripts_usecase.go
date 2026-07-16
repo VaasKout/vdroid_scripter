@@ -22,7 +22,7 @@ const (
 
 // ScriptsUseCase ...
 type ScriptsUseCase interface {
-	GetScriptNames() ([]string, error)
+	GetNodes(node string) ([]string, error)
 	GetScript(node string, scriptName string) (*models.Script, error)
 	DeleteScript(node string, scriptName string) error
 	RunScript(serial string, node string, scriptName string, basePort int) error
@@ -129,9 +129,10 @@ func (i *interactorImpl) FindText(
 	return result
 }
 
-func (i *interactorImpl) GetScriptNames() ([]string, error) {
-	scriptsDir := i.filesDB.CreateScriptDir()
-	dirs := i.filesDB.GetDirs(scriptsDir)
+func (i *interactorImpl) GetNodes(node string) ([]string, error) {
+	node = strings.TrimSpace(node)
+	scriptsDir := i.filesDB.CreateScriptDir(node)
+	dirs := i.filesDB.GetDirs(scriptsDir, false)
 	names := make([]string, len(dirs))
 	for index, script := range dirs {
 		names[index] = filepath.Base(script)
@@ -162,12 +163,11 @@ func (i *interactorImpl) GetScript(node string, scriptName string) (*models.Scri
 
 func (i *interactorImpl) DeleteScript(node string, scriptName string) error {
 	scriptName = strings.TrimSpace(scriptName)
+	nodeDir := i.filesDB.CreateScriptDir(node)
 	if scriptName == "" {
-		return errors.New(ScriptNameIsEmpty)
+		return os.RemoveAll(nodeDir)
 	}
-
-	scriptsDir := i.filesDB.CreateScriptDir(node)
-	i.filesDB.DeleteDirByName(scriptsDir, scriptName)
+	i.filesDB.DeleteDirByName(nodeDir, scriptName)
 	return nil
 }
 

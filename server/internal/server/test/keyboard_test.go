@@ -71,7 +71,7 @@ func TestSaveDefaultKeyboardScript(t *testing.T) {
 	var data = ""
 
 	makeHTTPRequest(
-		SaveStepPath,
+		SaveScriptPath,
 		http.MethodPost,
 		bytes,
 		&data,
