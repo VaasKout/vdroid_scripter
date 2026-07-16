@@ -93,7 +93,7 @@ func (i *interactorImpl) executeScript(
 		return
 	}
 
-	scriptDir := i.filesDB.CreateScriptDir(script.Name)
+	scriptDir := i.filesDB.CreateScriptDir(script.Node, script.Name)
 	if scriptDir == "" {
 		i.logger.Error(fmt.Sprintf("scriptDir not found %s", script.Name))
 		return
