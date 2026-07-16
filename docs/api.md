@@ -32,10 +32,12 @@ This document describes every HTTP endpoint exposed by the server, defined in
 | ------ | ---- | ----------- |
 | GET | `/ping` | Health check |
 | GET | `/devices` | List connected ADB devices |
-| GET | `/scripts` | List script node (screen) names |
-| GET | `/scripts/{node}/{name}` | Get a single script |
-| DELETE | `/scripts/{node}/{name}` | Delete a script |
-| GET | `/devices/{serial}/scripts/{node}/{name}/run` | Run a script on a device |
+| GET | `/nodes` | List node (screen) names |
+| GET | `/nodes/{node}` | List script names saved under a node |
+| DELETE | `/nodes/{node}` | Delete a node and all its scripts |
+| GET | `/nodes/{node}/{name}` | Get a single script |
+| DELETE | `/nodes/{node}/{name}` | Delete a script |
+| GET | `/nodes/{node}/{name}/run?serial=` | Run a script on a device |
 | POST | `/save_rectangle` | Save a selected zone (rectangle) |
 | POST | `/save_script` | Create or replace a script |
 | GET | `/devices/{serial}/find_text` | OCR: locate text on the current screen |
@@ -77,20 +79,19 @@ Returns all ADB devices currently visible to the server.
   ```
   `devices` is `[]` when none are connected.
 
-## Scripts
+## Nodes & Scripts
 
-A script belongs to a **node** (the screen it is recorded on) and is identified by
-the `node` + `name` pair. On disk it lives at
-`scripts/<node>/<name>/run.json`, with template images stored next to it as
-`<param.id>.png`.
+Scripts are organised into **nodes** — a node is a screen, and the scripts under
+it are the interactions recorded on that screen. A script is identified by its
+`node` + `name` pair. On disk it lives at `scripts/<node>/<name>/run.json`, with
+template images stored next to it as `<param.id>.png`.
 
-Scripts are stored server-wide: listing, fetching, and deleting are
+Nodes and scripts are stored server-wide: listing, fetching, and deleting are
 device-independent. Only running a script targets a specific device.
 
-### `GET /scripts`
+### `GET /nodes`
 
-Lists the names of the top-level script directories — i.e. the **node (screen)
-names** that have scripts saved under them.
+Lists the saved node (screen) names.
 
 - **Response `200`:** array of strings.
   ```json
@@ -98,35 +99,57 @@ names** that have scripts saved under them.
   ```
 - **Errors:** `500` on read failure.
 
-### `GET /scripts/{node}/{name}`
+### `GET /nodes/{node}`
+
+Lists the names of the scripts saved under a node.
+
+- **Path params:** `node` (required).
+- **Response `200`:** array of strings.
+  ```json
+  ["open_profile", "open_settings"]
+  ```
+- **Errors:** `500` on read failure.
+
+### `DELETE /nodes/{node}`
+
+Deletes a whole node — its directory and every script inside it.
+
+- **Path params:** `node` (required).
+- **Response `200`:** `{ "status": "ok" }`
+- **Errors:** `400` if `node` is empty.
+
+### `GET /nodes/{node}/{name}`
 
 Returns a single script.
 
 - **Path params:** `node`, `name` (both required).
 - **Response `200`:** a [`Script`](#script) object.
-- **Errors:** `400` if `node` or `name` is empty, `500` on read failure.
+- **Errors:** `400` if `node` is empty, `500` on read failure.
 
-### `DELETE /scripts/{node}/{name}`
+### `DELETE /nodes/{node}/{name}`
 
-Deletes a script (removes its whole directory, including template images).
+Deletes a single script (its directory, including template images).
 
 - **Path params:** `node`, `name` (both required).
 - **Response `200`:** `{ "status": "ok" }`
-- **Errors:** `400` if `node` or `name` is empty.
+- **Errors:** `400` if `node` is empty.
 
-### `GET /devices/{serial}/scripts/{node}/{name}/run`
+### `GET /nodes/{node}/{name}/run`
 
-Executes the named script on the given device.
+Executes the named script on a device.
 
-The script's `params` are matched **in order** to narrow down the interactive
-zone (e.g. first locate a text label, then the checkbox nearest to it). The
-script's `events` are then replayed over the scrcpy control socket, offset to the
-**last** matched parameter's region. If `params` is empty and `events` is not,
-the events are replayed exactly as recorded.
+The script's `params` are located on screen **in order** — each must be found
+before the script's `timeout` expires — progressively identifying the element to
+act on. The script's `events` are then replayed over the scrcpy control socket,
+offset to the **last** parameter's matched region. A `type_text` parameter
+instead types its `value` on the on-screen keyboard. If `params` is empty and
+`events` is not, the events are replayed exactly as recorded.
 
-- **Path params:** `serial`, `node`, `name` (all required).
+- **Path params:** `node`, `name` (both required).
+- **Query params:** `serial` — target device serial (required).
 - **Response `200`:** `{ "status": "ok" }`
-- **Errors:** `500` if the script is not found/empty or execution fails.
+- **Errors:** `400` if `serial`, `node` or `name` is empty; `500` if the script is
+  empty or execution fails.
 
 ### `POST /save_rectangle`
 
@@ -162,13 +185,13 @@ The body is a whole [`Script`](#script) object.
     "timeout": 15
   }
   ```
-  `name` and `node` are required. `params[].id` is assigned by the server
-  (sequentially, starting at `1`) — any value sent is overwritten. `timeout` is
-  optional (seconds to keep locating a parameter's target before failing;
-  defaults to `15` when omitted or `<= 0`).
-- **Template images:** a pending zone saved via
-  [`POST /save_rectangle`](#post-save_rectangle) is committed to the **last**
-  `template` parameter as `<param.id>.png` in the script's directory.
+  `name` and `node` are required. The server assigns the **last** parameter's
+  `id` (set to the number of parameters); earlier parameters keep the `id` you
+  send. `timeout` is optional (seconds to keep locating a parameter's target
+  before failing; defaults to `15` when omitted or `<= 0`).
+- **Template images:** if the **last** parameter is a `template`, a pending zone
+  saved via [`POST /save_rectangle`](#post-save_rectangle) is committed to it as
+  `<param.id>.png` in the script's directory.
 - **Response `200`:** `{ "status": "ok" }`
 - **Errors:** `400` on invalid JSON or empty `node`/`name`, `500` if not saved.
 
@@ -327,16 +350,16 @@ ports.
 
 ### Parameter
 
-A parameter locates an element on screen. Parameters are matched in order, each
-narrowing the zone — later params resolve to the candidate nearest the previous
-match (e.g. "the checkbox next to *this* label").
+A parameter locates an element on screen. Parameters are matched **in order**,
+progressively identifying the element to act on; the script's `events` are
+applied to the last one's region.
 
 | Field | JSON | Type | Notes |
 | ----- | ---- | ---- | ----- |
-| ID | `id` | int | Assigned by the server (from `1`); template images are named `<id>.png` |
+| ID | `id` | int | Template images are named `<id>.png`; on save the server sets the last parameter's `id` |
 | Type | `type` | string | One of `template`, `text`, `type_text`, `yolo_class`, `command` |
-| Value | `value` | string | OCR text for `text`, YOLO class name for `yolo_class`; unused for `template` (matched by `<id>.png`) |
-| Locale | `locale` | string | omitempty; OCR language/locale |
+| Value | `value` | string | OCR text for `text`, YOLO class name for `yolo_class`, text to type for `type_text`; unused for `template` (matched by `<id>.png`) |
+| Locale | `locale` | string | omitempty; OCR language/locale, and the keyboard locale for `type_text` |
 
 ### Event
 
