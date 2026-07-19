@@ -93,8 +93,8 @@ class MenuInteractor @Inject constructor(
             }
 
             is MenuState.Usual -> {
-                val newCvMode = state.cvMode.increment()
-                _menuState.update { state.copy(cvMode = newCvMode) }
+                val newCvMode = state.localCvMode.increment()
+                _menuState.update { state.copy(localCvMode = newCvMode) }
                 _events.tryEmit(MenuEvent.CvModeClicked(newCvMode))
             }
 
@@ -126,7 +126,7 @@ class MenuInteractor @Inject constructor(
             }
 
             is MenuState.Usual -> _menuState.update {
-                state.copy(cvMode = CVMode.NO_CV, textHighlighted = true)
+                state.copy(localCvMode = CVMode.NO_CV, textHighlighted = true)
             }
 
             else -> {}

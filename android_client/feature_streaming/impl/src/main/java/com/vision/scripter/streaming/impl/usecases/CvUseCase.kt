@@ -131,12 +131,18 @@ class CvUseCase @Inject constructor(
 
     suspend fun saveSelectedRectangle(
         serial: String,
+        node: String,
+        name: String,
+        value: String,
         screenSizes: ScreenSizes,
     ) {
         val tmpZone = _selectedRectangles.value.firstOrNull()
         if (!tmpZone.isEmpty()) {
             scripterRepository.saveRect(
                 serial = serial,
+                node = node,
+                name = name,
+                value = value,
                 rectangle = tmpZone?.adjustToServer(screenSizes),
             )
         }

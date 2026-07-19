@@ -54,7 +54,7 @@ fun UsualMenu(
             )
 
             BaseMenuIcons(
-                cvMode = menuState.cvMode,
+                cvMode = menuState.localCvMode,
                 textHighlighted = menuState.textHighlighted,
                 keyboardHighlighted = menuState.keyboardHighlighted,
                 uiStateHolder = uiStateHolder,
@@ -122,7 +122,7 @@ private fun UsualExpandedHighlightedTextPreview() {
     UsualMenu(
         menuState = MenuState.Usual(
             expanded = true,
-            cvMode = CVMode.CV_RECTS,
+            localCvMode = CVMode.CV_RECTS,
         ),
         uiStateHolder = MenuPreviewUiStateHolder(),
     )

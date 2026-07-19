@@ -54,7 +54,7 @@ fun ScriptMenu(
         )
 
         BaseMenuIcons(
-            cvMode = menuState.cvMode,
+            cvMode = menuState.localCvMode,
             textHighlighted = menuState.textHighlighted,
             keyboardHighlighted = menuState.keyboardHighlighted,
             uiStateHolder = uiStateHolder,

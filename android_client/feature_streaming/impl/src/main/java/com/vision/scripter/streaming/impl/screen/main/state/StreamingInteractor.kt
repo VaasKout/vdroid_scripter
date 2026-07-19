@@ -122,11 +122,16 @@ class StreamingInteractor @Inject constructor(
                 }
                 if (event.param.type == TEMPLATE) {
                     val screenSizes = videoUseCase.observeScreenSizes().value ?: return
+                    cvUseCase.nextCvMode(CVMode.NO_CV)
+                    val templateName = "${currentState.record.params.size + 1}"
                     cvUseCase.saveSelectedRectangle(
                         serial = currentState.serial,
+                        node = currentState.record.node,
+                        name = currentState.record.recordName,
+                        value = templateName,
                         screenSizes = screenSizes,
                     )
-                    addParam(Parameter(type = TEMPLATE))
+                    addParam(Parameter(type = TEMPLATE, value = templateName))
                     return
                 }
                 if (event.param.type == YOLO_CLASS) {

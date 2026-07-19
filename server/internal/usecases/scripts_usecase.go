@@ -51,7 +51,7 @@ func (i *interactorImpl) SaveZone(saveZone *SaveZoneDto) bool {
 		return false
 	}
 	var scriptDir = i.filesDB.CreateScriptDir(saveZone.Node, saveZone.Name)
-	var tmpImg = filepath.Join(scriptDir, saveZone.Value)
+	var tmpImg = filepath.Join(scriptDir, saveZone.Value+".png")
 	created := file.CreateFileIfNotExist(tmpImg)
 	if !created {
 		return false

@@ -77,11 +77,17 @@ class ScripterRepositoryImpl @Inject constructor(
 
     override suspend fun saveRect(
         serial: String,
+        node: String,
+        name: String,
+        value: String,
         rectangle: CvRectangle?,
     ): Boolean {
         if (rectangle.isEmpty()) return false
         val saveRectRequest = SaveRectRequest(
             serial = serial,
+            node = node,
+            name = name,
+            value = value,
             rectangle = rectangle,
         )
         val body = Json.encodeToString(saveRectRequest)

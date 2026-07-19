@@ -16,6 +16,9 @@ interface ScripterRepository {
 
     suspend fun saveRect(
         serial: String,
+        node: String,
+        name: String,
+        value: String,
         rectangle: CvRectangle?,
     ): Boolean
 

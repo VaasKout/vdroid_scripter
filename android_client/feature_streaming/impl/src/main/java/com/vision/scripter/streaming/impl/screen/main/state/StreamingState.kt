@@ -68,7 +68,7 @@ data class StreamingState(
 
 sealed interface MenuState {
     data class Usual(
-        val cvMode: CVMode = CVMode.NO_CV,
+        val localCvMode: CVMode = CVMode.NO_CV,
         val textHighlighted: Boolean = false,
         val keyboardHighlighted: Boolean = false,
         val expanded: Boolean = false,
@@ -76,7 +76,7 @@ sealed interface MenuState {
 
     data class Recording(
         val controlRecording: Boolean = false,
-        val cvMode: CVMode = CVMode.NO_CV,
+        val localCvMode: CVMode = CVMode.NO_CV,
         val textHighlighted: Boolean = false,
         val keyboardHighlighted: Boolean = false,
         val customTimeout: Boolean = false,
