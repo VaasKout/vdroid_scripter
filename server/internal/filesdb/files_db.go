@@ -9,13 +9,12 @@ import (
 const (
 	ScreenshotDir = "screenshot"
 	TesseractDir  = "tesseract"
-	TmpDir        = "tmp"
 )
 
 // Script JSONs
 const (
-	RunJSON    = "run.json"
-	TmpZone    = "tmp.png"
+	RunJSON = "run.json"
+	TmpZone = "tmp.png"
 )
 
 // FilesDB ...

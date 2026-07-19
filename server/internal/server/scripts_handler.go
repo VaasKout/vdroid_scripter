@@ -174,6 +174,8 @@ func (s *serverImpl) handleSaveRectangle(w http.ResponseWriter, r *http.Request)
 
 	var data struct {
 		Serial    string           `json:"serial"`
+		Node      string           `json:"node"`
+		Name      string           `json:"name"`
 		Rectangle models.Rectangle `json:"rectangle"`
 	}
 	err := json.NewDecoder(r.Body).Decode(&data)
@@ -182,7 +184,12 @@ func (s *serverImpl) handleSaveRectangle(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	saved := s.interactor.SaveZone(data.Serial, &data.Rectangle)
+	saved := s.interactor.SaveZone(
+		data.Serial,
+		data.Node,
+		data.Name,
+		&data.Rectangle,
+	)
 	if saved {
 		s.sendStatusOk(w)
 		return

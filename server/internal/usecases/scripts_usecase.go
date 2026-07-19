@@ -27,16 +27,26 @@ type ScriptsUseCase interface {
 	DeleteScript(node string, scriptName string) error
 	RunScript(serial string, node string, scriptName string, basePort int) error
 
-	SaveZone(serial string, zone *models.Rectangle) bool
+	SaveZone(
+		serial string,
+		node string,
+		name string,
+		zone *models.Rectangle,
+	) bool
 	SaveScript(data *models.Script) bool
 	FindText(serial string, text string, locale string) []cv.OCRResult
 }
 
-func (i *interactorImpl) SaveZone(serial string, zone *models.Rectangle) bool {
-	if zone.IsEmpty() {
+func (i *interactorImpl) SaveZone(
+	serial string,
+	node string,
+	name string,
+	zone *models.Rectangle,
+) bool {
+	if zone.IsEmpty() || strings.TrimSpace(node) == "" || strings.TrimSpace(name) == "" {
 		return false
 	}
-	var tmpDir = i.filesDB.CreateScriptDir(filesdb.TmpDir)
+	var tmpDir = i.filesDB.CreateScriptDir(node, name)
 	var tmpImg = filepath.Join(tmpDir, filesdb.TmpZone)
 	created := file.CreateFileIfNotExist(tmpImg)
 	if !created {
@@ -66,23 +76,6 @@ func (i *interactorImpl) SaveScript(data *models.Script) bool {
 	runnerPath := i.getScriptRunner(data.Node, data.Name)
 	if runnerPath == "" {
 		return false
-	}
-
-	var lastParam = &models.Parameter{}
-	if len(data.Params) > 0 {
-		lastParam = &data.Params[len(data.Params)-1]
-	}
-
-	// TODO for all params
-	if lastParam.Type == models.Template {
-		scriptDir := i.filesDB.CreateScriptDir(data.Node, data.Name)
-		tmpDir := i.filesDB.CreateScriptDir(filesdb.TmpDir)
-		tmpImg := filepath.Join(tmpDir, filesdb.TmpZone)
-		if tmpImg != "" {
-			newImagePath := filepath.Join(scriptDir, fmt.Sprintf("%s.png", lastParam.Value))
-			os.Rename(tmpImg, newImagePath)
-		}
-		i.filesDB.DeletePathInScriptDir(filesdb.TmpDir)
 	}
 
 	return i.saveScriptInFile(data, runnerPath)
@@ -136,9 +129,6 @@ func (i *interactorImpl) GetNodes(node string) ([]string, error) {
 	names := make([]string, 0, len(dirs))
 	for _, script := range dirs {
 		name := filepath.Base(script)
-		if name == filesdb.TmpDir {
-			continue
-		}
 		names = append(names, name)
 	}
 	return names, nil
