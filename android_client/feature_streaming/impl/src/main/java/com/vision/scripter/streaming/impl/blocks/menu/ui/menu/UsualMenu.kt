@@ -19,24 +19,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.vision.scripter.streaming.impl.blocks.menu.state.MenuUiStateHolder
 import com.vision.scripter.streaming.impl.screen.main.state.CVMode
 import com.vision.scripter.streaming.impl.screen.main.state.MenuState
-import com.vision.scripter.streaming.impl.screen.main.state.TEXT
+import com.vision.scripter.streaming.impl.screen.main.ui.MenuPreviewUiStateHolder
 import com.vision.scripter.ui.customClickable
-import kotlinx.collections.immutable.ImmutableSet
-import kotlinx.collections.immutable.persistentSetOf
 
 @Composable
 fun UsualMenu(
     modifier: Modifier = Modifier,
     menuState: MenuState.Usual,
-    paramKeys: ImmutableSet<String>,
-    onScriptModeClick: () -> Unit,
-    onKeyboardClick: () -> Unit,
-    onCvModeClick: () -> Unit,
-    onTextModeClick: () -> Unit,
-    onExpandClick: () -> Unit,
-    onExitClick: () -> Unit,
+    uiStateHolder: MenuUiStateHolder,
 ) {
     if (menuState.expanded) {
         Column(
@@ -53,7 +46,7 @@ fun UsualMenu(
                 modifier = Modifier
                     .size(32.dp)
                     .customClickable(
-                        onClick = onScriptModeClick,
+                        onClick = uiStateHolder::onScriptModeClicked,
                     ),
                 imageVector = Icons.Filled.Add,
                 tint = MaterialTheme.colorScheme.onSurface,
@@ -61,16 +54,16 @@ fun UsualMenu(
             )
 
             BaseMenuIcons(
-                paramKeys = paramKeys,
-                onCvModeClick = onCvModeClick,
-                onTextClick = onTextModeClick,
-                onKeyboardClick = onKeyboardClick,
+                cvMode = menuState.cvMode,
+                textHighlighted = menuState.textHighlighted,
+                keyboardHighlighted = menuState.keyboardHighlighted,
+                uiStateHolder = uiStateHolder,
             )
 
             Icon(
                 modifier = Modifier
                     .size(32.dp)
-                    .customClickable(onClick = onExitClick),
+                    .customClickable(onClick = uiStateHolder::onExitClicked),
                 imageVector = Icons.AutoMirrored.Filled.Logout,
                 tint = MaterialTheme.colorScheme.onSurface,
                 contentDescription = ""
@@ -79,7 +72,7 @@ fun UsualMenu(
             Icon(
                 modifier = Modifier
                     .size(32.dp)
-                    .customClickable(onClick = onExpandClick),
+                    .customClickable(onClick = uiStateHolder::onExpandClicked),
                 imageVector = Icons.AutoMirrored.Filled.ArrowForward,
                 tint = MaterialTheme.colorScheme.onSurface,
                 contentDescription = ""
@@ -97,7 +90,7 @@ fun UsualMenu(
                 shape = RoundedCornerShape(topStart = 8.dp, bottomStart = 8.dp),
             )
             .customClickable(
-                onClick = onExpandClick,
+                onClick = uiStateHolder::onExpandClicked,
             ),
         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
         tint = MaterialTheme.colorScheme.onSurface,
@@ -110,13 +103,7 @@ fun UsualMenu(
 private fun UsualMenuPreview() {
     UsualMenu(
         menuState = MenuState.Usual(),
-        paramKeys = persistentSetOf(),
-        onScriptModeClick = {},
-        onKeyboardClick = {},
-        onCvModeClick = {},
-        onTextModeClick = {},
-        onExpandClick = {},
-        onExitClick = {},
+        uiStateHolder = MenuPreviewUiStateHolder(),
     )
 }
 
@@ -125,13 +112,7 @@ private fun UsualMenuPreview() {
 private fun UsualExpandedMenuPreview() {
     UsualMenu(
         menuState = MenuState.Usual(expanded = true),
-        paramKeys = persistentSetOf(),
-        onScriptModeClick = {},
-        onKeyboardClick = {},
-        onCvModeClick = {},
-        onTextModeClick = {},
-        onExpandClick = {},
-        onExitClick = {},
+        uiStateHolder = MenuPreviewUiStateHolder(),
     )
 }
 
@@ -143,12 +124,6 @@ private fun UsualExpandedHighlightedTextPreview() {
             expanded = true,
             cvMode = CVMode.CV_RECTS,
         ),
-        paramKeys = persistentSetOf(TEXT),
-        onScriptModeClick = {},
-        onKeyboardClick = {},
-        onCvModeClick = {},
-        onTextModeClick = {},
-        onExpandClick = {},
-        onExitClick = {},
+        uiStateHolder = MenuPreviewUiStateHolder(),
     )
 }

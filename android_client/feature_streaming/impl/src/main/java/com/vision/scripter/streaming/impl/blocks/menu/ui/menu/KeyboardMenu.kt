@@ -22,18 +22,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.vision.scripter.streaming.impl.blocks.menu.state.MenuUiStateHolder
 import com.vision.scripter.streaming.impl.screen.main.state.MenuState
+import com.vision.scripter.streaming.impl.screen.main.ui.MenuPreviewUiStateHolder
 import com.vision.scripter.ui.customClickable
 
 @Composable
 fun KeyboardMenu(
     modifier: Modifier = Modifier,
     menuState: MenuState.Keyboard,
-    onKeyboardRecordingClick: () -> Unit,
-    onKeyboardInitClick: () -> Unit,
-    onKeyboardEdit: (addNew: Boolean) -> Unit,
-    onSaveClick: () -> Unit,
-    onCancelClick: () -> Unit,
+    uiStateHolder: MenuUiStateHolder,
 ) {
     Column(
         modifier = modifier
@@ -55,7 +53,7 @@ fun KeyboardMenu(
                 modifier = Modifier
                     .size(32.dp)
                     .customClickable(
-                        onClick = onKeyboardRecordingClick,
+                        onClick = uiStateHolder::onRecordingClicked,
                     ),
                 imageVector = Icons.Filled.RadioButtonChecked,
                 tint =
@@ -68,7 +66,7 @@ fun KeyboardMenu(
         Icon(
             modifier = Modifier
                 .size(32.dp)
-                .customClickable(onClick = onKeyboardInitClick),
+                .customClickable(onClick = uiStateHolder::onKeyboardInitClicked),
             imageVector = Icons.Filled.Search,
             tint = MaterialTheme.colorScheme.onSurface,
             contentDescription = ""
@@ -77,7 +75,7 @@ fun KeyboardMenu(
         Icon(
             modifier = Modifier
                 .size(32.dp)
-                .customClickable(onClick = { onKeyboardEdit(false) }),
+                .customClickable(onClick = { uiStateHolder.onKeyboardEdited(false) }),
             imageVector = Icons.Filled.Edit,
             tint = if (menuState.editing) Color.Red
             else MaterialTheme.colorScheme.onSurface,
@@ -87,7 +85,7 @@ fun KeyboardMenu(
         Icon(
             modifier = Modifier
                 .size(32.dp)
-                .customClickable(onClick = { onKeyboardEdit(true) }),
+                .customClickable(onClick = { uiStateHolder.onKeyboardEdited(true) }),
             imageVector = Icons.Filled.Add,
             tint = if (menuState.showCvRectangles) Color.Red
             else MaterialTheme.colorScheme.onSurface,
@@ -97,7 +95,7 @@ fun KeyboardMenu(
         Icon(
             modifier = Modifier
                 .size(32.dp)
-                .customClickable(onClick = onCancelClick),
+                .customClickable(onClick = uiStateHolder::onCancelClicked),
             imageVector = Icons.Filled.Close,
             tint = MaterialTheme.colorScheme.onSurface,
             contentDescription = ""
@@ -107,7 +105,7 @@ fun KeyboardMenu(
             Icon(
                 modifier = Modifier
                     .size(32.dp)
-                    .customClickable(onClick = onSaveClick),
+                    .customClickable(onClick = uiStateHolder::onSaveClicked),
                 imageVector = Icons.Filled.Check,
                 tint = Color.Green,
                 contentDescription = "",
@@ -121,11 +119,7 @@ fun KeyboardMenu(
 private fun KeyboardMenuDefaultPreview() {
     KeyboardMenu(
         menuState = MenuState.Keyboard(isLoadingKeyboard = false),
-        onKeyboardRecordingClick = {},
-        onKeyboardInitClick = {},
-        onKeyboardEdit = {},
-        onSaveClick = {},
-        onCancelClick = {},
+        uiStateHolder = MenuPreviewUiStateHolder(),
     )
 }
 
@@ -137,11 +131,7 @@ private fun KeyboardMenuFromUsualPreview() {
             isLoadingKeyboard = false,
             fromUsual = true,
         ),
-        onKeyboardRecordingClick = {},
-        onKeyboardInitClick = {},
-        onKeyboardEdit = {},
-        onSaveClick = {},
-        onCancelClick = {},
+        uiStateHolder = MenuPreviewUiStateHolder(),
     )
 }
 
@@ -153,11 +143,7 @@ private fun KeyboardMenuEditingPreview() {
             isLoadingKeyboard = false,
             editing = true,
         ),
-        onKeyboardRecordingClick = {},
-        onKeyboardInitClick = {},
-        onKeyboardEdit = {},
-        onSaveClick = {},
-        onCancelClick = {},
+        uiStateHolder = MenuPreviewUiStateHolder(),
     )
 }
 
@@ -170,10 +156,6 @@ private fun KeyboardMenuEditingShowCvPreview() {
             editing = true,
             showCvRectangles = true,
         ),
-        onKeyboardRecordingClick = {},
-        onKeyboardInitClick = {},
-        onKeyboardEdit = {},
-        onSaveClick = {},
-        onCancelClick = {},
+        uiStateHolder = MenuPreviewUiStateHolder(),
     )
 }

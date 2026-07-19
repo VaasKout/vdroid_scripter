@@ -23,8 +23,6 @@ data class Script(
 
 @Serializable
 data class Parameter(
-    @SerialName("id")
-    val id: Int = 0,
     @SerialName("type")
     val type: String = "",
     @SerialName("value")

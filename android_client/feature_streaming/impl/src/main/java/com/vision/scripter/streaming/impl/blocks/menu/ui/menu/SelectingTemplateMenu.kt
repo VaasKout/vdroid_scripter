@@ -17,17 +17,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.vision.scripter.streaming.impl.blocks.menu.state.MenuUiStateHolder
 import com.vision.scripter.streaming.impl.screen.main.state.CVMode
-import com.vision.scripter.streaming.impl.screen.main.state.toType
+import com.vision.scripter.streaming.impl.screen.main.ui.MenuPreviewUiStateHolder
 import com.vision.scripter.ui.customClickable
 
 @Composable
 fun SelectingTemplateMenu(
     modifier: Modifier = Modifier,
     cvMode: CVMode,
-    onCvModeClick: () -> Unit,
-    onSaveClick: () -> Unit,
-    onBackClick: () -> Unit,
+    uiStateHolder: MenuUiStateHolder,
 ) {
     Column(
         modifier = modifier
@@ -42,8 +41,8 @@ fun SelectingTemplateMenu(
         Icon(
             modifier = Modifier
                 .size(32.dp)
-                .customClickable(onClick = onCvModeClick),
-            imageVector = detectionIcon(cvMode.toType()),
+                .customClickable(onClick = uiStateHolder::onCvModeClicked),
+            imageVector = detectionIcon(cvMode),
             tint = Color.Red,
             contentDescription = ""
         )
@@ -51,7 +50,7 @@ fun SelectingTemplateMenu(
         Icon(
             modifier = Modifier
                 .size(32.dp)
-                .customClickable(onClick = onSaveClick),
+                .customClickable(onClick = uiStateHolder::onSaveClicked),
             imageVector = Icons.Filled.Check,
             tint = Color.Green,
             contentDescription = ""
@@ -60,7 +59,7 @@ fun SelectingTemplateMenu(
         Icon(
             modifier = Modifier
                 .size(32.dp)
-                .customClickable(onClick = onBackClick),
+                .customClickable(onClick = uiStateHolder::onCancelClicked),
             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
             tint = MaterialTheme.colorScheme.onSurface,
             contentDescription = ""
@@ -73,8 +72,6 @@ fun SelectingTemplateMenu(
 fun SelectingTemplateMenuPreview() {
     SelectingTemplateMenu(
         cvMode = CVMode.CV_RECTS,
-        onCvModeClick = {},
-        onSaveClick = {},
-        onBackClick = {},
+        uiStateHolder = MenuPreviewUiStateHolder(),
     )
 }

@@ -4,12 +4,9 @@ import androidx.compose.runtime.Immutable
 import com.vision.scripter.data.api.models.CvRectangle
 import com.vision.scripter.data.api.models.RectangleWithText
 import com.vision.scripter.streaming.impl.blocks.menu.state.DialogState
-import com.vision.scripter.streaming.impl.screen.main.state.DEFAULT_TIMEOUT
 import com.vision.scripter.streaming.impl.screen.main.state.MenuState
 import kotlinx.collections.immutable.ImmutableList
-import kotlinx.collections.immutable.ImmutableSet
 import kotlinx.collections.immutable.persistentListOf
-import kotlinx.collections.immutable.persistentSetOf
 
 @Immutable
 data class StreamingUiState(
@@ -20,6 +17,4 @@ data class StreamingUiState(
     val selectedRectangles: ImmutableList<CvRectangle> = persistentListOf(),
     val keyboardButtons: ImmutableList<RectangleWithText> = persistentListOf(),
     val menuState: MenuState = MenuState.Usual(),
-    val recordTimeout: Int = DEFAULT_TIMEOUT,
-    val paramKeys: ImmutableSet<String> = persistentSetOf(),
 )

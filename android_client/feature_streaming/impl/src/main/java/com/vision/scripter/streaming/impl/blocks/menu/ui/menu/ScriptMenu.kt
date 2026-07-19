@@ -19,26 +19,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.vision.scripter.streaming.impl.blocks.menu.state.MenuUiStateHolder
 import com.vision.scripter.streaming.impl.screen.main.state.MenuState
-import com.vision.scripter.streaming.impl.screen.main.state.TEMPLATE
-import com.vision.scripter.streaming.impl.screen.main.state.TEXT
-import com.vision.scripter.streaming.impl.screen.main.state.TYPE_TEXT
+import com.vision.scripter.streaming.impl.screen.main.ui.MenuPreviewUiStateHolder
 import com.vision.scripter.ui.customClickable
-import kotlinx.collections.immutable.ImmutableSet
-import kotlinx.collections.immutable.persistentSetOf
 
 @Composable
 fun ScriptMenu(
     modifier: Modifier = Modifier,
     menuState: MenuState.Recording,
-    paramKeys: ImmutableSet<String>,
-    onRecordingClick: () -> Unit,
-    onCvModeClick: () -> Unit,
-    onTextModeClick: () -> Unit,
-    onKeyboardClick: () -> Unit,
-    onTimeoutClick: () -> Unit,
-    onSaveClick: () -> Unit,
-    onCancelClick: () -> Unit,
+    uiStateHolder: MenuUiStateHolder,
 ) {
     Column(
         modifier = modifier
@@ -54,7 +44,7 @@ fun ScriptMenu(
             modifier = Modifier
                 .size(32.dp)
                 .customClickable(
-                    onClick = onRecordingClick,
+                    onClick = uiStateHolder::onRecordingClicked,
                 ),
             imageVector = Icons.Filled.RadioButtonChecked,
             tint =
@@ -64,16 +54,16 @@ fun ScriptMenu(
         )
 
         BaseMenuIcons(
-            paramKeys = paramKeys,
-            onCvModeClick = onCvModeClick,
-            onTextClick = onTextModeClick,
-            onKeyboardClick = onKeyboardClick,
+            cvMode = menuState.cvMode,
+            textHighlighted = menuState.textHighlighted,
+            keyboardHighlighted = menuState.keyboardHighlighted,
+            uiStateHolder = uiStateHolder,
         )
 
         Icon(
             modifier = Modifier
                 .size(32.dp)
-                .customClickable(onClick = onTimeoutClick),
+                .customClickable(onClick = uiStateHolder::onTimeoutClicked),
             imageVector = Icons.Filled.Timer,
             tint =
                 if (menuState.customTimeout) Color.Red
@@ -84,7 +74,7 @@ fun ScriptMenu(
         Icon(
             modifier = Modifier
                 .size(32.dp)
-                .customClickable(onClick = onCancelClick),
+                .customClickable(onClick = uiStateHolder::onCancelClicked),
             imageVector = Icons.Filled.Close,
             tint = MaterialTheme.colorScheme.onSurface,
             contentDescription = ""
@@ -93,7 +83,7 @@ fun ScriptMenu(
         Icon(
             modifier = Modifier
                 .size(32.dp)
-                .customClickable(onClick = onSaveClick),
+                .customClickable(onClick = uiStateHolder::onSaveClicked),
             imageVector = Icons.Filled.Check,
             tint = Color.Green,
             contentDescription = ""
@@ -106,14 +96,7 @@ fun ScriptMenu(
 private fun ScriptMenuDefaultPreview() {
     ScriptMenu(
         menuState = MenuState.Recording(),
-        paramKeys = persistentSetOf(),
-        onRecordingClick = {},
-        onCvModeClick = {},
-        onTextModeClick = {},
-        onKeyboardClick = {},
-        onTimeoutClick = {},
-        onSaveClick = {},
-        onCancelClick = {},
+        uiStateHolder = MenuPreviewUiStateHolder(),
     )
 }
 
@@ -125,13 +108,6 @@ private fun ScriptMenuRecordingPreview() {
             controlRecording = true,
             customTimeout = true,
         ),
-        paramKeys = persistentSetOf(TEMPLATE, TEXT, TYPE_TEXT),
-        onRecordingClick = {},
-        onCvModeClick = {},
-        onTextModeClick = {},
-        onKeyboardClick = {},
-        onTimeoutClick = {},
-        onSaveClick = {},
-        onCancelClick = {},
+        uiStateHolder = MenuPreviewUiStateHolder(),
     )
 }

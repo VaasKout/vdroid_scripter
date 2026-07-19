@@ -4,7 +4,6 @@ import com.vision.scripter.streaming.impl.blocks.menu.state.DialogState
 import com.vision.scripter.streaming.impl.screen.main.ui.StreamingUiState
 import com.vision.scripter.ui.states.LoadingState
 import dagger.hilt.android.scopes.ViewModelScoped
-import kotlinx.collections.immutable.toImmutableSet
 import kotlinx.collections.immutable.toPersistentList
 import javax.inject.Inject
 
@@ -32,8 +31,6 @@ class StreamingUiStateMapper @Inject constructor() {
             keyboardButtons = keyboardButtons.toPersistentList(),
             menuState = menuState,
             dialogState = dialogState,
-            recordTimeout = state.record.timeout,
-            paramKeys = state.record.params.map { it.type }.toImmutableSet(),
         )
     }
 }

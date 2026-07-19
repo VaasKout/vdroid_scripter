@@ -111,6 +111,10 @@ class StreamingInteractor @Inject constructor(
 
     private suspend fun handleMenuEvent(event: MenuEvent) {
         when (event) {
+            is MenuEvent.CvModeClicked -> {
+                cvUseCase.nextCvMode(event.cvMode)
+            }
+
             is MenuEvent.SaveClicked -> {
                 if (event.param == null) {
                     saveScript()
@@ -136,7 +140,7 @@ class StreamingInteractor @Inject constructor(
                 }
             }
 
-            MenuEvent.RecordCancelled -> _stateFlow.update {
+            is MenuEvent.RecordCancelled -> _stateFlow.update {
                 it.copy(record = StreamingState.Record())
             }
 
@@ -155,7 +159,7 @@ class StreamingInteractor @Inject constructor(
                 menuInteractor.onTextSearchSuccess(text = event.text, locale = event.locale)
             }
 
-            MenuEvent.KeyboardInit -> {
+            is MenuEvent.KeyboardInit -> {
                 val result = scripterRepository.resetKeyboard(
                     serial = currentState.serial,
                     locale = currentState.record.locale,
@@ -166,20 +170,16 @@ class StreamingInteractor @Inject constructor(
             }
 
             is MenuEvent.EditKeyboardButton -> {
-                val menuState = menuInteractor.observeMenuState().value
-                val oldName = (menuState as? MenuState.Keyboard)?.oldKey.orEmpty()
                 val screenSizes = videoUseCase.observeScreenSizes().value ?: return
                 val success = cvUseCase.editKeyboardSelectedRectangle(
                     serial = currentState.serial,
                     locale = currentState.record.locale,
-                    oldName = oldName,
-                    newName = event.name,
+                    oldName = event.oldKey,
+                    newName = event.newKey,
                     screenSizes = screenSizes,
                 )
-                menuInteractor.hideDialog()
                 cvUseCase.clearSelectedRectangles()
                 if (success) {
-                    menuInteractor.setKeyboardLoadingState(true)
                     getOrResetKeyboard()
                     return
                 }
@@ -199,6 +199,10 @@ class StreamingInteractor @Inject constructor(
 
             is MenuEvent.TimeoutSaved -> _stateFlow.update {
                 it.copy(record = it.record.copy(timeout = event.timeout))
+            }
+
+            is MenuEvent.ClearRectangles -> {
+                cvUseCase.clearAllRectangles()
             }
         }
     }
@@ -430,6 +434,7 @@ class StreamingInteractor @Inject constructor(
     }
 
     private suspend fun getOrResetKeyboard() {
+        menuInteractor.setKeyboardLoadingState(true)
         val keyboardResult = scripterRepository.getKeyboard(
             serial = currentState.serial,
             locale = currentState.record.locale,

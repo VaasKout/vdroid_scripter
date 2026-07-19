@@ -75,7 +75,7 @@ class MenuInteractor @Inject constructor(
                 )
             }
 
-            else -> Unit
+            else -> {}
         }
     }
 
@@ -83,29 +83,33 @@ class MenuInteractor @Inject constructor(
         when (val state = _menuState.value) {
             is MenuState.Recording -> {
                 _menuState.update { MenuState.SelectingCV(cvMode = CVMode.CV_RECTS) }
+                _events.tryEmit(MenuEvent.CvModeClicked(CVMode.CV_RECTS))
             }
 
             is MenuState.SelectingCV -> {
                 val cvMode = state.cvMode.toggleDetection()
                 _menuState.update { state.copy(cvMode = cvMode) }
+                _events.tryEmit(MenuEvent.CvModeClicked(cvMode))
             }
 
             is MenuState.Usual -> {
                 val newCvMode = state.cvMode.increment()
                 _menuState.update { state.copy(cvMode = newCvMode) }
+                _events.tryEmit(MenuEvent.CvModeClicked(newCvMode))
             }
 
-            else -> Unit
+            else -> {}
         }
     }
 
     override fun onTextModeClicked() {
-        when (_menuState.value) {
-            is MenuState.Recording -> _dialogState.update { DialogState.TEXT }
-            is MenuState.SelectingText -> _dialogState.update { DialogState.TEXT }
-            is MenuState.Usual -> _dialogState.update { DialogState.TEXT }
-            else -> Unit
+        val state = _menuState.value
+        if (state is MenuState.Usual && state.textHighlighted) {
+            _menuState.update { state.copy(textHighlighted = false) }
+            _events.tryEmit(MenuEvent.ClearRectangles)
+            return
         }
+        _dialogState.update { DialogState.TEXT }
     }
 
     override fun onTryToFindText(text: String, locale: String) {
@@ -122,10 +126,10 @@ class MenuInteractor @Inject constructor(
             }
 
             is MenuState.Usual -> _menuState.update {
-                state.copy(cvMode = CVMode.NO_CV)
+                state.copy(cvMode = CVMode.NO_CV, textHighlighted = true)
             }
 
-            else -> Unit
+            else -> {}
         }
     }
 
@@ -144,8 +148,16 @@ class MenuInteractor @Inject constructor(
         _menuState.update { newState }
     }
 
-    override fun onEditKeyboardButtonSaved(name: String) {
-        _events.tryEmit(MenuEvent.EditKeyboardButton(name))
+    override fun onEditKeyboardButtonSaved(newKey: String) {
+        val state = _menuState.value
+        if (state !is MenuState.Keyboard) return
+        hideDialog()
+        _events.tryEmit(
+            MenuEvent.EditKeyboardButton(
+                newKey = newKey,
+                oldKey = state.oldKey,
+            )
+        )
     }
 
     override fun onSaveClicked() {
@@ -203,6 +215,10 @@ class MenuInteractor @Inject constructor(
     override fun onTimeoutSaved(timeout: Int) {
         updateTimeoutState(timeout > 0)
         hideDialog()
+        val menuState = _menuState.value
+        if (menuState is MenuState.Recording) {
+            _menuState.update { menuState.copy(recordTimeout = timeout) }
+        }
         _events.tryEmit(MenuEvent.TimeoutSaved(timeout))
     }
 
@@ -266,7 +282,7 @@ class MenuInteractor @Inject constructor(
         _dialogState.update { DialogState.EDIT_KEYBOARD }
     }
 
-    fun hideDialog() {
+    private fun hideDialog() {
         _dialogState.update { DialogState.NONE }
     }
 

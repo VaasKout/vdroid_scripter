@@ -37,7 +37,7 @@ internal class StreamingPreviewScreenUiStateHolder(state: StreamingUiState) :
     }
 }
 
-internal class StreamingPreviewMenuUiStateHolder : MenuUiStateHolder {
+internal class MenuPreviewUiStateHolder : MenuUiStateHolder {
     override val uiCommandsFlow: CommandFlow<MenuUiCommand>
         get() = throw UnsupportedOperationException()
 
@@ -48,7 +48,7 @@ internal class StreamingPreviewMenuUiStateHolder : MenuUiStateHolder {
     override fun onKeyboardClicked() {}
     override fun onKeyboardInitClicked() {}
     override fun onKeyboardEdited(addNew: Boolean) {}
-    override fun onEditKeyboardButtonSaved(name: String) {}
+    override fun onEditKeyboardButtonSaved(newKey: String) {}
     override fun onRecordingClicked() {}
     override fun onSaveClicked() {}
     override fun onExpandClicked() {}

@@ -18,14 +18,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.vision.scripter.streaming.impl.blocks.menu.state.MenuUiStateHolder
+import com.vision.scripter.streaming.impl.screen.main.ui.MenuPreviewUiStateHolder
 import com.vision.scripter.ui.customClickable
 
 @Composable
 fun SelectingTextMenu(
     modifier: Modifier = Modifier,
-    onTextModeClick: () -> Unit,
-    onSaveClick: () -> Unit,
-    onBackClick: () -> Unit,
+    uiStateHolder: MenuUiStateHolder,
 ) {
     Column(
         modifier = modifier
@@ -40,7 +40,7 @@ fun SelectingTextMenu(
         Icon(
             modifier = Modifier
                 .size(32.dp)
-                .customClickable(onClick = onTextModeClick),
+                .customClickable(onClick = uiStateHolder::onTextModeClicked),
             imageVector = Icons.Filled.TextFields,
             tint = Color.Red,
             contentDescription = ""
@@ -49,7 +49,7 @@ fun SelectingTextMenu(
         Icon(
             modifier = Modifier
                 .size(32.dp)
-                .customClickable(onClick = onSaveClick),
+                .customClickable(onClick = uiStateHolder::onSaveClicked),
             imageVector = Icons.Filled.Check,
             tint = Color.Green,
             contentDescription = ""
@@ -58,7 +58,7 @@ fun SelectingTextMenu(
         Icon(
             modifier = Modifier
                 .size(32.dp)
-                .customClickable(onClick = onBackClick),
+                .customClickable(onClick = uiStateHolder::onCancelClicked),
             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
             tint = MaterialTheme.colorScheme.onSurface,
             contentDescription = ""
@@ -70,8 +70,6 @@ fun SelectingTextMenu(
 @Composable
 fun SelectingTextMenuPreview() {
     SelectingTextMenu(
-        onTextModeClick = {},
-        onSaveClick = {},
-        onBackClick = {},
+        uiStateHolder = MenuPreviewUiStateHolder(),
     )
 }
