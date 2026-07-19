@@ -20,6 +20,20 @@ const (
 	ScriptNameIsEmpty = "script name is empty"
 )
 
+type SaveZoneDto struct {
+	Serial    string           `json:"serial"`
+	Node      string           `json:"node"`
+	Name      string           `json:"name"`
+	Value     string           `json:"value"`
+	Rectangle models.Rectangle `json:"rectangle"`
+}
+
+func (s *SaveZoneDto) Valid() bool {
+	return s != nil && strings.TrimSpace(s.Serial) != "" &&
+		strings.TrimSpace(s.Node) != "" && strings.TrimSpace(s.Name) != "" &&
+		strings.TrimSpace(s.Value) != "" && s.Rectangle.IsNotEmpty()
+}
+
 // ScriptsUseCase ...
 type ScriptsUseCase interface {
 	GetNodes(node string) ([]string, error)
@@ -27,37 +41,27 @@ type ScriptsUseCase interface {
 	DeleteScript(node string, scriptName string) error
 	RunScript(serial string, node string, scriptName string, basePort int) error
 
-	SaveZone(
-		serial string,
-		node string,
-		name string,
-		zone *models.Rectangle,
-	) bool
+	SaveZone(saveZone *SaveZoneDto) bool
 	SaveScript(data *models.Script) bool
 	FindText(serial string, text string, locale string) []cv.OCRResult
 }
 
-func (i *interactorImpl) SaveZone(
-	serial string,
-	node string,
-	name string,
-	zone *models.Rectangle,
-) bool {
-	if zone.IsEmpty() || strings.TrimSpace(node) == "" || strings.TrimSpace(name) == "" {
+func (i *interactorImpl) SaveZone(saveZone *SaveZoneDto) bool {
+	if !saveZone.Valid() {
 		return false
 	}
-	var tmpDir = i.filesDB.CreateScriptDir(node, name)
-	var tmpImg = filepath.Join(tmpDir, filesdb.TmpZone)
+	var scriptDir = i.filesDB.CreateScriptDir(saveZone.Node, saveZone.Name)
+	var tmpImg = filepath.Join(scriptDir, saveZone.Value)
 	created := file.CreateFileIfNotExist(tmpImg)
 	if !created {
 		return false
 	}
 
-	screenShot := i.cmd.ScreenShot(serial)
+	screenShot := i.cmd.ScreenShot(saveZone.Serial)
 	if screenShot == "" {
 		return false
 	}
-	imgRect := zone.ToImageRectangle()
+	imgRect := saveZone.Rectangle.ToImageRectangle()
 	i.cv.CutZone(screenShot, tmpImg, imgRect)
 	return true
 }

@@ -1,6 +1,7 @@
 package server
 
 import (
+	"android_vision_scripter/internal/usecases"
 	"android_vision_scripter/pkg/models"
 	"encoding/json"
 	"net/http"
@@ -172,24 +173,14 @@ func (s *serverImpl) handleRunScript(w http.ResponseWriter, r *http.Request) {
 func (s *serverImpl) handleSaveRectangle(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 
-	var data struct {
-		Serial    string           `json:"serial"`
-		Node      string           `json:"node"`
-		Name      string           `json:"name"`
-		Rectangle models.Rectangle `json:"rectangle"`
-	}
-	err := json.NewDecoder(r.Body).Decode(&data)
-	if err != nil || data.Serial == "" {
+	var saveZone = &usecases.SaveZoneDto{}
+	err := json.NewDecoder(r.Body).Decode(saveZone)
+	if err != nil || !saveZone.Valid() {
 		http.Error(w, "Invalid JSON", http.StatusBadRequest)
 		return
 	}
 
-	saved := s.interactor.SaveZone(
-		data.Serial,
-		data.Node,
-		data.Name,
-		&data.Rectangle,
-	)
+	saved := s.interactor.SaveZone(saveZone)
 	if saved {
 		s.sendStatusOk(w)
 		return
