@@ -41,7 +41,6 @@ type Script struct {
 
 // Parameter ...
 type Parameter struct {
-	ID     int    `json:"id"`
 	Type   string `json:"type"`
 	Value  string `json:"value"`
 	Locale string `json:"locale,omitempty"`

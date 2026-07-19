@@ -71,15 +71,15 @@ func (i *interactorImpl) SaveScript(data *models.Script) bool {
 	var lastParam = &models.Parameter{}
 	if len(data.Params) > 0 {
 		lastParam = &data.Params[len(data.Params)-1]
-		lastParam.ID = len(data.Params)
 	}
 
+	// TODO for all params
 	if lastParam.Type == models.Template {
 		scriptDir := i.filesDB.CreateScriptDir(data.Node, data.Name)
 		tmpDir := i.filesDB.CreateScriptDir(filesdb.TmpDir)
 		tmpImg := filepath.Join(tmpDir, filesdb.TmpZone)
 		if tmpImg != "" {
-			newImagePath := filepath.Join(scriptDir, fmt.Sprintf("%d.png", lastParam.ID))
+			newImagePath := filepath.Join(scriptDir, fmt.Sprintf("%s.png", lastParam.Value))
 			os.Rename(tmpImg, newImagePath)
 		}
 		i.filesDB.DeletePathInScriptDir(filesdb.TmpDir)
@@ -133,9 +133,13 @@ func (i *interactorImpl) GetNodes(node string) ([]string, error) {
 	node = strings.TrimSpace(node)
 	scriptsDir := i.filesDB.CreateScriptDir(node)
 	dirs := i.filesDB.GetDirs(scriptsDir, false)
-	names := make([]string, len(dirs))
-	for index, script := range dirs {
-		names[index] = filepath.Base(script)
+	names := make([]string, 0, len(dirs))
+	for _, script := range dirs {
+		name := filepath.Base(script)
+		if name == filesdb.TmpDir {
+			continue
+		}
+		names = append(names, name)
 	}
 	return names, nil
 }

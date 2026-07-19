@@ -182,7 +182,7 @@ func (i *interactorImpl) findRectangle(
 	}
 
 	if models.ImageRectIsEmpty(foundRect) {
-		return nil, fmt.Errorf("rectangle for step %d not found", param.ID)
+		return nil, fmt.Errorf("rectangle for step %s not found", param.Value)
 	}
 
 	return foundRect, nil
@@ -196,7 +196,7 @@ func (i *interactorImpl) findRectByFlag(
 ) (*image.Rectangle, error) {
 
 	if param.Type == models.Template {
-		tmpImage := filepath.Join(scriptDir, fmt.Sprintf("%d.png", param.ID))
+		tmpImage := filepath.Join(scriptDir, fmt.Sprintf("%s.png", param.Value))
 		if !file.Exists(tmpImage) {
 			return nil, fmt.Errorf("template file not found: %s", tmpImage)
 		}
