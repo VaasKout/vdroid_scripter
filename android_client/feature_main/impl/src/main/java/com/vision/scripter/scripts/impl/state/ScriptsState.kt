@@ -5,8 +5,11 @@ import com.vision.scripter.ui.states.LoadingState
 
 data class ScriptsState(
     val loadingState: LoadingState = LoadingState.LoadingOnStart,
+    val nodes: List<String> = listOf(),
+    val selectedNode: String = "",
     val scripts: List<String> = listOf(),
-    val scriptToDelete: String = "",
+    val deleteTarget: String = "",
+    val deleteIsNode: Boolean = false,
     val scriptToRun: String = "",
     val devices: List<AdbDevice> = listOf(),
     val isDevicesLoading: Boolean = false,

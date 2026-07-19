@@ -56,6 +56,7 @@ fun VideoScreen(
                         .align(Alignment.TopEnd)
                         .padding(top = 128.dp),
                     menuState = state.menuState,
+                    paramKeys = state.paramKeys,
                     onScriptModeClick = menuUiStateHolder::onScriptModeClicked,
                     onKeyboardClick = menuUiStateHolder::onKeyboardClicked,
                     onCvModeClick = menuUiStateHolder::onCvModeClicked,
@@ -70,7 +71,7 @@ fun VideoScreen(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
                         .padding(top = 128.dp),
-                    flags = state.menuState.flags,
+                    cvMode = state.menuState.cvMode,
                     onCvModeClick = menuUiStateHolder::onCvModeClicked,
                     onSaveClick = menuUiStateHolder::onSaveClicked,
                     onBackClick = menuUiStateHolder::onCancelClicked,
@@ -82,7 +83,6 @@ fun VideoScreen(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
                         .padding(top = 128.dp),
-                    flags = state.menuState.flags,
                     onTextModeClick = menuUiStateHolder::onTextModeClicked,
                     onSaveClick = menuUiStateHolder::onSaveClicked,
                     onBackClick = menuUiStateHolder::onCancelClicked,
@@ -95,6 +95,7 @@ fun VideoScreen(
                         .align(Alignment.TopEnd)
                         .padding(top = 128.dp),
                     menuState = state.menuState,
+                    paramKeys = state.paramKeys,
                     onRecordingClick = menuUiStateHolder::onRecordingClicked,
                     onCvModeClick = menuUiStateHolder::onCvModeClicked,
                     onTextModeClick = menuUiStateHolder::onTextModeClicked,

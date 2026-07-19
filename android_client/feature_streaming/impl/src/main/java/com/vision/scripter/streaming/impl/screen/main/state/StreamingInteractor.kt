@@ -8,13 +8,13 @@ import androidx.core.net.toUri
 import com.vision.scripter.coroutines.api.CoroutineScopeFactory
 import com.vision.scripter.data.api.ControlStreamer
 import com.vision.scripter.data.api.ScripterRepository
+import com.vision.scripter.data.api.models.Event
+import com.vision.scripter.data.api.models.Parameter
 import com.vision.scripter.data.api.models.RectangleWithText
-import com.vision.scripter.data.api.models.ScriptStep
-import com.vision.scripter.data.api.models.StepEvent
+import com.vision.scripter.data.api.models.Script
 import com.vision.scripter.data.api.models.StreamingData
 import com.vision.scripter.data.api.models.adjustToClient
 import com.vision.scripter.data.api.models.contains
-import com.vision.scripter.data.api.models.extractPressEvent
 import com.vision.scripter.network.api.ApiResponse
 import com.vision.scripter.prefs.api.DataStoreRepository
 import com.vision.scripter.streaming.impl.blocks.menu.state.MenuEvent
@@ -111,45 +111,30 @@ class StreamingInteractor @Inject constructor(
 
     private suspend fun handleMenuEvent(event: MenuEvent) {
         when (event) {
-            is MenuEvent.SaveTemplate -> {
-                val label =
-                    cvUseCase.observeSelectedRectangles().value.firstOrNull()?.label.orEmpty()
-                _stateFlow.update {
-                    it.copy(record = it.record.copy(flags = event.flags, label = label))
+            is MenuEvent.SaveClicked -> {
+                if (event.param == null) {
+                    saveScript()
+                    return
                 }
-                if (event.flags.templateFlag() != 0) {
+                if (event.param.type == TEMPLATE) {
                     val screenSizes = videoUseCase.observeScreenSizes().value ?: return
                     cvUseCase.saveSelectedRectangle(
                         serial = currentState.serial,
                         screenSizes = screenSizes,
                     )
+                    addParam(Parameter(type = TEMPLATE))
+                    return
+                }
+                if (event.param.type == YOLO_CLASS) {
+                    val label =
+                        cvUseCase.observeSelectedRectangles().value.firstOrNull()?.label.orEmpty()
+                    addParam(Parameter(type = YOLO_CLASS, value = label))
+                    return
+                }
+                if (event.param.type.isNotEmpty()) {
+                    addParam(event.param)
                 }
             }
-
-            is MenuEvent.SaveText -> _stateFlow.update {
-                it.copy(
-                    record = it.record.copy(
-                        text = event.text,
-                        locale = event.locale,
-                        flags = event.flags,
-                    )
-                )
-            }
-
-            is MenuEvent.SaveTyping -> {
-                val pressEvent = currentState.record.stepEvents.extractPressEvent()
-                _stateFlow.update {
-                    it.copy(
-                        record = it.record.copy(
-                            text = event.text,
-                            flags = event.flags,
-                            stepEvents = pressEvent,
-                        )
-                    )
-                }
-            }
-
-            MenuEvent.SaveStep -> saveStep()
 
             MenuEvent.RecordCancelled -> _stateFlow.update {
                 it.copy(record = StreamingState.Record())
@@ -401,7 +386,7 @@ class StreamingInteractor @Inject constructor(
             (System.nanoTime() - startRecordingTime) / 1_000_000L
         }
 
-        val newStepEvent = StepEvent(
+        val newEvent = Event(
             time = elapsedMs,
             data = bytesArray,
         )
@@ -409,33 +394,38 @@ class StreamingInteractor @Inject constructor(
         _stateFlow.update {
             it.copy(
                 record = it.record.copy(
-                    stepEvents = it.record.stepEvents + newStepEvent
+                    events = it.record.events + newEvent
                 )
             )
         }
     }
 
-    private suspend fun saveStep() {
+    private fun addParam(param: Parameter) {
+        _stateFlow.update {
+            it.copy(record = it.record.copy(params = it.record.params + param))
+        }
+    }
+
+    private suspend fun saveScript() {
         val record = currentState.record
-        val success = scripterRepository.saveScriptStep(
-            serial = currentState.serial,
-            name = record.recordName,
-            step = ScriptStep(
-                events = record.stepEvents,
-                flags = record.flags,
-                text = record.text,
-                label = record.label,
-                locale = record.locale,
+        val success = scripterRepository.saveScript(
+            Script(
+                name = record.recordName,
+                node = record.node,
+                params = record.params,
+                events = record.events,
                 timeout = record.timeout,
             ),
         )
         if (!success) return
 
-        uiCommandsFlow.tryEmit(StreamingUiCommand.ShowStepSavedSnackbar)
+        uiCommandsFlow.tryEmit(StreamingUiCommand.ShowScriptSavedSnackbar)
         startRecordingTime = 0L
-        menuInteractor.onStepSaved()
+        menuInteractor.onScriptSaved()
+        cvUseCase.nextCvMode(CVMode.NO_CV)
+        cvUseCase.clearAllRectangles()
         _stateFlow.update {
-            it.copy(record = it.record.clearStep())
+            it.copy(record = it.record.clear())
         }
     }
 

@@ -50,9 +50,14 @@ internal class ScriptsInteractor @Inject constructor(
                 )
             }
 
-            when (val result = scripterRepository.getScripts()) {
-                is ApiResponse.Success -> {
-                    _stateFlow.update { it.copy(scripts = result.data) }
+            val node = currentState.selectedNode
+            val result = if (node.isEmpty()) scripterRepository.getNodes()
+            else scripterRepository.getNodeScripts(node)
+
+            when (result) {
+                is ApiResponse.Success -> _stateFlow.update {
+                    if (node.isEmpty()) it.copy(nodes = result.data)
+                    else it.copy(scripts = result.data)
                 }
 
                 is ApiResponse.Error -> {
@@ -67,6 +72,16 @@ internal class ScriptsInteractor @Inject constructor(
                 )
             }
         }
+    }
+
+    override fun onNodeClick(node: String) {
+        _stateFlow.update { it.copy(selectedNode = node, scripts = listOf()) }
+        onLoadData(onStart = true)
+    }
+
+    override fun onBack() {
+        _stateFlow.update { it.copy(selectedNode = "", scripts = listOf()) }
+        onLoadData(onStart = true)
     }
 
     override fun onPlayScript(name: String) {
@@ -106,10 +121,11 @@ internal class ScriptsInteractor @Inject constructor(
     override fun onConfirmRunScript() {
         val serial = currentState.selectedSerial
         val name = currentState.scriptToRun
-        if (serial.isEmpty() || name.isEmpty()) return
+        val node = currentState.selectedNode
+        if (serial.isEmpty() || name.isEmpty() || node.isEmpty()) return
 
         coroutineScope.launch {
-            val started = scripterRepository.runScript(serial = serial, name = name)
+            val started = scripterRepository.runScript(serial = serial, node = node, name = name)
             if (!started) uiCommandsFlow.tryEmit(ScriptsUiCommand.ShowNetworkError)
         }
         onDismissDevicePicker()
@@ -126,25 +142,31 @@ internal class ScriptsInteractor @Inject constructor(
         }
     }
 
+    override fun onDeleteNode(node: String) {
+        _stateFlow.update {
+            it.copy(deleteTarget = node, deleteIsNode = true)
+        }
+    }
+
     override fun onDeleteScript(name: String) {
         _stateFlow.update {
-            it.copy(
-                scriptToDelete = name,
-            )
+            it.copy(deleteTarget = name, deleteIsNode = false)
         }
     }
 
     override fun onDismissDeleteDialog() {
         _stateFlow.update {
-            it.copy(
-                scriptToDelete = "",
-            )
+            it.copy(deleteTarget = "", deleteIsNode = false)
         }
     }
 
-    override fun onConfirmDeleteScript() {
+    override fun onConfirmDelete() {
+        val target = currentState.deleteTarget
+        val isNode = currentState.deleteIsNode
+        val node = currentState.selectedNode
         coroutineScope.launch {
-            val deleted = scripterRepository.deleteScript(name = currentState.scriptToDelete)
+            val deleted = if (isNode) scripterRepository.deleteNode(node = target)
+            else scripterRepository.deleteScript(node = node, name = target)
             if (!deleted) uiCommandsFlow.tryEmit(ScriptsUiCommand.ShowNetworkError)
             onDismissDeleteDialog()
             onLoadData(onStart = false)

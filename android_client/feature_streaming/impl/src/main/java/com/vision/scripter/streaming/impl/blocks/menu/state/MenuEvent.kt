@@ -1,10 +1,9 @@
 package com.vision.scripter.streaming.impl.blocks.menu.state
 
+import com.vision.scripter.data.api.models.Parameter
+
 sealed interface MenuEvent {
-    data class SaveTemplate(val flags: Int) : MenuEvent
-    data class SaveText(val text: String, val locale: String, val flags: Int) : MenuEvent
-    data class SaveTyping(val text: String, val flags: Int) : MenuEvent
-    data object SaveStep : MenuEvent
+    data class SaveClicked(val param: Parameter?) : MenuEvent
     data object RecordCancelled : MenuEvent
     data class FindText(val text: String, val locale: String) : MenuEvent
     data object KeyboardInit : MenuEvent

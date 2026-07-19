@@ -76,6 +76,43 @@ fun ScriptItem(
     }
 }
 
+@Composable
+fun NodeItem(
+    modifier: Modifier = Modifier,
+    name: String,
+    onClick: (String) -> Unit,
+    onDeleteClick: (String) -> Unit,
+) {
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .background(color = Color.White, shape = RoundedCornerShape(16.dp))
+            .customClickable(onClick = { onClick(name) })
+            .padding(16.dp),
+    ) {
+        Text(
+            modifier = Modifier.align(Alignment.CenterStart),
+            text = name,
+            color = Color.Black,
+            style = TextStyle(
+                color = Color.Black,
+                fontSize = 24.sp,
+                fontWeight = FontWeight.Bold
+            )
+        )
+
+        Icon(
+            modifier = Modifier
+                .align(Alignment.CenterEnd)
+                .size(32.dp)
+                .customClickable(onClick = { onDeleteClick(name) }),
+            imageVector = Icons.Filled.Delete,
+            tint = Color.Red,
+            contentDescription = ""
+        )
+    }
+}
+
 @Preview
 @Composable
 private fun ScriptItemPreview() {
@@ -83,6 +120,17 @@ private fun ScriptItemPreview() {
         modifier = Modifier.fillMaxWidth(),
         name = "test_1",
         onPlayClick = {},
+        onDeleteClick = {},
+    )
+}
+
+@Preview
+@Composable
+private fun NodeItemPreview() {
+    NodeItem(
+        modifier = Modifier.fillMaxWidth(),
+        name = "main_screen",
+        onClick = {},
         onDeleteClick = {},
     )
 }

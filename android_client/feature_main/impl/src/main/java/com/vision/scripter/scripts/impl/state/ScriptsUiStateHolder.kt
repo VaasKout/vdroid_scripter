@@ -11,13 +11,17 @@ interface ScriptsUiStateHolder {
 
     fun onLoadData(onStart: Boolean)
 
+    fun onNodeClick(node: String)
+    fun onBack()
+
     fun onPlayScript(name: String)
     fun onSelectDevice(serial: String)
     fun onConfirmRunScript()
     fun onDismissDevicePicker()
 
+    fun onDeleteNode(node: String)
     fun onDeleteScript(name: String)
 
     fun onDismissDeleteDialog()
-    fun onConfirmDeleteScript()
+    fun onConfirmDelete()
 }

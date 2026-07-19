@@ -8,9 +8,19 @@ import kotlinx.collections.immutable.persistentListOf
 data class ScriptsUiState(
     val isLoading: Boolean = true,
     val isRefreshing: Boolean = false,
+    val showScripts: Boolean = false,
+    val selectedNode: String = "",
+    val nodes: ImmutableList<String> = persistentListOf(),
     val scripts: ImmutableList<String> = persistentListOf(),
-    val scriptNameToDelete: String = "",
+    val deleteDialog: DeleteDialogData = DeleteDialogData(),
     val devicePickerData: DevicePickerBottomSheetData = DevicePickerBottomSheetData(),
+)
+
+@Immutable
+data class DeleteDialogData(
+    val show: Boolean = false,
+    val name: String = "",
+    val isNode: Boolean = false,
 )
 
 @Immutable

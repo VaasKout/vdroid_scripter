@@ -12,8 +12,15 @@ class ScriptsUiStateMapper @Inject constructor() {
         return ScriptsUiState(
             isLoading = state.loadingState == LoadingState.LoadingOnStart,
             isRefreshing = state.loadingState == LoadingState.RefreshLoading,
+            showScripts = state.selectedNode.isNotEmpty(),
+            selectedNode = state.selectedNode,
+            nodes = state.nodes.toImmutableList(),
             scripts = state.scripts.toImmutableList(),
-            scriptNameToDelete = state.scriptToDelete,
+            deleteDialog = DeleteDialogData(
+                show = state.deleteTarget.isNotEmpty(),
+                name = state.deleteTarget,
+                isNode = state.deleteIsNode,
+            ),
             devicePickerData = DevicePickerBottomSheetData(
                 showDevicePicker = state.scriptToRun.isNotEmpty(),
                 isDevicesLoading = state.isDevicesLoading,

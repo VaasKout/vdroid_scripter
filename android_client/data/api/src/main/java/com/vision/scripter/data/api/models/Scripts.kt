@@ -6,63 +6,47 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 @Serializable
-data class SaveStepRequest(
-    @SerialName("serial")
-    val serial: String,
-    @SerialName("name")
-    val name: String,
-    @SerialName("step")
-    val scriptStep: ScriptStep,
-)
-
-@Serializable
 data class Script(
     @SerialName("name")
     val name: String = "",
-    @SerialName("steps")
-    val steps: List<ScriptStep> = listOf(),
-)
-
-const val EVENT_ON_TEMPLATE = 1 shl 0
-const val EVENT_ON_TEXT = 1 shl 1
-const val EVENT_ON_CLASS = 1 shl 2
-const val TEMPLATE_IS_VISIBLE = 1 shl 3
-const val TEXT_IS_VISIBLE = 1 shl 4
-const val CLASS_IS_VISIBLE = 1 shl 5
-const val TYPE_TEXT = 1 shl 6
-
-@Serializable
-data class ScriptStep(
+    @SerialName("node")
+    val node: String = "",
+    @SerialName("next_node")
+    val nextNode: String = "",
+    @SerialName("params")
+    val params: List<Parameter> = listOf(),
     @SerialName("events")
-    val events: List<StepEvent> = listOf(),
-    @SerialName("flags")
-    val flags: Int = 0,
-    @SerialName("text")
-    val text: String = "",
-    @SerialName("label")
-    val label: String = "",
-    @SerialName("locale")
-    val locale: String = "",
-    @SerialName("command")
-    val command: String = "",
+    val events: List<Event> = listOf(),
     @SerialName("timeout")
     val timeout: Int = 0,
 )
 
-fun ScriptStep.isEmpty(): Boolean {
-    return events.isEmpty() && flags == 0 && text.isEmpty() && command.isEmpty()
+@Serializable
+data class Parameter(
+    @SerialName("id")
+    val id: Int = 0,
+    @SerialName("type")
+    val type: String = "",
+    @SerialName("value")
+    val value: String = "",
+    @SerialName("locale")
+    val locale: String = "",
+)
+
+fun Script.isEmpty(): Boolean {
+    return params.isEmpty() && events.isEmpty()
 }
 
 @Serializable
-data class StepEvent(
+data class Event(
     @SerialName("time")
     val time: Long = 0L,
     @SerialName("data")
     val data: ByteArray? = null,
 )
 
-fun List<StepEvent>.extractPressEvent(): List<StepEvent> {
-    val pressAction = mutableListOf<StepEvent>()
+fun List<Event>.extractPressEvent(): List<Event> {
+    val pressAction = mutableListOf<Event>()
     forEachIndexed { index, event ->
         val data = event.data ?: return@forEachIndexed
         val nextData = if (index < this.size - 1) this[index + 1].data else null

@@ -1,15 +1,10 @@
 package com.vision.scripter.streaming.impl.screen.main.state
 
-import com.vision.scripter.data.api.models.CLASS_IS_VISIBLE
 import com.vision.scripter.data.api.models.CvRectangle
-import com.vision.scripter.data.api.models.EVENT_ON_CLASS
-import com.vision.scripter.data.api.models.EVENT_ON_TEMPLATE
-import com.vision.scripter.data.api.models.EVENT_ON_TEXT
+import com.vision.scripter.data.api.models.Event
+import com.vision.scripter.data.api.models.Parameter
 import com.vision.scripter.data.api.models.RectangleWithText
-import com.vision.scripter.data.api.models.StepEvent
 import com.vision.scripter.data.api.models.StreamingData
-import com.vision.scripter.data.api.models.TEMPLATE_IS_VISIBLE
-import com.vision.scripter.data.api.models.TEXT_IS_VISIBLE
 import com.vision.scripter.streaming.impl.blocks.video.VideoCodec
 import com.vision.scripter.ui.states.LoadingState
 
@@ -20,6 +15,14 @@ const val PHONE = "phone"
 const val SPACE_KEY = "space"
 
 const val DEFAULT_TIMEOUT = 15
+
+const val NEW_SCRIPTS_NODE = "new_scripts"
+
+const val TEMPLATE = "template"
+const val YOLO_CLASS = "yolo_class"
+const val TEXT = "text"
+const val TYPE_TEXT = "type_text"
+const val COMMAND = "command"
 
 val locales = listOf(
     ENG,
@@ -49,14 +52,13 @@ data class StreamingState(
 ) {
     data class Record(
         val recordName: String = "",
-        val stepEvents: List<StepEvent> = listOf(),
-        val text: String = "",
-        val label: String = "",
+        val node: String = NEW_SCRIPTS_NODE,
+        val params: List<Parameter> = listOf(),
+        val events: List<Event> = listOf(),
         val locale: String = "",
-        val flags: Int = 0,
         val timeout: Int = DEFAULT_TIMEOUT,
     ) {
-        fun clearStep() = Record(recordName = recordName)
+        fun clear() = Record()
     }
 
     data class Keyboard(
@@ -67,22 +69,19 @@ data class StreamingState(
 sealed interface MenuState {
     data class Usual(
         val cvMode: CVMode = CVMode.NO_CV,
-        val textHighlighted: Boolean = false,
         val expanded: Boolean = false,
     ) : MenuState
 
     data class Recording(
         val controlRecording: Boolean = false,
         val customTimeout: Boolean = false,
-        val flags: Int = 0,
     ) : MenuState
 
     data class SelectingCV(
-        val flags: Int = EVENT_ON_TEMPLATE,
+        val cvMode: CVMode = CVMode.CV_RECTS,
     ) : MenuState
 
     data class SelectingText(
-        val flags: Int = EVENT_ON_TEXT,
         val text: String = "",
         val locale: String = "",
     ) : MenuState
@@ -110,40 +109,13 @@ fun CVMode.increment(): CVMode {
     return newMode ?: CVMode.NO_CV
 }
 
-fun Int.hasFlag(flag: Int): Boolean = this and flag != 0
-
-fun Int.withFlag(flag: Int, enabled: Boolean): Int =
-    if (enabled) this or flag else this and flag.inv()
-
-fun Int.templateFlag(): Int = this and (EVENT_ON_TEMPLATE or TEMPLATE_IS_VISIBLE)
-
-fun Int.textFlag(): Int = this and (EVENT_ON_TEXT or TEXT_IS_VISIBLE)
-
-fun Int.classFlag(): Int = this and (EVENT_ON_CLASS or CLASS_IS_VISIBLE)
-
-fun Int.combineDetection(detection: Int): Int =
-    (this and (EVENT_ON_TEMPLATE or TEMPLATE_IS_VISIBLE or EVENT_ON_CLASS or CLASS_IS_VISIBLE)
-        .inv()) or detection
-
-fun Int.combineText(text: Int): Int =
-    (this and (EVENT_ON_TEXT or TEXT_IS_VISIBLE).inv()) or text
-
-fun Int.nextDetection(): Int = when (this) {
-    EVENT_ON_TEMPLATE -> TEMPLATE_IS_VISIBLE
-    TEMPLATE_IS_VISIBLE -> EVENT_ON_CLASS
-    EVENT_ON_CLASS -> CLASS_IS_VISIBLE
-    CLASS_IS_VISIBLE -> 0
-    else -> EVENT_ON_TEMPLATE
+fun CVMode.toggleDetection(): CVMode = when (this) {
+    CVMode.CV_RECTS -> CVMode.YOLO
+    else -> CVMode.CV_RECTS
 }
 
-fun Int.nextTemplateActive(): Int = when (this) {
-    EVENT_ON_TEMPLATE -> TEMPLATE_IS_VISIBLE
-    TEMPLATE_IS_VISIBLE -> EVENT_ON_TEMPLATE
-    else -> EVENT_ON_TEMPLATE
-}
-
-fun Int.nextText(): Int = when (this) {
-    EVENT_ON_TEXT -> TEXT_IS_VISIBLE
-    TEXT_IS_VISIBLE -> 0
-    else -> EVENT_ON_TEXT
+fun CVMode.toType(): String = when (this) {
+    CVMode.CV_RECTS -> TEMPLATE
+    CVMode.YOLO -> YOLO_CLASS
+    else -> ""
 }

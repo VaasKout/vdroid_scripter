@@ -18,13 +18,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import com.vision.scripter.data.api.models.EVENT_ON_TEXT
 import com.vision.scripter.ui.customClickable
 
 @Composable
 fun SelectingTextMenu(
     modifier: Modifier = Modifier,
-    flags: Int,
     onTextModeClick: () -> Unit,
     onSaveClick: () -> Unit,
     onBackClick: () -> Unit,
@@ -44,7 +42,7 @@ fun SelectingTextMenu(
                 .size(32.dp)
                 .customClickable(onClick = onTextModeClick),
             imageVector = Icons.Filled.TextFields,
-            tint = textTint(flags),
+            tint = Color.Red,
             contentDescription = ""
         )
 
@@ -72,7 +70,6 @@ fun SelectingTextMenu(
 @Composable
 fun SelectingTextMenuPreview() {
     SelectingTextMenu(
-        flags = EVENT_ON_TEXT,
         onTextModeClick = {},
         onSaveClick = {},
         onBackClick = {},

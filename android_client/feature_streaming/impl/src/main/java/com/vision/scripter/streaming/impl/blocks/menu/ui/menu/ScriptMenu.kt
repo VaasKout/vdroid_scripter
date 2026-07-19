@@ -19,18 +19,19 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import com.vision.scripter.data.api.models.EVENT_ON_TEMPLATE
-import com.vision.scripter.data.api.models.EVENT_ON_TEXT
-import com.vision.scripter.data.api.models.TEMPLATE_IS_VISIBLE
-import com.vision.scripter.data.api.models.TEXT_IS_VISIBLE
-import com.vision.scripter.data.api.models.TYPE_TEXT
 import com.vision.scripter.streaming.impl.screen.main.state.MenuState
+import com.vision.scripter.streaming.impl.screen.main.state.TEMPLATE
+import com.vision.scripter.streaming.impl.screen.main.state.TEXT
+import com.vision.scripter.streaming.impl.screen.main.state.TYPE_TEXT
 import com.vision.scripter.ui.customClickable
+import kotlinx.collections.immutable.ImmutableSet
+import kotlinx.collections.immutable.persistentSetOf
 
 @Composable
 fun ScriptMenu(
     modifier: Modifier = Modifier,
     menuState: MenuState.Recording,
+    paramKeys: ImmutableSet<String>,
     onRecordingClick: () -> Unit,
     onCvModeClick: () -> Unit,
     onTextModeClick: () -> Unit,
@@ -63,7 +64,7 @@ fun ScriptMenu(
         )
 
         BaseMenuIcons(
-            flags = menuState.flags,
+            paramKeys = paramKeys,
             onCvModeClick = onCvModeClick,
             onTextClick = onTextModeClick,
             onKeyboardClick = onKeyboardClick,
@@ -104,9 +105,8 @@ fun ScriptMenu(
 @Composable
 private fun ScriptMenuDefaultPreview() {
     ScriptMenu(
-        menuState = MenuState.Recording(
-            flags = EVENT_ON_TEMPLATE or TEXT_IS_VISIBLE,
-        ),
+        menuState = MenuState.Recording(),
+        paramKeys = persistentSetOf(),
         onRecordingClick = {},
         onCvModeClick = {},
         onTextModeClick = {},
@@ -123,9 +123,9 @@ private fun ScriptMenuRecordingPreview() {
     ScriptMenu(
         menuState = MenuState.Recording(
             controlRecording = true,
-            flags = TEMPLATE_IS_VISIBLE or EVENT_ON_TEXT or TYPE_TEXT,
             customTimeout = true,
         ),
+        paramKeys = persistentSetOf(TEMPLATE, TEXT, TYPE_TEXT),
         onRecordingClick = {},
         onCvModeClick = {},
         onTextModeClick = {},

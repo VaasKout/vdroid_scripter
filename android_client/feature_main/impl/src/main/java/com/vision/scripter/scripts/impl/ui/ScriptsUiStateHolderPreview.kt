@@ -9,10 +9,10 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 
 internal val scriptsUiStatePreview = ScriptsUiState(
-    scripts = persistentListOf(
-        "test_1",
-        "test_2",
-    )
+    nodes = persistentListOf(
+        "main_screen",
+        "profile",
+    ),
 )
 
 internal class ScriptsScreenUiStateHolderPreview(state: ScriptsUiState) : ScriptsUiStateHolder {
@@ -22,11 +22,14 @@ internal class ScriptsScreenUiStateHolderPreview(state: ScriptsUiState) : Script
         get() = throw UnsupportedOperationException()
 
     override fun onLoadData(onStart: Boolean) {}
+    override fun onNodeClick(node: String) {}
+    override fun onBack() {}
     override fun onPlayScript(name: String) {}
     override fun onSelectDevice(serial: String) {}
     override fun onConfirmRunScript() {}
     override fun onDismissDevicePicker() {}
+    override fun onDeleteNode(node: String) {}
     override fun onDeleteScript(name: String) {}
     override fun onDismissDeleteDialog() {}
-    override fun onConfirmDeleteScript() {}
+    override fun onConfirmDelete() {}
 }
