@@ -25,10 +25,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import com.vision.scripter.streaming.impl.blocks.menu.state.MenuUiStateHolder
+import com.vision.scripter.streaming.impl.blocks.menu.state.MenuState
+import com.vision.scripter.streaming.impl.blocks.menu.ui.MenuPreviewUiStateHolder
+import com.vision.scripter.streaming.impl.blocks.menu.ui.MenuUiStateHolder
+import com.vision.scripter.streaming.impl.blocks.menu.ui.usualMenuPreviewUiState
 import com.vision.scripter.streaming.impl.screen.main.state.CVMode
-import com.vision.scripter.streaming.impl.screen.main.state.MenuState
-import com.vision.scripter.streaming.impl.screen.main.ui.MenuPreviewUiStateHolder
 import com.vision.scripter.ui.customClickable
 
 @Composable
@@ -138,7 +139,7 @@ fun detectionIcon(cvMode: CVMode): ImageVector = when (cvMode) {
 private fun UsualMenuPreview() {
     UsualMenu(
         menuState = MenuState.Usual(),
-        uiStateHolder = MenuPreviewUiStateHolder(),
+        uiStateHolder = MenuPreviewUiStateHolder(usualMenuPreviewUiState),
     )
 }
 
@@ -147,7 +148,7 @@ private fun UsualMenuPreview() {
 private fun UsualExpandedMenuPreview() {
     UsualMenu(
         menuState = MenuState.Usual(expanded = true),
-        uiStateHolder = MenuPreviewUiStateHolder(),
+        uiStateHolder = MenuPreviewUiStateHolder(usualMenuPreviewUiState),
     )
 }
 
@@ -159,6 +160,6 @@ private fun UsualExpandedHighlightedTextPreview() {
             expanded = true,
             localCvMode = CVMode.CV_RECTS,
         ),
-        uiStateHolder = MenuPreviewUiStateHolder(),
+        uiStateHolder = MenuPreviewUiStateHolder(usualMenuPreviewUiState),
     )
 }

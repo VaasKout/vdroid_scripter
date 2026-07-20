@@ -22,10 +22,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import com.vision.scripter.streaming.impl.blocks.menu.state.MenuUiStateHolder
+import com.vision.scripter.streaming.impl.blocks.menu.state.MenuState
+import com.vision.scripter.streaming.impl.blocks.menu.ui.MenuPreviewUiStateHolder
+import com.vision.scripter.streaming.impl.blocks.menu.ui.MenuUiStateHolder
+import com.vision.scripter.streaming.impl.blocks.menu.ui.usualMenuPreviewUiState
 import com.vision.scripter.streaming.impl.screen.main.state.DEFAULT_TIMEOUT
-import com.vision.scripter.streaming.impl.screen.main.state.MenuState
-import com.vision.scripter.streaming.impl.screen.main.ui.MenuPreviewUiStateHolder
 import com.vision.scripter.ui.customClickable
 
 @Composable
@@ -120,7 +121,7 @@ fun ScriptMenu(
 private fun ScriptMenuDefaultPreview() {
     ScriptMenu(
         menuState = MenuState.Recording(),
-        uiStateHolder = MenuPreviewUiStateHolder(),
+        uiStateHolder = MenuPreviewUiStateHolder(usualMenuPreviewUiState),
     )
 }
 
@@ -132,6 +133,6 @@ private fun ScriptMenuRecordingPreview() {
             controlRecording = true,
             recordTimeout = DEFAULT_TIMEOUT + 1,
         ),
-        uiStateHolder = MenuPreviewUiStateHolder(),
+        uiStateHolder = MenuPreviewUiStateHolder(usualMenuPreviewUiState),
     )
 }

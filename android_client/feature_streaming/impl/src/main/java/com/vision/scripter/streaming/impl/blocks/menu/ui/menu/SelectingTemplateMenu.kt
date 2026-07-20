@@ -17,9 +17,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import com.vision.scripter.streaming.impl.blocks.menu.state.MenuUiStateHolder
+import com.vision.scripter.streaming.impl.blocks.menu.ui.MenuPreviewUiStateHolder
+import com.vision.scripter.streaming.impl.blocks.menu.ui.MenuUiStateHolder
+import com.vision.scripter.streaming.impl.blocks.menu.ui.usualMenuPreviewUiState
 import com.vision.scripter.streaming.impl.screen.main.state.CVMode
-import com.vision.scripter.streaming.impl.screen.main.ui.MenuPreviewUiStateHolder
 import com.vision.scripter.ui.customClickable
 
 @Composable
@@ -72,6 +73,6 @@ fun SelectingTemplateMenu(
 fun SelectingTemplateMenuPreview() {
     SelectingTemplateMenu(
         cvMode = CVMode.CV_RECTS,
-        uiStateHolder = MenuPreviewUiStateHolder(),
+        uiStateHolder = MenuPreviewUiStateHolder(usualMenuPreviewUiState),
     )
 }

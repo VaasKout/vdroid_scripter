@@ -1,4 +1,4 @@
-package com.vision.scripter.streaming.impl.blocks.video.ui
+package com.vision.scripter.streaming.impl.blocks.video.ui.items
 
 import android.annotation.SuppressLint
 import android.graphics.SurfaceTexture

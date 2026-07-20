@@ -1,13 +1,5 @@
 package com.vision.scripter.streaming.impl.screen.main.state
 
-import com.vision.scripter.data.api.models.CvRectangle
-import com.vision.scripter.data.api.models.Event
-import com.vision.scripter.data.api.models.Parameter
-import com.vision.scripter.data.api.models.RectangleWithText
-import com.vision.scripter.data.api.models.StreamingData
-import com.vision.scripter.streaming.impl.blocks.video.VideoCodec
-import com.vision.scripter.ui.states.LoadingState
-
 const val ENG = "eng"
 const val RUS = "rus"
 const val NUMBERS = "numbers"
@@ -36,67 +28,6 @@ val keyboardLocales = listOf(
     PHONE,
 )
 
-data class StreamingState(
-    val serial: String = "",
-    val loadingState: LoadingState = LoadingState.LoadingOnStart,
-
-    val connectionEstablished: Boolean = false,
-    val streamingHost: String = "",
-    val videoCodec: VideoCodec = VideoCodec.H264,
-    val streamingData: StreamingData? = null,
-    val cvRectangles: List<CvRectangle> = listOf(),
-    val selectedRectangles: List<CvRectangle> = listOf(),
-
-    val record: Record = Record(),
-    val keyboard: Keyboard = Keyboard(),
-) {
-    data class Record(
-        val recordName: String = "",
-        val node: String = NEW_SCRIPTS_NODE,
-        val params: List<Parameter> = listOf(),
-        val events: List<Event> = listOf(),
-        val locale: String = "",
-        val timeout: Int = DEFAULT_TIMEOUT,
-    )
-
-    data class Keyboard(
-        val buttons: List<RectangleWithText> = listOf(),
-    )
-}
-
-sealed interface MenuState {
-    data class Usual(
-        val localCvMode: CVMode = CVMode.NO_CV,
-        val textHighlighted: Boolean = false,
-        val keyboardHighlighted: Boolean = false,
-        val expanded: Boolean = false,
-    ) : MenuState
-
-    data class Recording(
-        val controlRecording: Boolean = false,
-        val recordTimeout: Int = DEFAULT_TIMEOUT,
-    ) : MenuState
-
-    data class SelectingCV(
-        val cvMode: CVMode = CVMode.CV_RECTS,
-    ) : MenuState
-
-    data class SelectingText(
-        val text: String = "",
-        val locale: String = "",
-    ) : MenuState
-
-    data class Keyboard(
-        val isLoadingKeyboard: Boolean = true,
-        val recordingKeyboard: Boolean = false,
-        val typeText: String = "",
-        val fromUsual: Boolean = false,
-        val oldKey: String = "",
-        val editing: Boolean = false,
-        val showCvRectangles: Boolean = false,
-    ) : MenuState
-}
-
 enum class CVMode(val value: Int) {
     NO_CV(0),
     CV_RECTS(1),
@@ -119,3 +50,7 @@ fun CVMode.toType(): String = when (this) {
     CVMode.YOLO -> YOLO_CLASS
     else -> ""
 }
+
+data class StreamingState(
+    val loading: Boolean = true,
+)

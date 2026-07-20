@@ -1,12 +1,14 @@
-package com.vision.scripter.streaming.impl.blocks.menu.state
+package com.vision.scripter.streaming.impl.blocks.menu.ui
 
 import androidx.compose.runtime.Stable
 import com.vision.scripter.ui.CommandFlow
+import kotlinx.coroutines.flow.StateFlow
 
 @Stable
 interface MenuUiStateHolder {
 
     val uiCommandsFlow: CommandFlow<MenuUiCommand>
+    val uiStateFlow: StateFlow<MenuUiState>
 
     fun onScriptModeClicked()
     fun onCvModeClicked()

@@ -1,0 +1,72 @@
+package com.vision.scripter.streaming.impl.blocks.video.state
+
+import android.annotation.SuppressLint
+import android.media.MediaFormat
+import com.vision.scripter.data.api.models.CvRectangle
+import com.vision.scripter.data.api.models.Event
+import com.vision.scripter.data.api.models.Parameter
+import com.vision.scripter.data.api.models.RectangleWithText
+import com.vision.scripter.data.api.models.StreamingData
+import com.vision.scripter.streaming.impl.screen.main.state.DEFAULT_TIMEOUT
+import com.vision.scripter.streaming.impl.screen.main.state.NEW_SCRIPTS_NODE
+import com.vision.scripter.ui.states.LoadingState
+
+data class VideoState(
+    val serial: String = "",
+    val loadingState: LoadingState = LoadingState.LoadingOnStart,
+
+    val connectionEstablished: Boolean = false,
+    val streamingHost: String = "",
+    val videoCodec: VideoCodec = VideoCodec.H264,
+    val streamingData: StreamingData? = null,
+    val cvRectangles: List<CvRectangle> = listOf(),
+    val selectedRectangles: List<CvRectangle> = listOf(),
+
+    val record: Record = Record(),
+    val keyboard: Keyboard = Keyboard(),
+    val actionState: ActionState = ActionState.None,
+) {
+    data class Record(
+        val recordName: String = "",
+        val node: String = NEW_SCRIPTS_NODE,
+        val params: List<Parameter> = listOf(),
+        val events: List<Event> = listOf(),
+        val timeout: Int = DEFAULT_TIMEOUT,
+    ) {
+        fun lastParam(): Parameter {
+            return this.params.lastOrNull() ?: Parameter()
+        }
+    }
+
+    data class Keyboard(
+        val buttons: List<RectangleWithText> = listOf(),
+    )
+
+    sealed interface ActionState {
+        data object None : ActionState
+        data object Recording : ActionState
+        data object SelectingCV : ActionState
+        data object SelectingText : ActionState
+        data class KeyboardRecording(val typeText: String) : ActionState
+        data class EditingKeyboard(val oldKey: String) : ActionState
+        data object AddingKeyboardKeys : ActionState
+    }
+}
+
+enum class VideoCodec(
+    val id: Int,
+    val codecName: String, // 4-byte ASCII representation of the name
+    val mimeType: String,
+) {
+    H264(0x68323634, "h264", MediaFormat.MIMETYPE_VIDEO_AVC),
+    H265(0x68323635, "h265", MediaFormat.MIMETYPE_VIDEO_HEVC),
+
+    @SuppressLint("InlinedApi")  // introduced in API 29
+    AV1(0x00617631, "av1", MediaFormat.MIMETYPE_VIDEO_AV1);
+
+    companion object {
+        fun findByName(name: String): VideoCodec? {
+            return entries.firstOrNull { it.codecName == name }
+        }
+    }
+}

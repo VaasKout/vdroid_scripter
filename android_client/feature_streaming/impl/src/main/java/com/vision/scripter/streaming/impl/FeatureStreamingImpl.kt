@@ -16,7 +16,6 @@ import androidx.navigation.navArgument
 import com.vision.scripter.streaming.api.FeatureStreaming
 import com.vision.scripter.streaming.api.StreamingRouteWithArgs
 import com.vision.scripter.streaming.api.StreamingSerialArg
-import com.vision.scripter.streaming.impl.screen.main.commandobservers.MenuCommandObserver
 import com.vision.scripter.streaming.impl.screen.main.commandobservers.StreamingCommandObserver
 import com.vision.scripter.streaming.impl.screen.main.state.StreamingViewModel
 import com.vision.scripter.streaming.impl.screen.main.ui.StreamingScreen
@@ -64,17 +63,12 @@ class FeatureStreamingImpl @Inject constructor() : FeatureStreaming {
             StreamingCommandObserver(
                 uiStateHolder = streamingViewModel,
                 snackbarHostState = snackbarHostState,
-            )
-
-            MenuCommandObserver(
-                uiStateHolder = streamingViewModel.menuInteractor,
                 navController = navController,
             )
 
             StreamingScreen(
                 serial = serial,
                 uiStateHolder = streamingViewModel,
-                menuUiStateHolder = streamingViewModel.menuInteractor,
                 snackbarHostState = snackbarHostState,
             )
         }

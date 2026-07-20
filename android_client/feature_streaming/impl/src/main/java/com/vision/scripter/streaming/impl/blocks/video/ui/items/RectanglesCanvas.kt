@@ -1,4 +1,4 @@
-package com.vision.scripter.streaming.impl.blocks.video.ui
+package com.vision.scripter.streaming.impl.blocks.video.ui.items
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.runtime.Composable

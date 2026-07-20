@@ -15,8 +15,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.vision.scripter.streaming.impl.R
-import com.vision.scripter.streaming.impl.blocks.menu.state.MenuUiStateHolder
-import com.vision.scripter.streaming.impl.blocks.video.ui.VideoScreen
+import com.vision.scripter.streaming.impl.blocks.menu.ui.MenuBlock
+import com.vision.scripter.streaming.impl.blocks.video.ui.VideoBlock
 import com.vision.scripter.ui.CustomButton
 import com.vision.scripter.ui.ProvideSnackbarHost
 
@@ -24,7 +24,6 @@ import com.vision.scripter.ui.ProvideSnackbarHost
 internal fun StreamingScreen(
     serial: String,
     uiStateHolder: StreamingUiStateHolder,
-    menuUiStateHolder: MenuUiStateHolder,
     snackbarHostState: SnackbarHostState,
 ) {
     val state = uiStateHolder.uiStateFlow.collectAsStateWithLifecycle(
@@ -36,13 +35,19 @@ internal fun StreamingScreen(
         uiStateHolder.onLoadData(onStart = true)
     }
 
-    if (state.hasConnection) {
-        VideoScreen(
-            modifier = Modifier.fillMaxSize(),
-            state = state,
-            uiStateHolder = uiStateHolder,
-            menuUiStateHolder = menuUiStateHolder,
-        )
+    if (!state.isLoading) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            VideoBlock(
+                modifier = Modifier.fillMaxSize(),
+                sharedStateHolder = uiStateHolder,
+            )
+            MenuBlock(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(top = 128.dp),
+                sharedStateHolder = uiStateHolder,
+            )
+        }
         return
     }
 
@@ -56,20 +61,20 @@ internal fun StreamingScreen(
                 .fillMaxSize()
                 .padding(paddingValues),
         ) {
-            if (state.isLoading) {
-                CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+            if (state.isError) {
+                CustomButton(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp)
+                        .align(Alignment.Center),
+                    text = stringResource(R.string.retry),
+                    onClick = {
+                        uiStateHolder.onLoadData(false)
+                    }
+                )
                 return@Scaffold
             }
-            CustomButton(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp)
-                    .align(Alignment.Center),
-                text = stringResource(R.string.retry),
-                onClick = {
-                    uiStateHolder.onLoadData(false)
-                }
-            )
+            CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
         }
     }
 }
