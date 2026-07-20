@@ -9,8 +9,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Keyboard
 import androidx.compose.material.icons.filled.RadioButtonChecked
+import androidx.compose.material.icons.filled.TextFields
 import androidx.compose.material.icons.filled.Timer
+import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
@@ -20,6 +23,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.vision.scripter.streaming.impl.blocks.menu.state.MenuUiStateHolder
+import com.vision.scripter.streaming.impl.screen.main.state.DEFAULT_TIMEOUT
 import com.vision.scripter.streaming.impl.screen.main.state.MenuState
 import com.vision.scripter.streaming.impl.screen.main.ui.MenuPreviewUiStateHolder
 import com.vision.scripter.ui.customClickable
@@ -53,11 +57,31 @@ fun ScriptMenu(
             contentDescription = ""
         )
 
-        BaseMenuIcons(
-            cvMode = menuState.localCvMode,
-            textHighlighted = menuState.textHighlighted,
-            keyboardHighlighted = menuState.keyboardHighlighted,
-            uiStateHolder = uiStateHolder,
+        Icon(
+            modifier = Modifier
+                .size(32.dp)
+                .customClickable(onClick = uiStateHolder::onCvModeClicked),
+            imageVector = Icons.Filled.Visibility,
+            tint = MaterialTheme.colorScheme.onSurface,
+            contentDescription = "",
+        )
+
+        Icon(
+            modifier = Modifier
+                .size(32.dp)
+                .customClickable(onClick = uiStateHolder::onTextModeClicked),
+            imageVector = Icons.Filled.TextFields,
+            tint = MaterialTheme.colorScheme.onSurface,
+            contentDescription = "",
+        )
+
+        Icon(
+            modifier = Modifier
+                .size(32.dp)
+                .customClickable(onClick = uiStateHolder::onKeyboardClicked),
+            imageVector = Icons.Filled.Keyboard,
+            tint = MaterialTheme.colorScheme.onSurface,
+            contentDescription = "",
         )
 
         Icon(
@@ -66,7 +90,7 @@ fun ScriptMenu(
                 .customClickable(onClick = uiStateHolder::onTimeoutClicked),
             imageVector = Icons.Filled.Timer,
             tint =
-                if (menuState.customTimeout) Color.Red
+                if (menuState.recordTimeout != DEFAULT_TIMEOUT) Color.Red
                 else MaterialTheme.colorScheme.onSurface,
             contentDescription = ""
         )
@@ -106,7 +130,7 @@ private fun ScriptMenuRecordingPreview() {
     ScriptMenu(
         menuState = MenuState.Recording(
             controlRecording = true,
-            customTimeout = true,
+            recordTimeout = DEFAULT_TIMEOUT + 1,
         ),
         uiStateHolder = MenuPreviewUiStateHolder(),
     )

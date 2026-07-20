@@ -112,7 +112,7 @@ func (i *interactorImpl) executeScript(
 
 	var timeout = script.GetTimeout()
 	for index, param := range script.Params {
-		if index < len(script.Params) || len(script.Events) == 0 {
+		if index < len(script.Params)-1 || len(script.Events) == 0 {
 			foundRect, err := i.findRectangle(serial, &param, timeout, scriptDir)
 			if err != nil {
 				i.logger.Error(err.Error())
@@ -123,7 +123,7 @@ func (i *interactorImpl) executeScript(
 			}
 		}
 
-		if len(script.Events) > 0 && index == len(script.Params)-1 {
+		if param.Type != models.TypeText && len(script.Events) > 0 && index == len(script.Params)-1 {
 			foundRect, err := i.findRectangle(serial, &param, timeout, scriptDir)
 			if err != nil {
 				i.logger.Error(err.Error())

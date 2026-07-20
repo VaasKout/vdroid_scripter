@@ -5,7 +5,7 @@ import com.vision.scripter.streaming.impl.screen.main.state.CVMode
 
 sealed interface MenuEvent {
     data class SaveClicked(val param: Parameter?) : MenuEvent
-    data class CvModeClicked(val cvMode: CVMode) : MenuEvent
+    data class NextCvMode(val cvMode: CVMode) : MenuEvent
     data object RecordCancelled : MenuEvent
     data class FindText(val text: String, val locale: String) : MenuEvent
     data object KeyboardInit : MenuEvent
@@ -13,6 +13,4 @@ sealed interface MenuEvent {
     data class SaveLocale(val locale: String) : MenuEvent
     data class SaveRecordName(val name: String) : MenuEvent
     data class TimeoutSaved(val timeout: Int) : MenuEvent
-
-    data object ClearRectangles: MenuEvent
 }

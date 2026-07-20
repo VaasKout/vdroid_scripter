@@ -111,7 +111,12 @@ class StreamingInteractor @Inject constructor(
 
     private suspend fun handleMenuEvent(event: MenuEvent) {
         when (event) {
-            is MenuEvent.CvModeClicked -> {
+            is MenuEvent.NextCvMode -> {
+                if (event.cvMode == CVMode.NO_CV) {
+                    cvUseCase.restoreSelectedRectangles()
+                } else {
+                    cvUseCase.snapshotSelectedRectangles()
+                }
                 cvUseCase.nextCvMode(event.cvMode)
             }
 
@@ -145,8 +150,9 @@ class StreamingInteractor @Inject constructor(
                 }
             }
 
-            is MenuEvent.RecordCancelled -> _stateFlow.update {
-                it.copy(record = StreamingState.Record())
+            is MenuEvent.RecordCancelled -> {
+                _stateFlow.update { it.copy(record = StreamingState.Record()) }
+                cvUseCase.clearAllRectangles()
             }
 
             is MenuEvent.FindText -> {
@@ -204,10 +210,6 @@ class StreamingInteractor @Inject constructor(
 
             is MenuEvent.TimeoutSaved -> _stateFlow.update {
                 it.copy(record = it.record.copy(timeout = event.timeout))
-            }
-
-            is MenuEvent.ClearRectangles -> {
-                cvUseCase.clearAllRectangles()
             }
         }
     }
@@ -306,7 +308,7 @@ class StreamingInteractor @Inject constructor(
             mutex.withLock {
                 try {
                     val menuState = menuInteractor.observeMenuState().value
-                    if (menuState is MenuState.SelectingCV) {
+                    if (menuState is MenuState.SelectingCV || menuState is MenuState.SelectingText) {
                         if (event.action == ACTION_DOWN) {
                             cvUseCase.selectRectangle(x = event.x.toInt(), y = event.y.toInt())
                         }
@@ -434,7 +436,7 @@ class StreamingInteractor @Inject constructor(
         cvUseCase.nextCvMode(CVMode.NO_CV)
         cvUseCase.clearAllRectangles()
         _stateFlow.update {
-            it.copy(record = it.record.clear())
+            it.copy(record = StreamingState.Record())
         }
     }
 

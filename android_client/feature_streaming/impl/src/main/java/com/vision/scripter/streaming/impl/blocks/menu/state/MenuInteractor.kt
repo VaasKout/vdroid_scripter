@@ -83,19 +83,19 @@ class MenuInteractor @Inject constructor(
         when (val state = _menuState.value) {
             is MenuState.Recording -> {
                 _menuState.update { MenuState.SelectingCV(cvMode = CVMode.CV_RECTS) }
-                _events.tryEmit(MenuEvent.CvModeClicked(CVMode.CV_RECTS))
+                _events.tryEmit(MenuEvent.NextCvMode(CVMode.CV_RECTS))
             }
 
             is MenuState.SelectingCV -> {
                 val cvMode = state.cvMode.toggleDetection()
                 _menuState.update { state.copy(cvMode = cvMode) }
-                _events.tryEmit(MenuEvent.CvModeClicked(cvMode))
+                _events.tryEmit(MenuEvent.NextCvMode(cvMode))
             }
 
             is MenuState.Usual -> {
                 val newCvMode = state.localCvMode.increment()
                 _menuState.update { state.copy(localCvMode = newCvMode) }
-                _events.tryEmit(MenuEvent.CvModeClicked(newCvMode))
+                _events.tryEmit(MenuEvent.NextCvMode(newCvMode))
             }
 
             else -> {}
@@ -106,7 +106,7 @@ class MenuInteractor @Inject constructor(
         val state = _menuState.value
         if (state is MenuState.Usual && state.textHighlighted) {
             _menuState.update { state.copy(textHighlighted = false) }
-            _events.tryEmit(MenuEvent.ClearRectangles)
+            _events.tryEmit(MenuEvent.NextCvMode(CVMode.NO_CV))
             return
         }
         _dialogState.update { DialogState.TEXT }
@@ -206,6 +206,7 @@ class MenuInteractor @Inject constructor(
                 _menuState.update { MenuState.Recording() }
             }
         }
+        _events.tryEmit(MenuEvent.NextCvMode(CVMode.NO_CV))
     }
 
     override fun onExitClicked() {
@@ -213,7 +214,6 @@ class MenuInteractor @Inject constructor(
     }
 
     override fun onTimeoutSaved(timeout: Int) {
-        updateTimeoutState(timeout > 0)
         hideDialog()
         val menuState = _menuState.value
         if (menuState is MenuState.Recording) {
@@ -266,15 +266,6 @@ class MenuInteractor @Inject constructor(
         if (state !is MenuState.Keyboard) return
         _menuState.update {
             state.copy(oldKey = oldKey)
-        }
-    }
-
-    private fun updateTimeoutState(customTimeout: Boolean) {
-        val menuState = _menuState.value
-        if (menuState is MenuState.Recording) {
-            _menuState.update {
-                menuState.copy(customTimeout = customTimeout)
-            }
         }
     }
 

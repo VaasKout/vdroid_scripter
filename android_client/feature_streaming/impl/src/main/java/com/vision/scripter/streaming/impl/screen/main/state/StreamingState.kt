@@ -57,9 +57,7 @@ data class StreamingState(
         val events: List<Event> = listOf(),
         val locale: String = "",
         val timeout: Int = DEFAULT_TIMEOUT,
-    ) {
-        fun clear() = Record()
-    }
+    )
 
     data class Keyboard(
         val buttons: List<RectangleWithText> = listOf(),
@@ -76,10 +74,6 @@ sealed interface MenuState {
 
     data class Recording(
         val controlRecording: Boolean = false,
-        val localCvMode: CVMode = CVMode.NO_CV,
-        val textHighlighted: Boolean = false,
-        val keyboardHighlighted: Boolean = false,
-        val customTimeout: Boolean = false,
         val recordTimeout: Int = DEFAULT_TIMEOUT,
     ) : MenuState
 
