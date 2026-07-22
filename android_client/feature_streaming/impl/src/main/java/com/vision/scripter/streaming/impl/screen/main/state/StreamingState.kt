@@ -53,4 +53,5 @@ fun CVMode.toType(): String = when (this) {
 
 data class StreamingState(
     val loading: Boolean = true,
+    val isError: Boolean = false,
 )

@@ -11,14 +11,12 @@ import com.vision.scripter.data.api.models.smallestBy
 import com.vision.scripter.network.api.ApiResponse
 import com.vision.scripter.streaming.impl.screen.main.state.CVMode
 import dagger.hilt.android.scopes.ViewModelScoped
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.serialization.json.Json
 import java.util.concurrent.atomic.AtomicReference
@@ -37,9 +35,7 @@ class CvUseCase @Inject constructor(
 
     private val selectedRectanglesSnapshot = AtomicReference<List<CvRectangle>>(listOf())
 
-    fun observeRectangles(
-        coroutineScope: CoroutineScope,
-    ): StateFlow<List<CvRectangle>> =
+    fun observeRectangles(): Flow<List<CvRectangle>> =
         combine(
             _cvRectanglesFlow,
             _yoloRectanglesFlow,
@@ -50,11 +46,7 @@ class CvUseCase @Inject constructor(
                 CVMode.CV_RECTS -> cvRects
                 CVMode.YOLO -> yoloRects
             }
-        }.stateIn(
-            scope = coroutineScope,
-            started = SharingStarted.WhileSubscribed(),
-            initialValue = listOf(),
-        )
+        }
 
     fun observeSelectedRectangles(): StateFlow<List<CvRectangle>> =
         _selectedRectangles.asStateFlow()

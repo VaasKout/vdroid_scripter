@@ -6,14 +6,14 @@ import com.vision.scripter.data.api.models.CvRectangle
 import com.vision.scripter.data.api.models.Event
 import com.vision.scripter.data.api.models.Parameter
 import com.vision.scripter.data.api.models.RectangleWithText
+import com.vision.scripter.data.api.models.ScreenSizes
 import com.vision.scripter.data.api.models.StreamingData
 import com.vision.scripter.streaming.impl.screen.main.state.DEFAULT_TIMEOUT
 import com.vision.scripter.streaming.impl.screen.main.state.NEW_SCRIPTS_NODE
-import com.vision.scripter.ui.states.LoadingState
 
 data class VideoState(
     val serial: String = "",
-    val loadingState: LoadingState = LoadingState.LoadingOnStart,
+    val screenSizes: ScreenSizes? = null,
 
     val connectionEstablished: Boolean = false,
     val streamingHost: String = "",

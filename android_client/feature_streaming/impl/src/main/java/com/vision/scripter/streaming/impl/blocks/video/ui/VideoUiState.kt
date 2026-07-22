@@ -8,7 +8,7 @@ import kotlinx.collections.immutable.persistentListOf
 
 @Immutable
 data class VideoUiState(
-    val hasConnection: Boolean = false,
+    val connectionEstablished: Boolean = false,
     val rectangles: ImmutableList<CvRectangle> = persistentListOf(),
     val selectedRectangles: ImmutableList<CvRectangle> = persistentListOf(),
     val keyboardButtons: ImmutableList<RectangleWithText> = persistentListOf(),

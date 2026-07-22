@@ -63,13 +63,13 @@ class FeatureStreamingImpl @Inject constructor() : FeatureStreaming {
             StreamingCommandObserver(
                 uiStateHolder = streamingViewModel,
                 snackbarHostState = snackbarHostState,
-                navController = navController,
             )
 
             StreamingScreen(
                 serial = serial,
                 uiStateHolder = streamingViewModel,
                 snackbarHostState = snackbarHostState,
+                navController = navController,
             )
         }
     }

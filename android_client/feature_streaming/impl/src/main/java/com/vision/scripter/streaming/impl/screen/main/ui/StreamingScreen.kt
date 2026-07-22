@@ -14,6 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.navigation.NavController
 import com.vision.scripter.streaming.impl.R
 import com.vision.scripter.streaming.impl.blocks.menu.ui.MenuBlock
 import com.vision.scripter.streaming.impl.blocks.video.ui.VideoBlock
@@ -25,6 +26,7 @@ internal fun StreamingScreen(
     serial: String,
     uiStateHolder: StreamingUiStateHolder,
     snackbarHostState: SnackbarHostState,
+    navController: NavController,
 ) {
     val state = uiStateHolder.uiStateFlow.collectAsStateWithLifecycle(
         initialValue = StreamingUiState(),
@@ -32,25 +34,23 @@ internal fun StreamingScreen(
 
     LaunchedEffect(Unit) {
         uiStateHolder.initArgs(serial = serial)
-        uiStateHolder.onLoadData(onStart = true)
+        uiStateHolder.onLoadData()
     }
 
-    if (!state.isLoading) {
-        Box(modifier = Modifier.fillMaxSize()) {
-            VideoBlock(
-                modifier = Modifier.fillMaxSize(),
-                sharedStateHolder = uiStateHolder,
-            )
-            MenuBlock(
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(top = 128.dp),
-                sharedStateHolder = uiStateHolder,
-            )
-        }
-        return
+    Box(modifier = Modifier.fillMaxSize()) {
+        VideoBlock(
+            modifier = Modifier.fillMaxSize(),
+            serialArg = serial,
+        )
+        MenuBlock(
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(top = 128.dp),
+            navController = navController,
+        )
     }
 
+    if (!state.isError && !state.isLoading) return
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         snackbarHost = { ProvideSnackbarHost(snackbarHostState) },
@@ -68,9 +68,7 @@ internal fun StreamingScreen(
                         .padding(horizontal = 16.dp)
                         .align(Alignment.Center),
                     text = stringResource(R.string.retry),
-                    onClick = {
-                        uiStateHolder.onLoadData(false)
-                    }
+                    onClick = uiStateHolder::onLoadData,
                 )
                 return@Scaffold
             }

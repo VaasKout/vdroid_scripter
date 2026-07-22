@@ -12,12 +12,10 @@ import com.vision.scripter.data.api.models.Event
 import com.vision.scripter.data.api.models.Parameter
 import com.vision.scripter.data.api.models.RectangleWithText
 import com.vision.scripter.data.api.models.Script
-import com.vision.scripter.data.api.models.StreamingData
 import com.vision.scripter.data.api.models.adjustToClient
 import com.vision.scripter.data.api.models.contains
 import com.vision.scripter.network.api.ApiResponse
 import com.vision.scripter.prefs.api.DataStoreRepository
-import com.vision.scripter.streaming.impl.blocks.video.ui.VideoUiCommand
 import com.vision.scripter.streaming.impl.blocks.video.ui.VideoUiState
 import com.vision.scripter.streaming.impl.blocks.video.ui.VideoUiStateHolder
 import com.vision.scripter.streaming.impl.screen.main.state.CVMode
@@ -25,10 +23,12 @@ import com.vision.scripter.streaming.impl.screen.main.state.SPACE_KEY
 import com.vision.scripter.streaming.impl.screen.main.state.TEMPLATE
 import com.vision.scripter.streaming.impl.screen.main.state.TYPE_TEXT
 import com.vision.scripter.streaming.impl.screen.main.state.YOLO_CLASS
+import com.vision.scripter.streaming.impl.shared.ScreenToVideo
+import com.vision.scripter.streaming.impl.shared.StreamingSharedEventsHolder
+import com.vision.scripter.streaming.impl.shared.VideoToMenu
+import com.vision.scripter.streaming.impl.shared.VideoToScreen
 import com.vision.scripter.streaming.impl.usecases.CvUseCase
 import com.vision.scripter.streaming.impl.usecases.VideoUseCase
-import com.vision.scripter.ui.CommandFlow
-import com.vision.scripter.ui.states.LoadingState
 import dagger.hilt.android.scopes.ViewModelScoped
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -39,6 +39,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -56,13 +57,11 @@ class VideoInteractor @Inject constructor(
     private val videoUseCase: VideoUseCase,
     private val controlStreamer: ControlStreamer,
     private val cvUseCase: CvUseCase,
+    private val sharedEvents: StreamingSharedEventsHolder,
 ) : VideoUiStateHolder {
 
     private val coroutineScope: CoroutineScope =
         coroutineScopeFactory.createBackgroundScope("video_interactor")
-
-    override val uiCommandsFlow: CommandFlow<VideoUiCommand> =
-        CommandFlow(coroutineScope)
 
     private val _stateFlow = MutableStateFlow(VideoState())
     private val stateFlow = _stateFlow.asStateFlow()
@@ -85,14 +84,8 @@ class VideoInteractor @Inject constructor(
 
     private var startRecordingTime = 0L
 
-    override fun initArgs(serial: String) {
-        _stateFlow.update {
-            it.copy(serial = serial)
-        }
-    }
-
-    init {
-        cvUseCase.observeRectangles(coroutineScope).onEach { rectangles ->
+    private fun startReactiveStreams() {
+        cvUseCase.observeRectangles().onEach { rectangles ->
             _stateFlow.update {
                 it.copy(cvRectangles = rectangles)
             }
@@ -103,9 +96,53 @@ class VideoInteractor @Inject constructor(
                 it.copy(selectedRectangles = selected)
             }
         }.launchIn(coroutineScope)
+
+        videoUseCase.observeScreenSizes().onEach { screenSizes ->
+            _stateFlow.update {
+                it.copy(screenSizes = screenSizes)
+            }
+        }.launchIn(coroutineScope)
+
+        sharedEvents.sharedEventsFlow.mapNotNull {
+            it as? ScreenToVideo
+        }.onEach {
+            when (it) {
+                is ScreenToVideo.StartLoading -> onLoadData()
+                is ScreenToVideo.InitArgs -> initArgs(it.serial)
+            }
+        }.launchIn(coroutineScope)
     }
 
-    override fun nextCvMode(cvMode: CVMode) {
+    private fun initArgs(serial: String) {
+        _stateFlow.update {
+            it.copy(serial = serial)
+        }
+    }
+
+    private fun onLoadData() {
+        coroutineScope.launch {
+            when (val result = scripterRepository.startSockets(currentState.serial)) {
+                is ApiResponse.Success -> {
+                    val fullServerUri = dataStoreRepository.getServerUrl().toUri()
+                    _stateFlow.update {
+                        it.copy(
+                            streamingHost = fullServerUri.host.orEmpty(),
+                            streamingData = result.data
+                        )
+                    }
+
+                    sharedEvents.emit(VideoToScreen.SuccessLoading)
+                }
+
+                is ApiResponse.Error -> {
+                    sharedEvents.emit(VideoToScreen.ShowNetworkError)
+                }
+            }
+        }
+        startReactiveStreams()
+    }
+
+    private fun nextCvMode(cvMode: CVMode) {
         coroutineScope.launch {
             if (cvMode == CVMode.NO_CV) {
                 cvUseCase.restoreSelectedRectangles()
@@ -116,14 +153,14 @@ class VideoInteractor @Inject constructor(
         }
     }
 
-    override fun saveClicked(parameter: Parameter?) {
+    private fun saveClicked(parameter: Parameter?) {
         coroutineScope.launch {
             if (parameter == null) {
                 saveScript()
                 return@launch
             }
             if (parameter.type == TEMPLATE) {
-                val screenSizes = videoUseCase.observeScreenSizes().value ?: return@launch
+                val screenSizes = currentState.screenSizes ?: return@launch
                 cvUseCase.nextCvMode(CVMode.NO_CV)
                 val templateName = "${currentState.record.params.size + 1}"
                 cvUseCase.saveSelectedRectangle(
@@ -144,99 +181,6 @@ class VideoInteractor @Inject constructor(
             }
             if (parameter.type.isNotEmpty()) {
                 addParam(parameter)
-            }
-        }
-    }
-
-    override fun recordCancelled() {
-        _stateFlow.update { it.copy(record = VideoState.Record()) }
-        cvUseCase.clearAllRectangles()
-    }
-
-    override fun findTextClicked(text: String, locale: String) {
-        coroutineScope.launch {
-            val screenSizes = videoUseCase.observeScreenSizes().value ?: return@launch
-            val found = cvUseCase.findTextRectangles(
-                serial = currentState.serial,
-                text = text,
-                locale = locale,
-                screenSizes = screenSizes,
-            )
-            if (!found) {
-                uiCommandsFlow.tryEmit(VideoUiCommand.ShowNetworkError)
-                return@launch
-            }
-            uiCommandsFlow.tryEmit(VideoUiCommand.TextFound)
-        }
-    }
-
-    override fun initKeyboardClicked() {
-        coroutineScope.launch {
-            val result = scripterRepository.resetKeyboard(
-                serial = currentState.serial,
-                locale = currentState.record.lastParam().locale,
-            )
-            if (result is ApiResponse.Success) {
-                setupKeyboardRects(result.data)
-            }
-        }
-    }
-
-    override fun editKeyboardKeyClicked(key: String) {
-        coroutineScope.launch {
-            val actionState = (currentState.actionState as? VideoState.ActionState.EditingKeyboard)
-                ?: return@launch
-            val screenSizes = videoUseCase.observeScreenSizes().value ?: return@launch
-            val success = cvUseCase.editKeyboardSelectedRectangle(
-                serial = currentState.serial,
-                locale = currentState.record.lastParam().locale,
-                oldName = actionState.oldKey,
-                newName = key,
-                screenSizes = screenSizes,
-            )
-            cvUseCase.clearSelectedRectangles()
-            if (success) {
-                getOrResetKeyboard()
-                return@launch
-            }
-            uiCommandsFlow.tryEmit(VideoUiCommand.ShowNetworkError)
-        }
-    }
-
-    override fun saveKeyboardLocaleClicked(locale: String) {
-        coroutineScope.launch {
-            val newParam = Parameter(type = TYPE_TEXT, locale = locale)
-            val updatedParams = currentState.record.params + newParam
-            _stateFlow.update {
-                it.copy(record = it.record.copy(params = updatedParams))
-            }
-            getOrResetKeyboard()
-        }
-    }
-
-    override fun saveTimeoutClicked(timeout: Int) {
-        _stateFlow.update {
-            it.copy(record = it.record.copy(timeout = timeout))
-        }
-    }
-
-    override fun saveRecordNameClicked(name: String) {
-        _stateFlow.update {
-            it.copy(record = it.record.copy(recordName = name))
-        }
-    }
-
-    override fun onLoadData(onStart: Boolean) {
-        coroutineScope.launch {
-            _stateFlow.update {
-                it.copy(loadingState = LoadingState.LoadingOnStart)
-            }
-            val result = getStreamingData()
-            if (result is ApiResponse.Error) {
-                uiCommandsFlow.tryEmit(VideoUiCommand.ShowNetworkError)
-                _stateFlow.update {
-                    it.copy(loadingState = LoadingState.None)
-                }
             }
         }
     }
@@ -266,18 +210,19 @@ class VideoInteractor @Inject constructor(
                 port = streamingData.cvPort.toInt(),
             )
 
-            val screenSizes = videoUseCase.observeScreenSizes().value
+            val screenSizes = currentState.screenSizes
             val connectionEstablished =
                 videoConnected && controlConnected && cvConnected && screenSizes != null
 
             _stateFlow.update {
-                it.copy(loadingState = LoadingState.None)
+                it.copy(connectionEstablished = connectionEstablished)
             }
 
             if (!connectionEstablished) {
                 _stateFlow.update {
                     it.copy(streamingData = null)
                 }
+                sharedEvents.emit(VideoToScreen.ShowNetworkError)
                 return@launch
             }
 
@@ -337,7 +282,7 @@ class VideoInteractor @Inject constructor(
                         if (event.action == ACTION_UP) appendTypedLetter(letter)
                     }
 
-                    val screenSizes = videoUseCase.observeScreenSizes().value ?: return@launch
+                    val screenSizes = currentState.screenSizes ?: return@launch
                     val bytesArray = controlStreamer.sendControlData(
                         screenSizes = screenSizes,
                         event = event,
@@ -352,6 +297,84 @@ class VideoInteractor @Inject constructor(
         }
     }
 
+    private fun recordCancelled() {
+        _stateFlow.update { it.copy(record = VideoState.Record()) }
+        cvUseCase.clearAllRectangles()
+    }
+
+    private fun findTextClicked(text: String, locale: String) {
+        coroutineScope.launch {
+            val screenSizes = currentState.screenSizes ?: return@launch
+            val found = cvUseCase.findTextRectangles(
+                serial = currentState.serial,
+                text = text,
+                locale = locale,
+                screenSizes = screenSizes,
+            )
+            if (!found) {
+                sharedEvents.emit(VideoToScreen.ShowNetworkError)
+                return@launch
+            }
+            sharedEvents.emit(VideoToMenu.TextFound)
+        }
+    }
+
+    private fun initKeyboardClicked() {
+        coroutineScope.launch {
+            val result = scripterRepository.resetKeyboard(
+                serial = currentState.serial,
+                locale = currentState.record.lastParam().locale,
+            )
+            if (result is ApiResponse.Success) {
+                setupKeyboardRects(result.data)
+            }
+        }
+    }
+
+    private fun editKeyboardKeyClicked(key: String) {
+        coroutineScope.launch {
+            val actionState = (currentState.actionState as? VideoState.ActionState.EditingKeyboard)
+                ?: return@launch
+            val screenSizes = currentState.screenSizes ?: return@launch
+            val success = cvUseCase.editKeyboardSelectedRectangle(
+                serial = currentState.serial,
+                locale = currentState.record.lastParam().locale,
+                oldName = actionState.oldKey,
+                newName = key,
+                screenSizes = screenSizes,
+            )
+            cvUseCase.clearSelectedRectangles()
+            if (success) {
+                getOrResetKeyboard()
+                return@launch
+            }
+            sharedEvents.emit(VideoToScreen.ShowNetworkError)
+        }
+    }
+
+    private fun saveKeyboardLocaleClicked(locale: String) {
+        coroutineScope.launch {
+            val newParam = Parameter(type = TYPE_TEXT, locale = locale)
+            val updatedParams = currentState.record.params + newParam
+            _stateFlow.update {
+                it.copy(record = it.record.copy(params = updatedParams))
+            }
+            getOrResetKeyboard()
+        }
+    }
+
+    private fun saveTimeoutClicked(timeout: Int) {
+        _stateFlow.update {
+            it.copy(record = it.record.copy(timeout = timeout))
+        }
+    }
+
+    private fun saveRecordNameClicked(name: String) {
+        _stateFlow.update {
+            it.copy(record = it.record.copy(recordName = name))
+        }
+    }
+
     private fun selectKeyboardKey(event: MotionEvent): Boolean {
         val actionState = currentState.actionState
         if (actionState is VideoState.ActionState.EditingKeyboard) {
@@ -359,12 +382,12 @@ class VideoInteractor @Inject constructor(
                 it.contains(x = event.x.toInt(), y = event.y.toInt())
             } ?: return false
             cvUseCase.setSelectedRectangle(button.rectangle)
-            uiCommandsFlow.tryEmit(VideoUiCommand.SelectKeyboardKey(button.text))
+            sharedEvents.emit(VideoToMenu.SelectKeyboardKey(button.text))
             return true
         }
         if (actionState == VideoState.ActionState.AddingKeyboardKeys) {
             cvUseCase.selectRectangle(x = event.x.toInt(), y = event.y.toInt())
-            uiCommandsFlow.tryEmit(VideoUiCommand.SelectKeyboardKey(""))
+            sharedEvents.emit(VideoToMenu.SelectKeyboardKey(""))
             return true
         }
         return false
@@ -413,9 +436,9 @@ class VideoInteractor @Inject constructor(
         )
         if (!success) return
 
-        uiCommandsFlow.tryEmit(VideoUiCommand.ShowScriptSavedSnackbar)
+        sharedEvents.emit(VideoToScreen.ShowScriptSavedSnackbar)
         startRecordingTime = 0L
-        uiCommandsFlow.tryEmit(VideoUiCommand.ScriptSaved)
+        sharedEvents.emit(VideoToMenu.ScriptSaved)
 
         cvUseCase.nextCvMode(CVMode.NO_CV)
         cvUseCase.clearAllRectangles()
@@ -425,7 +448,7 @@ class VideoInteractor @Inject constructor(
     }
 
     private suspend fun getOrResetKeyboard() {
-        uiCommandsFlow.tryEmit(VideoUiCommand.SetKeyboardLoading(true))
+        sharedEvents.emit(VideoToMenu.SetKeyboardLoading(true))
         val keyboardResult = scripterRepository.getKeyboard(
             serial = currentState.serial,
             locale = currentState.record.lastParam().locale,
@@ -447,7 +470,7 @@ class VideoInteractor @Inject constructor(
     }
 
     private fun setupKeyboardRects(data: List<RectangleWithText>) {
-        val screenSizes = videoUseCase.observeScreenSizes().value ?: return
+        val screenSizes = currentState.screenSizes ?: return
         val buttons = data.mapNotNull {
             val rectangle = it.rectangle ?: return@mapNotNull null
             it.copy(rectangle = rectangle.adjustToClient(screenSizes))
@@ -456,7 +479,7 @@ class VideoInteractor @Inject constructor(
         _stateFlow.update {
             it.copy(keyboard = it.keyboard.copy(buttons = buttons))
         }
-        uiCommandsFlow.tryEmit(VideoUiCommand.SetKeyboardLoading(false))
+        sharedEvents.emit(VideoToMenu.SetKeyboardLoading(false))
     }
 
     fun appendTypedLetter(letter: String) {
@@ -473,27 +496,7 @@ class VideoInteractor @Inject constructor(
     }
 
     private fun showKeyboardError() {
-        uiCommandsFlow.tryEmit(VideoUiCommand.SetKeyboardLoading(false))
-        uiCommandsFlow.tryEmit(VideoUiCommand.ShowNetworkError)
-    }
-
-    suspend fun getStreamingData(): ApiResponse<StreamingData> {
-        val result = scripterRepository.startSockets(currentState.serial)
-        when (result) {
-            is ApiResponse.Success -> {
-                val fullServerUri = dataStoreRepository.getServerUrl().toUri()
-                _stateFlow.update {
-                    it.copy(
-                        streamingHost = fullServerUri.host.orEmpty(),
-                        streamingData = result.data
-                    )
-                }
-            }
-
-            is ApiResponse.Error -> {
-                uiCommandsFlow.tryEmit(VideoUiCommand.ShowNetworkError)
-            }
-        }
-        return result
+        sharedEvents.emit(VideoToMenu.SetKeyboardLoading(false))
+        sharedEvents.emit(VideoToScreen.ShowNetworkError)
     }
 }

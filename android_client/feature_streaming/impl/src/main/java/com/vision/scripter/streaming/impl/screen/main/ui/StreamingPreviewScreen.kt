@@ -1,6 +1,5 @@
 package com.vision.scripter.streaming.impl.screen.main.ui
 
-import com.vision.scripter.streaming.impl.screen.main.commandobservers.StreamingSharedEvent
 import com.vision.scripter.ui.CommandFlow
 import kotlinx.coroutines.flow.StateFlow
 
@@ -12,11 +11,7 @@ internal class StreamingPreviewScreenUiStateHolder(state: StreamingUiState) :
         get() = throw UnsupportedOperationException()
     override val uiCommandsFlow: CommandFlow<StreamingUiCommand>
         get() = throw UnsupportedOperationException()
-    override val sharedEventsFlow: CommandFlow<StreamingSharedEvent>
-        get() = throw UnsupportedOperationException()
 
-    override fun initArgs(serial: String) {}
-    override fun onLoadData(onStart: Boolean) {}
-    override fun showNetworkError() {}
-    override fun showStepSavedSnackbar() {}
+    override fun initArgs(serial: String) = Unit
+    override fun onLoadData() = Unit
 }

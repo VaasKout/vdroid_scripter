@@ -5,7 +5,6 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.navigation.NavController
 import com.vision.scripter.streaming.impl.R
 import com.vision.scripter.streaming.impl.screen.main.ui.StreamingUiCommand
 import com.vision.scripter.streaming.impl.screen.main.ui.StreamingUiStateHolder
@@ -16,7 +15,6 @@ import com.vision.scripter.ui.R as CommonR
 internal fun StreamingCommandObserver(
     uiStateHolder: StreamingUiStateHolder,
     snackbarHostState: SnackbarHostState,
-    navController: NavController,
 ) {
     val ctx = LocalContext.current
     val commonNetworkError = stringResource(CommonR.string.common_network_error)
@@ -33,10 +31,6 @@ internal fun StreamingCommandObserver(
                     scriptSavedMessage,
                     Toast.LENGTH_SHORT
                 ).show()
-            }
-
-            is StreamingUiCommand.Exit -> {
-                navController.popBackStack()
             }
         }
     }
