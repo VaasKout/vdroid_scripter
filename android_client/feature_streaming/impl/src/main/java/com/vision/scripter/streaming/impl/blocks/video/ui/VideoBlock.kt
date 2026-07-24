@@ -11,7 +11,6 @@ import com.vision.scripter.streaming.impl.blocks.video.ui.items.VideoSurface
 @Composable
 fun VideoBlock(
     modifier: Modifier = Modifier,
-    serialArg: String,
 ) {
     val uiStateHolder = hiltViewModel<VideoViewModel>()
     val state = uiStateHolder.uiStateFlow.collectAsStateWithLifecycle().value

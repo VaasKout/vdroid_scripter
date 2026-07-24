@@ -60,7 +60,7 @@ private fun MenuContent(
         is MenuState.SelectingCV -> {
             SelectingTemplateMenu(
                 modifier = modifier,
-                cvMode = state.menuState.cvMode,
+                cvMode = state.menuState.localCvMode,
                 uiStateHolder = uiStateHolder,
             )
         }

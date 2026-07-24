@@ -1,6 +1,5 @@
 package com.vision.scripter.streaming.impl.shared
 
-import com.vision.scripter.data.api.models.Parameter
 import com.vision.scripter.streaming.impl.screen.main.state.CVMode
 
 // video -> menu
@@ -11,12 +10,6 @@ sealed interface VideoToMenu : StreamingSharedEvent {
     data class SelectKeyboardKey(val oldKey: String) : VideoToMenu
 }
 
-// screen -> video
-sealed interface ScreenToVideo : StreamingSharedEvent {
-    data object StartLoading : ScreenToVideo
-    data class InitArgs(val serial: String) : ScreenToVideo
-}
-
 // video -> screen
 sealed interface VideoToScreen : StreamingSharedEvent {
     data object ShowNetworkError : VideoToScreen
@@ -24,16 +17,22 @@ sealed interface VideoToScreen : StreamingSharedEvent {
     data object SuccessLoading : VideoToScreen
 }
 
+// screen -> video
+sealed interface ScreenToVideo : StreamingSharedEvent {
+    data object StartLoading : ScreenToVideo
+    data class InitArgs(val serial: String) : ScreenToVideo
+}
+
 // menu -> video
 sealed interface MenuToVideo : StreamingSharedEvent {
-    data class SaveClicked(val param: Parameter?) : MenuToVideo
+    data object SaveClicked : MenuToVideo
     data class NextCvMode(val cvMode: CVMode) : MenuToVideo
     data object RecordCancelled : MenuToVideo
-    data class FindText(val text: String, val locale: String) : MenuToVideo
-    data object KeyboardInit : MenuToVideo
-    data class EditKeyboardButton(val newKey: String, val oldKey: String) : MenuToVideo
-    data class SaveLocale(val locale: String) : MenuToVideo
-    data class SaveRecordName(val name: String) : MenuToVideo
+    data class TextFound(val text: String, val locale: String) : MenuToVideo
+    data object KeyboardInited : MenuToVideo
+    data class KeyboardButtonEdited(val newKey: String) : MenuToVideo
+    data class LocaleSaved(val locale: String) : MenuToVideo
+    data class RecordNameSaved(val name: String) : MenuToVideo
     data class TimeoutSaved(val timeout: Int) : MenuToVideo
 }
 

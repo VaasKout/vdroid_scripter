@@ -23,7 +23,7 @@ data class VideoState(
     val selectedRectangles: List<CvRectangle> = listOf(),
 
     val record: Record = Record(),
-    val keyboard: Keyboard = Keyboard(),
+    val keyboardButtons: List<RectangleWithText> = listOf(),
     val actionState: ActionState = ActionState.None,
 ) {
     data class Record(
@@ -37,10 +37,6 @@ data class VideoState(
             return this.params.lastOrNull() ?: Parameter()
         }
     }
-
-    data class Keyboard(
-        val buttons: List<RectangleWithText> = listOf(),
-    )
 
     sealed interface ActionState {
         data object None : ActionState

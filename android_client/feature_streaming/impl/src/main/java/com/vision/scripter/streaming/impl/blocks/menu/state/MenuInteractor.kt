@@ -7,6 +7,9 @@ import com.vision.scripter.streaming.impl.blocks.menu.ui.MenuUiStateHolder
 import com.vision.scripter.streaming.impl.screen.main.state.CVMode
 import com.vision.scripter.streaming.impl.screen.main.state.increment
 import com.vision.scripter.streaming.impl.screen.main.state.toggleDetection
+import com.vision.scripter.streaming.impl.shared.MenuToVideo
+import com.vision.scripter.streaming.impl.shared.StreamingSharedEventsHolder
+import com.vision.scripter.streaming.impl.shared.VideoToMenu
 import com.vision.scripter.ui.CommandFlow
 import dagger.hilt.android.scopes.ViewModelScoped
 import kotlinx.coroutines.CoroutineScope
@@ -16,6 +19,9 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.mapNotNull
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import javax.inject.Inject
@@ -24,6 +30,7 @@ import javax.inject.Inject
 class MenuInteractor @Inject constructor(
     coroutineScopeFactory: CoroutineScopeFactory,
     uiStateMapper: MenuUiStateMapper,
+    private val sharedEventsHolder: StreamingSharedEventsHolder,
 ) : MenuUiStateHolder {
 
     private val coroutineScope: CoroutineScope =
@@ -47,6 +54,19 @@ class MenuInteractor @Inject constructor(
             dialogState = dialogState,
         )
     }.stateIn(coroutineScope, SharingStarted.Eagerly, MenuUiState())
+
+    init {
+        sharedEventsHolder.sharedEventsFlow.mapNotNull {
+            it as? VideoToMenu
+        }.onEach {
+            when (it) {
+                is VideoToMenu.ScriptSaved -> onScriptSaved()
+                is VideoToMenu.SelectKeyboardKey -> onEditKeyboardRectangleSelected(it.oldKey)
+                is VideoToMenu.SetKeyboardLoading -> setKeyboardLoading(it.isLoading)
+                is VideoToMenu.TextFound -> onTextFound()
+            }
+        }.launchIn(coroutineScope)
+    }
 
     override fun onScriptModeClicked() {
         _dialogState.update { DialogState.Record }
@@ -86,20 +106,20 @@ class MenuInteractor @Inject constructor(
     override fun onCvModeClicked() {
         when (val state = _menuState.value) {
             is MenuState.Recording -> {
-                _menuState.update { MenuState.SelectingCV(cvMode = CVMode.CV_RECTS) }
-                uiCommandsFlow.tryEmit(MenuUiCommand.NextCvMode(CVMode.CV_RECTS))
+                _menuState.update { MenuState.SelectingCV(localCvMode = CVMode.CV_RECTS) }
+                sharedEventsHolder.emit(MenuToVideo.NextCvMode(CVMode.CV_RECTS))
             }
 
             is MenuState.SelectingCV -> {
-                val cvMode = state.cvMode.toggleDetection()
-                _menuState.update { state.copy(cvMode = cvMode) }
-                uiCommandsFlow.tryEmit(MenuUiCommand.NextCvMode(cvMode))
+                val cvMode = state.localCvMode.toggleDetection()
+                _menuState.update { state.copy(localCvMode = cvMode) }
+                sharedEventsHolder.emit(MenuToVideo.NextCvMode(cvMode))
             }
 
             is MenuState.Usual -> {
                 val newCvMode = state.localCvMode.increment()
                 _menuState.update { state.copy(localCvMode = newCvMode) }
-                uiCommandsFlow.tryEmit(MenuUiCommand.NextCvMode(newCvMode))
+                sharedEventsHolder.emit(MenuToVideo.NextCvMode(newCvMode))
             }
 
             else -> {}
@@ -110,7 +130,7 @@ class MenuInteractor @Inject constructor(
         val state = _menuState.value
         if (state is MenuState.Usual && state.textHighlighted) {
             _menuState.update { state.copy(textHighlighted = false) }
-            uiCommandsFlow.tryEmit(MenuUiCommand.NextCvMode(CVMode.NO_CV))
+            sharedEventsHolder.emit(MenuToVideo.NextCvMode(CVMode.NO_CV))
             return
         }
         _dialogState.update { DialogState.Text }
@@ -118,10 +138,10 @@ class MenuInteractor @Inject constructor(
 
     override fun onTryToFindText(text: String, locale: String) {
         hideDialog()
-        uiCommandsFlow.tryEmit(MenuUiCommand.FindText(text = text.trim(), locale = locale))
+        sharedEventsHolder.emit(MenuToVideo.TextFound(text = text.trim(), locale = locale))
     }
 
-    fun onTextSearchSuccess(text: String, locale: String) {
+    fun onTextFound() {
         when (val state = _menuState.value) {
             is MenuState.Recording -> {
                 _menuState.update {
@@ -142,7 +162,7 @@ class MenuInteractor @Inject constructor(
         if (state is MenuState.Keyboard) {
             _menuState.update { state.copy(isLoadingKeyboard = true) }
         }
-        uiCommandsFlow.tryEmit(MenuUiCommand.KeyboardInit)
+        sharedEventsHolder.emit(MenuToVideo.KeyboardInited)
     }
 
     override fun onKeyboardEdited(addNew: Boolean) {
@@ -159,19 +179,18 @@ class MenuInteractor @Inject constructor(
         val state = _menuState.value
         if (state !is MenuState.Keyboard) return
         hideDialog()
-        uiCommandsFlow.tryEmit(MenuUiCommand.EditKeyboardButton(key = newKey))
+        sharedEventsHolder.emit(MenuToVideo.KeyboardButtonEdited(newKey))
     }
 
     override fun onSaveClicked() {
-        uiCommandsFlow.tryEmit(MenuUiCommand.SaveParameter)
-        _menuState.update { MenuState.Recording() }
+        sharedEventsHolder.emit(MenuToVideo.SaveClicked)
     }
 
     override fun onCancelClicked() {
         when (val state = _menuState.value) {
             is MenuState.Recording -> {
                 _menuState.update { MenuState.Usual(expanded = true) }
-                uiCommandsFlow.tryEmit(MenuUiCommand.CancelRecording)
+                sharedEventsHolder.emit(MenuToVideo.RecordCancelled)
             }
 
             is MenuState.Keyboard -> {
@@ -186,7 +205,7 @@ class MenuInteractor @Inject constructor(
                 _menuState.update { MenuState.Recording() }
             }
         }
-        uiCommandsFlow.tryEmit(MenuUiCommand.NextCvMode(CVMode.NO_CV))
+        sharedEventsHolder.emit(MenuToVideo.NextCvMode(CVMode.NO_CV))
     }
 
     override fun onExitClicked() {
@@ -199,13 +218,13 @@ class MenuInteractor @Inject constructor(
         if (menuState is MenuState.Recording) {
             _menuState.update { menuState.copy(recordTimeout = timeout) }
         }
-        uiCommandsFlow.tryEmit(MenuUiCommand.SaveTimeout(timeout))
+        sharedEventsHolder.emit(MenuToVideo.TimeoutSaved(timeout))
     }
 
     override fun onSavedRecordName(name: String) {
         hideDialog()
         _menuState.update { MenuState.Recording() }
-        uiCommandsFlow.tryEmit(MenuUiCommand.SaveRecordName(name))
+        sharedEventsHolder.emit(MenuToVideo.RecordNameSaved(name))
     }
 
     override fun onSaveLocale(locale: String) {
@@ -216,11 +235,22 @@ class MenuInteractor @Inject constructor(
             else -> _menuState.value
         }
         _menuState.update { updated }
-        uiCommandsFlow.tryEmit(MenuUiCommand.SaveLocale(locale))
+        sharedEventsHolder.emit(MenuToVideo.LocaleSaved(locale))
     }
 
     override fun onDialogDismissed() {
         hideDialog()
+    }
+
+    private fun onScriptSaved() {
+        _menuState.update { MenuState.Usual() }
+    }
+
+    private fun setKeyboardLoading(isLoading: Boolean) {
+        val state = _menuState.value
+        if (state is MenuState.Keyboard) {
+            _menuState.value = state.copy(isLoadingKeyboard = isLoading)
+        }
     }
 
     fun onEditKeyboardRectangleSelected(oldKey: String) {

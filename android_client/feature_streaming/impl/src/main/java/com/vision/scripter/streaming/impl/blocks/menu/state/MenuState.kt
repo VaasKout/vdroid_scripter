@@ -17,7 +17,7 @@ sealed interface MenuState {
     ) : MenuState
 
     data class SelectingCV(
-        val cvMode: CVMode = CVMode.CV_RECTS,
+        val localCvMode: CVMode = CVMode.CV_RECTS,
     ) : MenuState
 
     data object SelectingText: MenuState

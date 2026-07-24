@@ -21,8 +21,10 @@ import com.vision.scripter.streaming.impl.blocks.video.ui.VideoUiStateHolder
 import com.vision.scripter.streaming.impl.screen.main.state.CVMode
 import com.vision.scripter.streaming.impl.screen.main.state.SPACE_KEY
 import com.vision.scripter.streaming.impl.screen.main.state.TEMPLATE
+import com.vision.scripter.streaming.impl.screen.main.state.TEXT
 import com.vision.scripter.streaming.impl.screen.main.state.TYPE_TEXT
 import com.vision.scripter.streaming.impl.screen.main.state.YOLO_CLASS
+import com.vision.scripter.streaming.impl.shared.MenuToVideo
 import com.vision.scripter.streaming.impl.shared.ScreenToVideo
 import com.vision.scripter.streaming.impl.shared.StreamingSharedEventsHolder
 import com.vision.scripter.streaming.impl.shared.VideoToMenu
@@ -39,7 +41,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -103,14 +104,43 @@ class VideoInteractor @Inject constructor(
             }
         }.launchIn(coroutineScope)
 
-        sharedEvents.sharedEventsFlow.mapNotNull {
-            it as? ScreenToVideo
-        }.onEach {
-            when (it) {
-                is ScreenToVideo.StartLoading -> onLoadData()
-                is ScreenToVideo.InitArgs -> initArgs(it.serial)
+        sharedEvents.sharedEventsFlow.onEach { event ->
+            when (event) {
+                is ScreenToVideo -> handleScreenToVideo(event)
+                is MenuToVideo -> handleMenuToVideo(event)
+                else -> Unit
             }
         }.launchIn(coroutineScope)
+    }
+
+    private fun handleScreenToVideo(event: ScreenToVideo) {
+        when (event) {
+            is ScreenToVideo.StartLoading -> onLoadData()
+            is ScreenToVideo.InitArgs -> initArgs(event.serial)
+        }
+    }
+
+    private fun handleMenuToVideo(event: MenuToVideo) {
+        when (event) {
+            is MenuToVideo.SaveClicked -> saveClicked(deriveSaveParameter())
+            is MenuToVideo.NextCvMode -> nextCvMode(event.cvMode)
+            is MenuToVideo.RecordCancelled -> recordCancelled()
+            is MenuToVideo.TextFound -> findTextClicked(event.text, event.locale)
+            is MenuToVideo.KeyboardInited -> initKeyboardClicked()
+            is MenuToVideo.KeyboardButtonEdited -> editKeyboardKeyClicked(event.newKey)
+            is MenuToVideo.LocaleSaved -> saveKeyboardLocaleClicked(event.locale)
+            is MenuToVideo.RecordNameSaved -> saveRecordNameClicked(event.name)
+            is MenuToVideo.TimeoutSaved -> saveTimeoutClicked(event.timeout)
+        }
+    }
+
+    private fun deriveSaveParameter(): Parameter? = when (val action = currentState.actionState) {
+        is VideoState.ActionState.KeyboardRecording ->
+            Parameter(type = TYPE_TEXT, value = action.typeText)
+
+        is VideoState.ActionState.SelectingText -> Parameter(type = TEXT)
+        is VideoState.ActionState.SelectingCV -> Parameter(type = TEMPLATE)
+        else -> null
     }
 
     private fun initArgs(serial: String) {
@@ -274,7 +304,7 @@ class VideoInteractor @Inject constructor(
                     if (selectKeyboardKey(event)) return@launch
 
                     if (actionState is VideoState.ActionState.KeyboardRecording) {
-                        val letter = currentState.keyboard.buttons.firstOrNull {
+                        val letter = currentState.keyboardButtons.firstOrNull {
                             it.contains(x = event.x.toInt(), y = event.y.toInt())
                         }?.text ?: return@launch
 
@@ -378,7 +408,7 @@ class VideoInteractor @Inject constructor(
     private fun selectKeyboardKey(event: MotionEvent): Boolean {
         val actionState = currentState.actionState
         if (actionState is VideoState.ActionState.EditingKeyboard) {
-            val button = currentState.keyboard.buttons.firstOrNull {
+            val button = currentState.keyboardButtons.firstOrNull {
                 it.contains(x = event.x.toInt(), y = event.y.toInt())
             } ?: return false
             cvUseCase.setSelectedRectangle(button.rectangle)
@@ -477,7 +507,7 @@ class VideoInteractor @Inject constructor(
         }
 
         _stateFlow.update {
-            it.copy(keyboard = it.keyboard.copy(buttons = buttons))
+            it.copy(keyboardButtons = buttons)
         }
         sharedEvents.emit(VideoToMenu.SetKeyboardLoading(false))
     }

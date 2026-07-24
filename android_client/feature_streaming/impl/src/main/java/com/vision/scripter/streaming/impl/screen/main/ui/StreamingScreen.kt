@@ -38,10 +38,7 @@ internal fun StreamingScreen(
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
-        VideoBlock(
-            modifier = Modifier.fillMaxSize(),
-            serialArg = serial,
-        )
+        VideoBlock(modifier = Modifier.fillMaxSize())
         MenuBlock(
             modifier = Modifier
                 .align(Alignment.TopEnd)

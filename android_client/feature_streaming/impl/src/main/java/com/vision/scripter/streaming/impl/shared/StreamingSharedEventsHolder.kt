@@ -9,7 +9,9 @@ import javax.inject.Singleton
 class StreamingSharedEventsHolder @Inject constructor(
     coroutineScopeFactory: CoroutineScopeFactory,
 ) {
-    val coroutineScope = coroutineScopeFactory.createBackgroundScope("StreamingSharedEventsHandler")
+    val coroutineScope = coroutineScopeFactory.createBackgroundScope(
+        "StreamingSharedEventsHandler",
+    )
     val sharedEventsFlow: CommandFlow<StreamingSharedEvent> = CommandFlow(coroutineScope)
 
     fun emit(event: StreamingSharedEvent) {
