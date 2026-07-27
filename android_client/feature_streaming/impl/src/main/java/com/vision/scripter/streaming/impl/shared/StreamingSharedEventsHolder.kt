@@ -1,20 +1,17 @@
 package com.vision.scripter.streaming.impl.shared
 
-import com.vision.scripter.coroutines.api.CoroutineScopeFactory
-import com.vision.scripter.ui.CommandFlow
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
-class StreamingSharedEventsHolder @Inject constructor(
-    coroutineScopeFactory: CoroutineScopeFactory,
-) {
-    val coroutineScope = coroutineScopeFactory.createBackgroundScope(
-        "StreamingSharedEventsHandler",
-    )
-    val sharedEventsFlow: CommandFlow<StreamingSharedEvent> = CommandFlow(coroutineScope)
+class StreamingSharedEventsHolder @Inject constructor() {
+    private val _sharedEventsFlow = MutableSharedFlow<StreamingSharedEvent>(replay = 1)
+    val sharedEventsFlow: SharedFlow<StreamingSharedEvent> = _sharedEventsFlow.asSharedFlow()
 
     fun emit(event: StreamingSharedEvent) {
-        sharedEventsFlow.tryEmit(event)
+        _sharedEventsFlow.tryEmit(event)
     }
 }

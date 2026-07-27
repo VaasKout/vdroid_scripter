@@ -33,8 +33,7 @@ internal fun StreamingScreen(
     ).value ?: StreamingUiState()
 
     LaunchedEffect(Unit) {
-        uiStateHolder.initArgs(serial = serial)
-        uiStateHolder.onLoadData()
+        uiStateHolder.onLoadData(serial = serial)
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -65,7 +64,7 @@ internal fun StreamingScreen(
                         .padding(horizontal = 16.dp)
                         .align(Alignment.Center),
                     text = stringResource(R.string.retry),
-                    onClick = uiStateHolder::onLoadData,
+                    onClick = { uiStateHolder.onLoadData(serial) },
                 )
                 return@Scaffold
             }

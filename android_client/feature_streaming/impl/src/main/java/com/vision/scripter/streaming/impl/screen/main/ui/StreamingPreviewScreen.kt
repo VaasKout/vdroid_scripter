@@ -12,6 +12,5 @@ internal class StreamingPreviewScreenUiStateHolder(state: StreamingUiState) :
     override val uiCommandsFlow: CommandFlow<StreamingUiCommand>
         get() = throw UnsupportedOperationException()
 
-    override fun initArgs(serial: String) = Unit
-    override fun onLoadData() = Unit
+    override fun onLoadData(serial: String) = Unit
 }

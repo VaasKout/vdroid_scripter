@@ -9,10 +9,10 @@ import javax.inject.Inject
 class VideoUiStateMapper @Inject constructor() {
     fun map(state: VideoState): VideoUiState {
         return VideoUiState(
-            connectionEstablished = state.connectionEstablished,
+            streamingIsLoading = state.streamingData == null,
             rectangles = state.cvRectangles.toPersistentList(),
             selectedRectangles = state.selectedRectangles.toPersistentList(),
-            keyboardButtons = state.keyboard.buttons.toPersistentList(),
+            keyboardButtons = state.keyboardButtons.toPersistentList(),
         )
     }
 }

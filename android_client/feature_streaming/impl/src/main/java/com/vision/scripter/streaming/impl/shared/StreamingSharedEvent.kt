@@ -19,8 +19,7 @@ sealed interface VideoToScreen : StreamingSharedEvent {
 
 // screen -> video
 sealed interface ScreenToVideo : StreamingSharedEvent {
-    data object StartLoading : ScreenToVideo
-    data class InitArgs(val serial: String) : ScreenToVideo
+    data class StartLoading(val serial: String) : ScreenToVideo
 }
 
 // menu -> video

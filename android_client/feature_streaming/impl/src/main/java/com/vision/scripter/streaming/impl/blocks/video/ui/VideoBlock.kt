@@ -15,7 +15,7 @@ fun VideoBlock(
     val uiStateHolder = hiltViewModel<VideoViewModel>()
     val state = uiStateHolder.uiStateFlow.collectAsStateWithLifecycle().value
 
-    if (!state.connectionEstablished) return
+    if (state.streamingIsLoading) return
     VideoSurface(
         modifier = modifier,
         onSurfaceCreated = uiStateHolder::onVideoSurfaceCreated,

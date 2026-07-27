@@ -59,12 +59,8 @@ class StreamingInteractor @Inject constructor(
 
     override val uiCommandsFlow: CommandFlow<StreamingUiCommand> = CommandFlow(coroutineScope)
 
-    override fun initArgs(serial: String) {
-        sharedEvents.emit(ScreenToVideo.InitArgs(serial))
-    }
-
-    override fun onLoadData() {
-        sharedEvents.emit(ScreenToVideo.StartLoading)
+    override fun onLoadData(serial: String) {
+        sharedEvents.emit(ScreenToVideo.StartLoading(serial))
     }
 
     private fun showStepSavedSnackbar() {

@@ -85,6 +85,10 @@ class VideoInteractor @Inject constructor(
 
     private var startRecordingTime = 0L
 
+    init {
+        startReactiveStreams()
+    }
+
     private fun startReactiveStreams() {
         cvUseCase.observeRectangles().onEach { rectangles ->
             _stateFlow.update {
@@ -115,8 +119,7 @@ class VideoInteractor @Inject constructor(
 
     private fun handleScreenToVideo(event: ScreenToVideo) {
         when (event) {
-            is ScreenToVideo.StartLoading -> onLoadData()
-            is ScreenToVideo.InitArgs -> initArgs(event.serial)
+            is ScreenToVideo.StartLoading -> onLoadData(event.serial)
         }
     }
 
@@ -143,14 +146,11 @@ class VideoInteractor @Inject constructor(
         else -> null
     }
 
-    private fun initArgs(serial: String) {
-        _stateFlow.update {
-            it.copy(serial = serial)
-        }
-    }
-
-    private fun onLoadData() {
+    private fun onLoadData(serial: String) {
         coroutineScope.launch {
+            _stateFlow.update {
+                it.copy(serial = serial)
+            }
             when (val result = scripterRepository.startSockets(currentState.serial)) {
                 is ApiResponse.Success -> {
                     val fullServerUri = dataStoreRepository.getServerUrl().toUri()
@@ -169,7 +169,6 @@ class VideoInteractor @Inject constructor(
                 }
             }
         }
-        startReactiveStreams()
     }
 
     private fun nextCvMode(cvMode: CVMode) {
@@ -243,10 +242,6 @@ class VideoInteractor @Inject constructor(
             val screenSizes = currentState.screenSizes
             val connectionEstablished =
                 videoConnected && controlConnected && cvConnected && screenSizes != null
-
-            _stateFlow.update {
-                it.copy(connectionEstablished = connectionEstablished)
-            }
 
             if (!connectionEstablished) {
                 _stateFlow.update {

@@ -15,7 +15,6 @@ data class VideoState(
     val serial: String = "",
     val screenSizes: ScreenSizes? = null,
 
-    val connectionEstablished: Boolean = false,
     val streamingHost: String = "",
     val videoCodec: VideoCodec = VideoCodec.H264,
     val streamingData: StreamingData? = null,

@@ -9,6 +9,5 @@ interface StreamingUiStateHolder {
     val uiStateFlow: StateFlow<StreamingUiState?>
     val uiCommandsFlow: CommandFlow<StreamingUiCommand>
 
-    fun initArgs(serial: String)
-    fun onLoadData()
+    fun onLoadData(serial: String)
 }
