@@ -18,7 +18,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -41,13 +40,17 @@ class StreamingInteractor @Inject constructor(
         get() = _stateFlow.value
 
     init {
-        sharedEvents.sharedEventsFlow.mapNotNull {
-            it as? VideoToScreen
-        }.onEach {
+        sharedEvents.sharedEventsFlow.onEach {
             when (it) {
-                is VideoToScreen.ShowNetworkError -> showNetworkError()
-                is VideoToScreen.ShowScriptSavedSnackbar -> showStepSavedSnackbar()
-                is VideoToScreen.SuccessLoading -> doneLoading()
+                is VideoToScreen -> {
+                    when (it) {
+                        is VideoToScreen.ShowNetworkError -> showNetworkError()
+                        is VideoToScreen.ShowScriptSavedSnackbar -> showStepSavedSnackbar()
+                        is VideoToScreen.SuccessLoading -> doneLoading()
+                    }
+                }
+
+                else -> Unit
             }
         }.launchIn(coroutineScope)
     }

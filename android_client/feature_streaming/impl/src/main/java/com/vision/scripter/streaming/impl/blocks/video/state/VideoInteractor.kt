@@ -160,8 +160,6 @@ class VideoInteractor @Inject constructor(
                             streamingData = result.data
                         )
                     }
-
-                    sharedEvents.emit(VideoToScreen.SuccessLoading)
                 }
 
                 is ApiResponse.Error -> {
@@ -250,6 +248,8 @@ class VideoInteractor @Inject constructor(
                 sharedEvents.emit(VideoToScreen.ShowNetworkError)
                 return@launch
             }
+
+            sharedEvents.emit(VideoToScreen.SuccessLoading)
 
             launch {
                 videoUseCase.decodeFramesInLoop(

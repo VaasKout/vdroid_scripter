@@ -9,6 +9,7 @@ class StreamingUiStateMapper @Inject constructor() {
     fun map(state: StreamingState): StreamingUiState {
         return StreamingUiState(
             isLoading = state.loading,
+            isError = state.isError,
         )
     }
 }
