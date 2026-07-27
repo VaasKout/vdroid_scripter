@@ -63,6 +63,7 @@ class StreamingInteractor @Inject constructor(
     override val uiCommandsFlow: CommandFlow<StreamingUiCommand> = CommandFlow(coroutineScope)
 
     override fun onLoadData(serial: String) {
+        _stateFlow.update { it.copy(loading = true, isError = false) }
         sharedEvents.emit(ScreenToVideo.StartLoading(serial))
     }
 
@@ -81,5 +82,6 @@ class StreamingInteractor @Inject constructor(
 
     fun clear() {
         coroutineScope.cancel()
+        sharedEvents.close()
     }
 }

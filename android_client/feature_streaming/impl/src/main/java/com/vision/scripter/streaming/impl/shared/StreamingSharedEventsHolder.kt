@@ -1,5 +1,6 @@
 package com.vision.scripter.streaming.impl.shared
 
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
@@ -13,5 +14,10 @@ class StreamingSharedEventsHolder @Inject constructor() {
 
     fun emit(event: StreamingSharedEvent) {
         _sharedEventsFlow.tryEmit(event)
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun close() {
+        _sharedEventsFlow.resetReplayCache()
     }
 }
