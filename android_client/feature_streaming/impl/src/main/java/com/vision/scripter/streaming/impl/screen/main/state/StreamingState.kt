@@ -51,6 +51,18 @@ fun CVMode.toType(): String = when (this) {
     else -> ""
 }
 
+enum class KeyboardState {
+    TYPING,
+    EDIT,
+    ADD_NEW,
+}
+
+fun KeyboardState.increment(): KeyboardState = when (this) {
+    KeyboardState.TYPING -> KeyboardState.EDIT
+    KeyboardState.EDIT -> KeyboardState.ADD_NEW
+    else -> KeyboardState.TYPING
+}
+
 data class StreamingState(
     val loading: Boolean = true,
     val isError: Boolean = false,

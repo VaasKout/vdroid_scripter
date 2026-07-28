@@ -26,20 +26,17 @@ fun RectanglesCanvas(
 ) {
     val textMeasurer = rememberTextMeasurer()
     Canvas(modifier = modifier) {
-        if (keyboardButtons.isNotEmpty()) {
-            keyboardButtons.forEach {
-                drawRectangle(
-                    textMeasurer = textMeasurer,
-                    rectangle = it.rectangle,
-                    color = Color.Red
-                )
-                drawTextInRectangle(
-                    textMeasurer = textMeasurer,
-                    rectangle = it.rectangle,
-                    text = it.text,
-                )
-            }
-            return@Canvas
+        keyboardButtons.forEach {
+            drawRectangle(
+                textMeasurer = textMeasurer,
+                rectangle = it.rectangle,
+                color = Color.Red
+            )
+            drawTextInRectangle(
+                textMeasurer = textMeasurer,
+                rectangle = it.rectangle,
+                text = it.text,
+            )
         }
 
         cvRectangles.forEach {

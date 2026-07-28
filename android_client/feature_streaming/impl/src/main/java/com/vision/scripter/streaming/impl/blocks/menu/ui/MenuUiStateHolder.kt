@@ -17,8 +17,7 @@ interface MenuUiStateHolder {
     fun onTryToFindText(text: String, locale: String)
 
     fun onKeyboardClicked()
-    fun onKeyboardInitClicked()
-    fun onKeyboardEdited(addNew: Boolean)
+    fun onKeyboardModeClicked()
     fun onEditKeyboardButtonSaved(oldKey: String, newKey: String)
 
     fun onRecordingClicked()

@@ -19,6 +19,7 @@ import com.vision.scripter.prefs.api.DataStoreRepository
 import com.vision.scripter.streaming.impl.blocks.video.ui.VideoUiState
 import com.vision.scripter.streaming.impl.blocks.video.ui.VideoUiStateHolder
 import com.vision.scripter.streaming.impl.screen.main.state.CVMode
+import com.vision.scripter.streaming.impl.screen.main.state.KeyboardState
 import com.vision.scripter.streaming.impl.screen.main.state.SPACE_KEY
 import com.vision.scripter.streaming.impl.screen.main.state.TEMPLATE
 import com.vision.scripter.streaming.impl.screen.main.state.TEXT
@@ -132,19 +133,20 @@ class VideoInteractor @Inject constructor(
             is MenuToVideo.OnTextModeClicked -> nextCvMode(CVMode.NO_CV, false)
             is MenuToVideo.CancelClicked -> onCancelClicked()
             is MenuToVideo.FindText -> findTextClicked(event.text, event.locale)
-            is MenuToVideo.KeyboardInited -> initKeyboardClicked()
-            is MenuToVideo.KeyboardButtonEdited -> editKeyboardKeyClicked(
+            is MenuToVideo.KeyboardStateChanged -> changeKeyboardState(event.keyboardState)
+            is MenuToVideo.KeyboardButtonEdited -> editKeyboardKey(
                 oldKey = event.oldKey,
                 newKey = event.newKey,
             )
 
-            is MenuToVideo.LocaleSaved -> saveKeyboardLocaleClicked(event.locale)
+            is MenuToVideo.KeyboardLocaleSaved -> openKeyboard(
+                locale = event.locale,
+                mode = event.mode,
+            )
+
             is MenuToVideo.RecordNameSaved -> saveRecordNameClicked(event.name)
             is MenuToVideo.TimeoutSaved -> saveTimeoutClicked(event.timeout)
-            is MenuToVideo.OnRecordingClicked -> onRecordingClicked(
-                isControlRecording = event.isControlRecording,
-                isKeyboardRecording = event.isKeyboardRecording,
-            )
+            is MenuToVideo.OnRecordingClicked -> onRecordingClicked(event.isControlRecording)
         }
     }
 
@@ -195,15 +197,17 @@ class VideoInteractor @Inject constructor(
     private fun onSaveClicked() {
         coroutineScope.launch {
             mutex.withLock {
+                if (currentState.keyboard.buttons.isNotEmpty()) {
+                    saveKeyboard()
+                    return@launch
+                }
+
                 val parameter = currentState.tmpParam
                 if (parameter == null) {
                     saveScript()
                     return@launch
                 }
 
-                _stateFlow.update {
-                    it.copy(tmpParam = null)
-                }
                 if (parameter.type == TEMPLATE) {
                     val screenSizes = currentState.screenSizes ?: return@launch
                     cvUseCase.nextCvMode(CVMode.NO_CV)
@@ -234,15 +238,9 @@ class VideoInteractor @Inject constructor(
         }
     }
 
-    private fun onRecordingClicked(
-        isControlRecording: Boolean,
-        isKeyboardRecording: Boolean,
-    ) {
+    private fun onRecordingClicked(isControlRecording: Boolean) {
         _stateFlow.update {
-            it.copy(
-                record = it.record.copy(controlRecording = isControlRecording),
-                keyboard = it.keyboard.copy(recording = isKeyboardRecording),
-            )
+            it.copy(record = it.record.copy(controlRecording = isControlRecording))
         }
     }
 
@@ -318,13 +316,8 @@ class VideoInteractor @Inject constructor(
                         return@launch
                     }
 
-                    if (tmpParam?.type == TYPE_TEXT) {
-                        selectKeyboardKey(event = event)
-                        return@launch
-                    }
-
-                    if (currentState.keyboard.recording) {
-                        recordLetters(event)
+                    if (currentState.keyboard.buttons.isNotEmpty()) {
+                        handleKeyboard(event)
                         return@launch
                     }
 
@@ -345,11 +338,8 @@ class VideoInteractor @Inject constructor(
         coroutineScope.launch {
             mutex.withLock {
                 val parameter = currentState.tmpParam
-                if (parameter != null) {
-                    _stateFlow.update { it.copy(record = VideoState.Record(), tmpParam = null) }
-                    cvUseCase.clearAllRectangles()
-                    return@launch
-                }
+                val newRecordName = if (parameter != null) currentState.record.recordName else ""
+                dropState(record = VideoState.Record(recordName = newRecordName))
             }
         }
     }
@@ -375,25 +365,27 @@ class VideoInteractor @Inject constructor(
         }
     }
 
-    private fun initKeyboardClicked() {
+    private fun changeKeyboardState(keyboardState: KeyboardState) {
         coroutineScope.launch {
             mutex.withLock {
-                val locale = currentState.tmpParam?.locale ?: return@launch
-                val result = scripterRepository.resetKeyboard(
-                    serial = currentState.serial,
-                    locale = locale,
-                )
-                if (result is ApiResponse.Success) {
-                    setupKeyboardRects(result.data)
+                _stateFlow.update {
+                    it.copy(keyboard = it.keyboard.copy(mode = keyboardState))
                 }
+                cvUseCase.clearSelectedRectangles()
+
+                if (keyboardState == KeyboardState.ADD_NEW) {
+                    cvUseCase.nextCvMode(CVMode.CV_RECTS)
+                    return@withLock
+                }
+                cvUseCase.nextCvMode(CVMode.NO_CV)
             }
         }
     }
 
-    private fun editKeyboardKeyClicked(oldKey: String, newKey: String) {
+    private fun editKeyboardKey(oldKey: String, newKey: String) {
         coroutineScope.launch {
             mutex.withLock {
-                val locale = currentState.tmpParam?.locale ?: return@launch
+                val locale = currentState.keyboard.locale.ifEmpty { return@launch }
                 val screenSizes = currentState.screenSizes ?: return@launch
                 val success = cvUseCase.editKeyboardSelectedRectangle(
                     serial = currentState.serial,
@@ -412,31 +404,11 @@ class VideoInteractor @Inject constructor(
         }
     }
 
-    fun recordLetters(event: MotionEvent) {
-        val letter = currentState.keyboard.buttons.firstOrNull {
-            it.contains(x = event.x.toInt(), y = event.y.toInt())
-        }?.text ?: return
-
-        val tmpParam = currentState.tmpParam ?: return
-        if (letter.isEmpty() || event.action != ACTION_UP || tmpParam.locale.isEmpty()) return
-
-        val updatedTypeText = buildString {
-            append(tmpParam.value)
-            if (letter == SPACE_KEY) append(" ")
-            else append(letter)
-        }
-
-        val updatedParam = tmpParam.copy(value = updatedTypeText)
-        _stateFlow.update { currentState.copy(tmpParam = updatedParam) }
-    }
-
-    private fun saveKeyboardLocaleClicked(locale: String) {
+    private fun openKeyboard(locale: String, mode: KeyboardState) {
         coroutineScope.launch {
             mutex.withLock {
-                val newParam = Parameter(type = TYPE_TEXT, locale = locale)
-                val updatedParams = currentState.record.params + newParam
                 _stateFlow.update {
-                    it.copy(record = it.record.copy(params = updatedParams))
+                    it.copy(keyboard = VideoState.Keyboard(locale = locale, mode = mode))
                 }
                 getOrResetKeyboard()
             }
@@ -455,12 +427,76 @@ class VideoInteractor @Inject constructor(
         }
     }
 
+    private fun handleKeyboard(event: MotionEvent) {
+        when (currentState.keyboard.mode) {
+            KeyboardState.TYPING -> { recordLetters(event)
+            }
+            KeyboardState.EDIT -> selectKeyboardKey(event)
+            KeyboardState.ADD_NEW -> selectNewKeyboardRect(event)
+        }
+    }
+
+    private fun recordLetters(event: MotionEvent) {
+        if (event.action != ACTION_UP) return
+        if (currentState.record.recordName.isEmpty()) return
+
+        val keyboard = currentState.keyboard
+        if (keyboard.locale.isEmpty()) return
+        val letter = keyboard.buttons.firstOrNull {
+            it.contains(x = event.x.toInt(), y = event.y.toInt())
+        }?.text ?: return
+        if (letter.isEmpty()) return
+
+        val updatedText = buildString {
+            append(keyboard.typedText)
+            if (letter == SPACE_KEY) append(" ")
+            else append(letter)
+        }
+        _stateFlow.update {
+            it.copy(keyboard = it.keyboard.copy(typedText = updatedText))
+        }
+    }
+
     private fun selectKeyboardKey(event: MotionEvent) {
+        if (event.action != ACTION_DOWN) return
         val button = currentState.keyboard.buttons.firstOrNull {
             it.contains(x = event.x.toInt(), y = event.y.toInt())
         } ?: return
         cvUseCase.setSelectedRectangle(button.rectangle)
         sharedEvents.emit(VideoToMenu.SelectKeyboardKey(button.text))
+    }
+
+    private fun selectNewKeyboardRect(event: MotionEvent) {
+        if (event.action != ACTION_DOWN) return
+        cvUseCase.selectRectangle(x = event.x.toInt(), y = event.y.toInt())
+        sharedEvents.emit(VideoToMenu.SelectKeyboardKey(""))
+    }
+
+    private suspend fun saveKeyboard() {
+        val keyboard = currentState.keyboard
+        if (keyboard.typedText.isEmpty()) {
+            dropState()
+            return
+        }
+        addParam(
+            Parameter(
+                type = TYPE_TEXT,
+                value = keyboard.typedText,
+                locale = keyboard.locale,
+            ),
+        )
+    }
+
+    private suspend fun dropState(record: VideoState.Record? = null) {
+        _stateFlow.update {
+            it.copy(
+                record = record ?: VideoState.Record(),
+                tmpParam = null,
+                keyboard = VideoState.Keyboard(),
+            )
+        }
+        cvUseCase.clearSelectedRectangles()
+        cvUseCase.nextCvMode(CVMode.NO_CV)
     }
 
     private fun recordBytes(bytesArray: ByteArray?) {
@@ -488,11 +524,11 @@ class VideoInteractor @Inject constructor(
     }
 
     private fun addParam(param: Parameter) {
-        _stateFlow.update {
-            it.copy(
-                record = it.record.copy(params = it.record.params + param),
-                tmpParam = null,
+        coroutineScope.launch {
+            val updatedRecord = currentState.record.copy(
+                params = currentState.record.params + param,
             )
+            dropState(record = updatedRecord)
         }
     }
 
@@ -511,16 +547,11 @@ class VideoInteractor @Inject constructor(
 
         sharedEvents.emit(VideoToScreen.ShowScriptSavedSnackbar)
         startRecordingTime = 0L
-
-        cvUseCase.nextCvMode(CVMode.NO_CV)
-        cvUseCase.clearAllRectangles()
-        _stateFlow.update {
-            it.copy(record = VideoState.Record(), tmpParam = null)
-        }
+        dropState()
     }
 
     private suspend fun getOrResetKeyboard() {
-        val locale = currentState.tmpParam?.locale ?: return
+        val locale = currentState.keyboard.locale.ifEmpty { return }
         sharedEvents.emit(VideoToMenu.SetKeyboardLoading(true))
         val keyboardResult = scripterRepository.getKeyboard(
             serial = currentState.serial,

@@ -7,12 +7,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.RadioButtonChecked
-import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Keyboard
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -26,6 +25,7 @@ import com.vision.scripter.streaming.impl.blocks.menu.state.MenuState
 import com.vision.scripter.streaming.impl.blocks.menu.ui.MenuPreviewUiStateHolder
 import com.vision.scripter.streaming.impl.blocks.menu.ui.MenuUiStateHolder
 import com.vision.scripter.streaming.impl.blocks.menu.ui.usualMenuPreviewUiState
+import com.vision.scripter.streaming.impl.screen.main.state.KeyboardState
 import com.vision.scripter.ui.customClickable
 
 @Composable
@@ -44,52 +44,30 @@ fun KeyboardMenu(
         horizontalAlignment = Alignment.End,
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        if (menuState.isLoadingKeyboard) {
+        if (menuState.isLoading) {
             CircularProgressIndicator(modifier = Modifier.size(32.dp))
             return
         }
 
-        if (!menuState.fromUsual) {
-            Icon(
-                modifier = Modifier
-                    .size(32.dp)
-                    .customClickable(
-                        onClick = uiStateHolder::onRecordingClicked,
-                    ),
-                imageVector = Icons.Filled.RadioButtonChecked,
-                tint =
-                    if (menuState.recordingKeyboard) Color.Red
-                    else MaterialTheme.colorScheme.onSurface,
-                contentDescription = "",
-            )
-        }
-
         Icon(
             modifier = Modifier
                 .size(32.dp)
-                .customClickable(onClick = uiStateHolder::onKeyboardInitClicked),
-            imageVector = Icons.Filled.Search,
-            tint = MaterialTheme.colorScheme.onSurface,
-            contentDescription = ""
+                .customClickable(onClick = uiStateHolder::onKeyboardModeClicked),
+            imageVector = when (menuState.mode) {
+                KeyboardState.TYPING -> Icons.Filled.Keyboard
+                KeyboardState.EDIT -> Icons.Filled.Edit
+                KeyboardState.ADD_NEW -> Icons.Filled.Add
+            },
+            tint = Color.Red,
+            contentDescription = "",
         )
 
         Icon(
             modifier = Modifier
                 .size(32.dp)
-                .customClickable(onClick = { uiStateHolder.onKeyboardEdited(false) }),
-            imageVector = Icons.Filled.Edit,
-            tint = if (menuState.editing) Color.Red
-            else MaterialTheme.colorScheme.onSurface,
-            contentDescription = ""
-        )
-
-        Icon(
-            modifier = Modifier
-                .size(32.dp)
-                .customClickable(onClick = { uiStateHolder.onKeyboardEdited(true) }),
-            imageVector = Icons.Filled.Add,
-            tint = if (menuState.showCvRectangles) Color.Red
-            else MaterialTheme.colorScheme.onSurface,
+                .customClickable(onClick = uiStateHolder::onSaveClicked),
+            imageVector = Icons.Filled.Check,
+            tint = Color.Green,
             contentDescription = "",
         )
 
@@ -97,40 +75,29 @@ fun KeyboardMenu(
             modifier = Modifier
                 .size(32.dp)
                 .customClickable(onClick = uiStateHolder::onCancelClicked),
-            imageVector = Icons.Filled.Close,
+            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
             tint = MaterialTheme.colorScheme.onSurface,
-            contentDescription = ""
+            contentDescription = "",
         )
-
-        if (!menuState.fromUsual) {
-            Icon(
-                modifier = Modifier
-                    .size(32.dp)
-                    .customClickable(onClick = uiStateHolder::onSaveClicked),
-                imageVector = Icons.Filled.Check,
-                tint = Color.Green,
-                contentDescription = "",
-            )
-        }
     }
 }
 
 @Preview
 @Composable
-private fun KeyboardMenuDefaultPreview() {
+private fun KeyboardMenuTypingPreview() {
     KeyboardMenu(
-        menuState = MenuState.Keyboard(isLoadingKeyboard = false),
+        menuState = MenuState.Keyboard(isLoading = false),
         uiStateHolder = MenuPreviewUiStateHolder(usualMenuPreviewUiState),
     )
 }
 
 @Preview
 @Composable
-private fun KeyboardMenuFromUsualPreview() {
+private fun KeyboardMenuEditPreview() {
     KeyboardMenu(
         menuState = MenuState.Keyboard(
-            isLoadingKeyboard = false,
-            fromUsual = true,
+            isLoading = false,
+            mode = KeyboardState.EDIT,
         ),
         uiStateHolder = MenuPreviewUiStateHolder(usualMenuPreviewUiState),
     )
@@ -138,24 +105,11 @@ private fun KeyboardMenuFromUsualPreview() {
 
 @Preview
 @Composable
-private fun KeyboardMenuEditingPreview() {
+private fun KeyboardMenuAddNewPreview() {
     KeyboardMenu(
         menuState = MenuState.Keyboard(
-            isLoadingKeyboard = false,
-            editing = true,
-        ),
-        uiStateHolder = MenuPreviewUiStateHolder(usualMenuPreviewUiState),
-    )
-}
-
-@Preview
-@Composable
-private fun KeyboardMenuEditingShowCvPreview() {
-    KeyboardMenu(
-        menuState = MenuState.Keyboard(
-            isLoadingKeyboard = false,
-            editing = true,
-            showCvRectangles = true,
+            isLoading = false,
+            mode = KeyboardState.ADD_NEW,
         ),
         uiStateHolder = MenuPreviewUiStateHolder(usualMenuPreviewUiState),
     )

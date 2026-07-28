@@ -16,8 +16,7 @@ internal class MenuPreviewUiStateHolder(state: MenuUiState) : MenuUiStateHolder 
     override fun onTextModeClicked() {}
     override fun onTryToFindText(text: String, locale: String) {}
     override fun onKeyboardClicked() {}
-    override fun onKeyboardInitClicked() {}
-    override fun onKeyboardEdited(addNew: Boolean) {}
+    override fun onKeyboardModeClicked() {}
     override fun onEditKeyboardButtonSaved(oldKey: String, newKey: String) {}
     override fun onRecordingClicked() {}
     override fun onSaveClicked() {}

@@ -9,6 +9,7 @@ import com.vision.scripter.data.api.models.RectangleWithText
 import com.vision.scripter.data.api.models.ScreenSizes
 import com.vision.scripter.data.api.models.StreamingData
 import com.vision.scripter.streaming.impl.screen.main.state.DEFAULT_TIMEOUT
+import com.vision.scripter.streaming.impl.screen.main.state.KeyboardState
 import com.vision.scripter.streaming.impl.screen.main.state.NEW_SCRIPTS_NODE
 
 data class VideoState(
@@ -35,8 +36,10 @@ data class VideoState(
     )
 
     data class Keyboard(
-        val recording: Boolean = false,
+        val locale: String = "",
         val buttons: List<RectangleWithText> = listOf(),
+        val mode: KeyboardState = KeyboardState.TYPING,
+        val typedText: String = "",
     )
 }
 
