@@ -7,7 +7,7 @@ import com.vision.scripter.data.api.models.Script
 import com.vision.scripter.data.api.models.StreamingData
 import com.vision.scripter.network.api.ApiResponse
 
-interface ScripterRepository {
+interface ScripterDataSource {
     suspend fun getDevices(): ApiResponse<List<AdbDevice>>
     suspend fun getDevicePreview(serial: String): ApiResponse<ByteArray>
     suspend fun pingServer(): Boolean

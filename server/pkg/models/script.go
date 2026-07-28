@@ -29,6 +29,11 @@ const (
 // DefaultTimeout ...
 const DefaultTimeout int = 15
 
+const (
+	actionDown byte = 0
+	actionUp   byte = 1
+)
+
 // Script ...
 type Script struct {
 	Name     string      `json:"name"`
@@ -50,6 +55,20 @@ type Parameter struct {
 type Event struct {
 	Time int64        `json:"time"`
 	Data ControlBytes `json:"data"`
+}
+
+func ExtractTapEvents(events []Event) []Event {
+	for index := 0; index < len(events)-1; index++ {
+		downData := events[index].Data
+		upData := events[index+1].Data
+		if len(downData) != ControlBytesSize || len(upData) != ControlBytesSize {
+			continue
+		}
+		if downData[1] == actionDown && upData[1] == actionUp {
+			return []Event{events[index], events[index+1]}
+		}
+	}
+	return events
 }
 
 // ToJSON ...

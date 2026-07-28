@@ -112,6 +112,15 @@ func (i *interactorImpl) executeScript(
 
 	var timeout = script.GetTimeout()
 	for index, param := range script.Params {
+		if param.Type == models.TypeText {
+			err := i.typeText(serial, timeout, &param, script.Events)
+			if err != nil {
+				i.logger.Error(err.Error())
+				return
+			}
+			continue
+		}
+
 		if index < len(script.Params)-1 || len(script.Events) == 0 {
 			foundRect, err := i.findRectangle(serial, &param, timeout, scriptDir)
 			if err != nil {
@@ -123,7 +132,7 @@ func (i *interactorImpl) executeScript(
 			}
 		}
 
-		if param.Type != models.TypeText && len(script.Events) > 0 && index == len(script.Params)-1 {
+		if len(script.Events) > 0 && index == len(script.Params)-1 {
 			foundRect, err := i.findRectangle(serial, &param, timeout, scriptDir)
 			if err != nil {
 				i.logger.Error(err.Error())
@@ -131,16 +140,6 @@ func (i *interactorImpl) executeScript(
 			}
 			i.playEvent(serial, foundRect, script.Events)
 		}
-
-		if param.Type == models.TypeText {
-			err := i.typeText(serial, timeout, &param, script.Events)
-			if err != nil {
-				i.logger.Error(err.Error())
-				return
-			}
-		}
-
-		time.Sleep(300 * time.Millisecond) //animation delay
 	}
 
 	i.logger.Info(fmt.Sprintf("script %s is COMPLETE ✅", script.Name))
@@ -247,6 +246,7 @@ func (i *interactorImpl) typeText(
 		return fmt.Errorf("nothing to type")
 	}
 
+	tapEvents := models.ExtractTapEvents(events)
 	deadline := time.Now().Add(timeout)
 attemptsLoop:
 	for time.Now().Before(deadline) {
@@ -283,7 +283,7 @@ attemptsLoop:
 
 		for _, key := range keysToPress {
 			var imgRect = key.Rectangle.ToImageRectangle()
-			i.playEvent(serial, imgRect, events)
+			i.playEvent(serial, imgRect, tapEvents)
 			time.Sleep(numutils.RandDelay(100, 300) * time.Millisecond)
 		}
 

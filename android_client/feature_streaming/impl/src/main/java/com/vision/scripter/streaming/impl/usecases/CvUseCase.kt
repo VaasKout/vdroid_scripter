@@ -1,7 +1,7 @@
 package com.vision.scripter.streaming.impl.usecases
 
 import com.vision.scripter.data.api.CvStreamer
-import com.vision.scripter.data.api.ScripterRepository
+import com.vision.scripter.data.api.ScripterDataSource
 import com.vision.scripter.data.api.models.CvRectangle
 import com.vision.scripter.data.api.models.ScreenSizes
 import com.vision.scripter.data.api.models.adjustToClient
@@ -25,7 +25,7 @@ import javax.inject.Inject
 @ViewModelScoped
 class CvUseCase @Inject constructor(
     private val cvStreamer: CvStreamer,
-    private val scripterRepository: ScripterRepository,
+    private val scripterDataSource: ScripterDataSource,
 ) {
     private val cvMode = MutableStateFlow(CVMode.NO_CV)
 
@@ -110,7 +110,7 @@ class CvUseCase @Inject constructor(
         locale: String,
         screenSizes: ScreenSizes,
     ): Boolean {
-        val result = scripterRepository.findText(serial = serial, text = text, locale = locale)
+        val result = scripterDataSource.findText(serial = serial, text = text, locale = locale)
         if (result is ApiResponse.Success) {
             val rectangles = result.data.mapNotNull { it.rectangle }
             _selectedRectangles.update {
@@ -130,7 +130,7 @@ class CvUseCase @Inject constructor(
     ) {
         val tmpZone = _selectedRectangles.value.firstOrNull()
         if (!tmpZone.isEmpty()) {
-            scripterRepository.saveRect(
+            scripterDataSource.saveRect(
                 serial = serial,
                 node = node,
                 name = name,
@@ -151,7 +151,7 @@ class CvUseCase @Inject constructor(
         if (newName.isEmpty()) return false
 
         if (oldName.isNotEmpty()) {
-            val deleted = scripterRepository.deleteButton(
+            val deleted = scripterDataSource.deleteButton(
                 serial = serial,
                 locale = locale,
                 name = oldName
@@ -159,7 +159,7 @@ class CvUseCase @Inject constructor(
             if (!deleted) return false
         }
 
-        return scripterRepository.editKeyboard(
+        return scripterDataSource.editKeyboard(
             serial = serial,
             locale = locale,
             name = newName,

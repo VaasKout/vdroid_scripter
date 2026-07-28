@@ -1,7 +1,7 @@
 package com.vision.scripter.scripts.impl.state
 
 import com.vision.scripter.coroutines.api.CoroutineScopeFactory
-import com.vision.scripter.data.api.ScripterRepository
+import com.vision.scripter.data.api.ScripterDataSource
 import com.vision.scripter.network.api.ApiResponse
 import com.vision.scripter.ui.CommandFlow
 import com.vision.scripter.ui.states.LoadingState
@@ -23,7 +23,7 @@ import javax.inject.Inject
 @ViewModelScoped
 internal class ScriptsInteractor @Inject constructor(
     coroutineScopeFactory: CoroutineScopeFactory,
-    private val scripterRepository: ScripterRepository,
+    private val scripterDataSource: ScripterDataSource,
     private val uiStateMapper: ScriptsUiStateMapper,
 ) : ScriptsUiStateHolder {
 
@@ -51,8 +51,8 @@ internal class ScriptsInteractor @Inject constructor(
             }
 
             val node = currentState.selectedNode
-            val result = if (node.isEmpty()) scripterRepository.getNodes()
-            else scripterRepository.getNodeScripts(node)
+            val result = if (node.isEmpty()) scripterDataSource.getNodes()
+            else scripterDataSource.getNodeScripts(node)
 
             when (result) {
                 is ApiResponse.Success -> _stateFlow.update {
@@ -95,7 +95,7 @@ internal class ScriptsInteractor @Inject constructor(
         }
 
         coroutineScope.launch {
-            when (val result = scripterRepository.getDevices()) {
+            when (val result = scripterDataSource.getDevices()) {
                 is ApiResponse.Success -> {
                     _stateFlow.update {
                         it.copy(
@@ -125,7 +125,7 @@ internal class ScriptsInteractor @Inject constructor(
         if (serial.isEmpty() || name.isEmpty() || node.isEmpty()) return
 
         coroutineScope.launch {
-            val started = scripterRepository.runScript(serial = serial, node = node, name = name)
+            val started = scripterDataSource.runScript(serial = serial, node = node, name = name)
             if (!started) uiCommandsFlow.tryEmit(ScriptsUiCommand.ShowNetworkError)
         }
         onDismissDevicePicker()
@@ -165,8 +165,8 @@ internal class ScriptsInteractor @Inject constructor(
         val isNode = currentState.deleteIsNode
         val node = currentState.selectedNode
         coroutineScope.launch {
-            val deleted = if (isNode) scripterRepository.deleteNode(node = target)
-            else scripterRepository.deleteScript(node = node, name = target)
+            val deleted = if (isNode) scripterDataSource.deleteNode(node = target)
+            else scripterDataSource.deleteScript(node = node, name = target)
             if (!deleted) uiCommandsFlow.tryEmit(ScriptsUiCommand.ShowNetworkError)
             onDismissDeleteDialog()
             onLoadData(onStart = false)

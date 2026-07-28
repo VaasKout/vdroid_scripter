@@ -2,7 +2,7 @@ package com.vision.scripter.welcome.impl.state
 
 import androidx.core.net.toUri
 import com.vision.scripter.coroutines.api.CoroutineScopeFactory
-import com.vision.scripter.data.api.ScripterRepository
+import com.vision.scripter.data.api.ScripterDataSource
 import com.vision.scripter.prefs.api.DataStoreRepository
 import com.vision.scripter.ui.CommandFlow
 import com.vision.scripter.welcome.impl.ui.WelcomeUiCommand
@@ -26,7 +26,7 @@ class WelcomeInteractor @Inject constructor(
     coroutineScopeFactory: CoroutineScopeFactory,
     private val uiStateMapper: WelcomeStateUiMapper,
     private val dataStoreRepository: DataStoreRepository,
-    private val scripterRepository: ScripterRepository,
+    private val scripterDataSource: ScripterDataSource,
 ) : WelcomeUiStateHolder {
 
     private val _stateFlow = MutableStateFlow(WelcomeState())
@@ -54,7 +54,7 @@ class WelcomeInteractor @Inject constructor(
                     oldPort = if (port <= 0) "" else port.toString(),
                 )
             }
-            val serverAvailable = scripterRepository.pingServer()
+            val serverAvailable = scripterDataSource.pingServer()
             if (serverAvailable) {
                 uiCommandsFlow.tryEmit(WelcomeUiCommand.NavigateToMain)
             }
@@ -89,7 +89,7 @@ class WelcomeInteractor @Inject constructor(
             }
 
             dataStoreRepository.setServerUrl(fullUrl)
-            val serverAvailable = scripterRepository.pingServer()
+            val serverAvailable = scripterDataSource.pingServer()
             if (!serverAvailable) {
                 uiCommandsFlow.tryEmit(WelcomeUiCommand.ShowAddressError)
                 return@launch

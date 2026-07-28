@@ -1,6 +1,6 @@
 package com.vision.scripter.data.impl
 
-import com.vision.scripter.data.api.ScripterRepository
+import com.vision.scripter.data.api.ScripterDataSource
 import com.vision.scripter.data.api.models.AdbDevice
 import com.vision.scripter.data.api.models.AdbDevicesResponse
 import com.vision.scripter.data.api.models.CvRectangle
@@ -19,9 +19,9 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
-class ScripterRepositoryImpl @Inject constructor(
+class ScripterDataSourceImpl @Inject constructor(
     private val networkClient: NetworkClient,
-) : ScripterRepository {
+) : ScripterDataSource {
 
     override suspend fun getDevices(): ApiResponse<List<AdbDevice>> {
         return when (val result = networkClient.get("devices")) {

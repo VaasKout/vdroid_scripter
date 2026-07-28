@@ -2,7 +2,7 @@ package com.vision.scripter.data.impl
 
 import com.vision.scripter.data.api.ControlStreamer
 import com.vision.scripter.data.api.CvStreamer
-import com.vision.scripter.data.api.ScripterRepository
+import com.vision.scripter.data.api.ScripterDataSource
 import com.vision.scripter.data.api.VideoStreamer
 import dagger.Binds
 import dagger.Module
@@ -14,7 +14,7 @@ import dagger.hilt.components.SingletonComponent
 interface DataBindModule {
 
     @Binds
-    fun bindScripterRepository(scripterRepositoryImpl: ScripterRepositoryImpl): ScripterRepository
+    fun bindScripterRepository(scripterRepositoryImpl: ScripterDataSourceImpl): ScripterDataSource
 
     @Binds
     fun bindVideoStreamer(videoStreamerImpl: VideoStreamerImpl): VideoStreamer

@@ -7,7 +7,7 @@ import android.view.Surface
 import androidx.core.net.toUri
 import com.vision.scripter.coroutines.api.CoroutineScopeFactory
 import com.vision.scripter.data.api.ControlStreamer
-import com.vision.scripter.data.api.ScripterRepository
+import com.vision.scripter.data.api.ScripterDataSource
 import com.vision.scripter.data.api.models.Event
 import com.vision.scripter.data.api.models.Parameter
 import com.vision.scripter.data.api.models.RectangleWithText
@@ -55,7 +55,7 @@ import javax.inject.Inject
 class VideoInteractor @Inject constructor(
     coroutineScopeFactory: CoroutineScopeFactory,
     uiStateMapper: VideoUiStateMapper,
-    private val scripterRepository: ScripterRepository,
+    private val scripterDataSource: ScripterDataSource,
     private val dataStoreRepository: DataStoreRepository,
     private val videoUseCase: VideoUseCase,
     private val controlStreamer: ControlStreamer,
@@ -155,7 +155,7 @@ class VideoInteractor @Inject constructor(
             _stateFlow.update {
                 it.copy(serial = serial)
             }
-            when (val result = scripterRepository.startSockets(currentState.serial)) {
+            when (val result = scripterDataSource.startSockets(currentState.serial)) {
                 is ApiResponse.Success -> {
                     val fullServerUri = dataStoreRepository.getServerUrl().toUri()
                     _stateFlow.update {
@@ -316,9 +316,15 @@ class VideoInteractor @Inject constructor(
                         return@launch
                     }
 
-                    if (currentState.keyboard.buttons.isNotEmpty()) {
-                        handleKeyboard(event)
-                        return@launch
+                    val keyboard = currentState.keyboard
+                    val record = currentState.record
+                    if (keyboard.buttons.isNotEmpty()) {
+                        when (keyboard.mode) {
+                            KeyboardState.TYPING -> recordLetters(event)
+                            KeyboardState.EDIT -> selectKeyboardKey(event)
+                            KeyboardState.ADD_NEW -> selectNewKeyboardRect(event)
+                        }
+                        if (keyboard.mode != KeyboardState.TYPING) return@launch
                     }
 
                     val bytesArray = controlStreamer.sendControlData(
@@ -326,7 +332,12 @@ class VideoInteractor @Inject constructor(
                         event = event,
                     )
 
-                    if (currentState.record.controlRecording) recordBytes(bytesArray)
+                    if (
+                        record.controlRecording ||
+                        keyboard.mode == KeyboardState.TYPING && record.recordName.isNotEmpty()
+                    ) {
+                        recordBytes(bytesArray)
+                    }
                 } finally {
                     event.recycle()
                 }
@@ -427,18 +438,8 @@ class VideoInteractor @Inject constructor(
         }
     }
 
-    private fun handleKeyboard(event: MotionEvent) {
-        when (currentState.keyboard.mode) {
-            KeyboardState.TYPING -> { recordLetters(event)
-            }
-            KeyboardState.EDIT -> selectKeyboardKey(event)
-            KeyboardState.ADD_NEW -> selectNewKeyboardRect(event)
-        }
-    }
-
     private fun recordLetters(event: MotionEvent) {
-        if (event.action != ACTION_UP) return
-        if (currentState.record.recordName.isEmpty()) return
+        if (event.action != ACTION_UP || currentState.record.recordName.isEmpty()) return
 
         val keyboard = currentState.keyboard
         if (keyboard.locale.isEmpty()) return
@@ -534,7 +535,7 @@ class VideoInteractor @Inject constructor(
 
     private suspend fun saveScript() {
         val record = currentState.record
-        val success = scripterRepository.saveScript(
+        val success = scripterDataSource.saveScript(
             Script(
                 name = record.recordName,
                 node = record.node,
@@ -553,7 +554,7 @@ class VideoInteractor @Inject constructor(
     private suspend fun getOrResetKeyboard() {
         val locale = currentState.keyboard.locale.ifEmpty { return }
         sharedEvents.emit(VideoToMenu.SetKeyboardLoading(true))
-        val keyboardResult = scripterRepository.getKeyboard(
+        val keyboardResult = scripterDataSource.getKeyboard(
             serial = currentState.serial,
             locale = locale,
         )
@@ -562,7 +563,7 @@ class VideoInteractor @Inject constructor(
             return
         }
 
-        val resetResult = scripterRepository.resetKeyboard(
+        val resetResult = scripterDataSource.resetKeyboard(
             serial = currentState.serial,
             locale = locale,
         )

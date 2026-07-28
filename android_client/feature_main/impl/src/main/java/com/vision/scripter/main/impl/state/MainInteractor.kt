@@ -1,7 +1,7 @@
 package com.vision.scripter.main.impl.state
 
 import com.vision.scripter.coroutines.api.CoroutineScopeFactory
-import com.vision.scripter.data.api.ScripterRepository
+import com.vision.scripter.data.api.ScripterDataSource
 import com.vision.scripter.main.impl.ui.MainUiCommand
 import com.vision.scripter.main.impl.ui.MainUiState
 import com.vision.scripter.main.impl.ui.MainUiStateHolder
@@ -26,7 +26,7 @@ import javax.inject.Inject
 @ViewModelScoped
 class MainInteractor @Inject constructor(
     coroutineScopeFactory: CoroutineScopeFactory,
-    private val scripterRepository: ScripterRepository,
+    private val scripterDataSource: ScripterDataSource,
     private val uiStateMapper: MainUiStateMapper,
 ) : MainUiStateHolder {
 
@@ -49,7 +49,7 @@ class MainInteractor @Inject constructor(
                     else LoadingState.RefreshLoading,
                 )
             }
-            when (val result = scripterRepository.getDevices()) {
+            when (val result = scripterDataSource.getDevices()) {
                 is ApiResponse.Success -> {
                     _stateFlow.update { it.copy(devices = result.data) }
                 }
