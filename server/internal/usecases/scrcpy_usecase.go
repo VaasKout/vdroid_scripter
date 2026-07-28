@@ -123,6 +123,7 @@ func (i *interactorImpl) initPorts(basePort int) *ClientConnection {
 		VideoPort:   videoPort,
 		CVPort:      cvPort,
 		ControlPort: controlPort,
+		DoneCh:      make(chan struct{}),
 	}
 }
 
