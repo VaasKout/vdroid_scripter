@@ -19,7 +19,7 @@ interface MenuUiStateHolder {
     fun onKeyboardClicked()
     fun onKeyboardInitClicked()
     fun onKeyboardEdited(addNew: Boolean)
-    fun onEditKeyboardButtonSaved(newKey: String)
+    fun onEditKeyboardButtonSaved(oldKey: String, newKey: String)
 
     fun onRecordingClicked()
     fun onSaveClicked()

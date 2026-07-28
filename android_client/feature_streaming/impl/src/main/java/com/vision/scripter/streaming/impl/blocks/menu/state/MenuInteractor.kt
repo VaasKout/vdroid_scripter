@@ -60,10 +60,8 @@ class MenuInteractor @Inject constructor(
             it as? VideoToMenu
         }.onEach {
             when (it) {
-                is VideoToMenu.ScriptSaved -> onScriptSaved()
                 is VideoToMenu.SelectKeyboardKey -> onEditKeyboardRectangleSelected(it.oldKey)
                 is VideoToMenu.SetKeyboardLoading -> setKeyboardLoading(it.isLoading)
-                is VideoToMenu.TextFound -> onTextFound()
             }
         }.launchIn(coroutineScope)
     }
@@ -89,13 +87,27 @@ class MenuInteractor @Inject constructor(
 
     override fun onRecordingClicked() {
         when (val state = _menuState.value) {
-            is MenuState.Recording -> _menuState.update {
-                state.copy(controlRecording = !state.controlRecording)
+            is MenuState.Recording -> {
+                _menuState.update {
+                    state.copy(controlRecording = !state.controlRecording)
+                }
+                sharedEventsHolder.emit(
+                    MenuToVideo.OnRecordingClicked(
+                        isControlRecording = !state.controlRecording,
+                        isKeyboardRecording = false,
+                    )
+                )
             }
 
-            is MenuState.Keyboard -> _menuState.update {
-                state.copy(
-                    recordingKeyboard = !state.recordingKeyboard,
+            is MenuState.Keyboard -> {
+                _menuState.update {
+                    state.copy(recordingKeyboard = !state.recordingKeyboard)
+                }
+                sharedEventsHolder.emit(
+                    MenuToVideo.OnRecordingClicked(
+                        isControlRecording = false,
+                        isKeyboardRecording = !state.recordingKeyboard,
+                    )
                 )
             }
 
@@ -107,19 +119,34 @@ class MenuInteractor @Inject constructor(
         when (val state = _menuState.value) {
             is MenuState.Recording -> {
                 _menuState.update { MenuState.SelectingCV(localCvMode = CVMode.CV_RECTS) }
-                sharedEventsHolder.emit(MenuToVideo.NextCvMode(CVMode.CV_RECTS))
+                sharedEventsHolder.emit(
+                    MenuToVideo.OnCvModeClicked(
+                        recording = true,
+                        nextMode = CVMode.CV_RECTS,
+                    )
+                )
             }
 
             is MenuState.SelectingCV -> {
                 val cvMode = state.localCvMode.toggleDetection()
                 _menuState.update { state.copy(localCvMode = cvMode) }
-                sharedEventsHolder.emit(MenuToVideo.NextCvMode(cvMode))
+                sharedEventsHolder.emit(
+                    MenuToVideo.OnCvModeClicked(
+                        recording = true,
+                        nextMode = cvMode,
+                    )
+                )
             }
 
             is MenuState.Usual -> {
                 val newCvMode = state.localCvMode.increment()
                 _menuState.update { state.copy(localCvMode = newCvMode) }
-                sharedEventsHolder.emit(MenuToVideo.NextCvMode(newCvMode))
+                sharedEventsHolder.emit(
+                    MenuToVideo.OnCvModeClicked(
+                        recording = false,
+                        nextMode = newCvMode,
+                    )
+                )
             }
 
             else -> {}
@@ -130,7 +157,7 @@ class MenuInteractor @Inject constructor(
         val state = _menuState.value
         if (state is MenuState.Usual && state.textHighlighted) {
             _menuState.update { state.copy(textHighlighted = false) }
-            sharedEventsHolder.emit(MenuToVideo.NextCvMode(CVMode.NO_CV))
+            sharedEventsHolder.emit(MenuToVideo.OnTextModeClicked(false))
             return
         }
         _dialogState.update { DialogState.Text }
@@ -138,10 +165,7 @@ class MenuInteractor @Inject constructor(
 
     override fun onTryToFindText(text: String, locale: String) {
         hideDialog()
-        sharedEventsHolder.emit(MenuToVideo.TextFound(text = text.trim(), locale = locale))
-    }
-
-    fun onTextFound() {
+        sharedEventsHolder.emit(MenuToVideo.FindText(text = text.trim(), locale = locale))
         when (val state = _menuState.value) {
             is MenuState.Recording -> {
                 _menuState.update {
@@ -175,22 +199,33 @@ class MenuInteractor @Inject constructor(
         _menuState.update { newState }
     }
 
-    override fun onEditKeyboardButtonSaved(newKey: String) {
+    override fun onEditKeyboardButtonSaved(oldKey: String, newKey: String) {
         val state = _menuState.value
         if (state !is MenuState.Keyboard) return
         hideDialog()
-        sharedEventsHolder.emit(MenuToVideo.KeyboardButtonEdited(newKey))
+        sharedEventsHolder.emit(MenuToVideo.KeyboardButtonEdited(oldKey, newKey))
     }
 
     override fun onSaveClicked() {
         sharedEventsHolder.emit(MenuToVideo.SaveClicked)
+        val state = _menuState.value
+        when (state) {
+            is MenuState.SelectingText, is MenuState.SelectingCV, is MenuState.Keyboard -> {
+                _menuState.update { MenuState.Recording() }
+            }
+
+            is MenuState.Recording -> {
+                _menuState.update { MenuState.Usual(expanded = true) }
+            }
+
+            else -> Unit
+        }
     }
 
     override fun onCancelClicked() {
         when (val state = _menuState.value) {
             is MenuState.Recording -> {
                 _menuState.update { MenuState.Usual(expanded = true) }
-                sharedEventsHolder.emit(MenuToVideo.RecordCancelled)
             }
 
             is MenuState.Keyboard -> {
@@ -205,7 +240,7 @@ class MenuInteractor @Inject constructor(
                 _menuState.update { MenuState.Recording() }
             }
         }
-        sharedEventsHolder.emit(MenuToVideo.NextCvMode(CVMode.NO_CV))
+        sharedEventsHolder.emit(MenuToVideo.CancelClicked)
     }
 
     override fun onExitClicked() {
@@ -240,10 +275,6 @@ class MenuInteractor @Inject constructor(
 
     override fun onDialogDismissed() {
         hideDialog()
-    }
-
-    private fun onScriptSaved() {
-        _menuState.update { MenuState.Usual() }
     }
 
     private fun setKeyboardLoading(isLoading: Boolean) {

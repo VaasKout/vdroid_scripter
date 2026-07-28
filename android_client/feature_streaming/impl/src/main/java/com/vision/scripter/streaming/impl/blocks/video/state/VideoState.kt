@@ -22,30 +22,22 @@ data class VideoState(
     val selectedRectangles: List<CvRectangle> = listOf(),
 
     val record: Record = Record(),
-    val keyboardButtons: List<RectangleWithText> = listOf(),
-    val actionState: ActionState = ActionState.None,
+    val keyboard: Keyboard = Keyboard(),
+    val tmpParam: Parameter? = null,
 ) {
     data class Record(
+        val controlRecording: Boolean = false,
         val recordName: String = "",
         val node: String = NEW_SCRIPTS_NODE,
         val params: List<Parameter> = listOf(),
         val events: List<Event> = listOf(),
         val timeout: Int = DEFAULT_TIMEOUT,
-    ) {
-        fun lastParam(): Parameter {
-            return this.params.lastOrNull() ?: Parameter()
-        }
-    }
+    )
 
-    sealed interface ActionState {
-        data object None : ActionState
-        data object Recording : ActionState
-        data object SelectingCV : ActionState
-        data object SelectingText : ActionState
-        data class KeyboardRecording(val typeText: String) : ActionState
-        data class EditingKeyboard(val oldKey: String) : ActionState
-        data object AddingKeyboardKeys : ActionState
-    }
+    data class Keyboard(
+        val recording: Boolean = false,
+        val buttons: List<RectangleWithText> = listOf(),
+    )
 }
 
 enum class VideoCodec(

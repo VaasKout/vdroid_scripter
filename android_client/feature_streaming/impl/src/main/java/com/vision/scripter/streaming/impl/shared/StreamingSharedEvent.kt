@@ -4,9 +4,7 @@ import com.vision.scripter.streaming.impl.screen.main.state.CVMode
 
 // video -> menu
 sealed interface VideoToMenu : StreamingSharedEvent {
-    data object TextFound : VideoToMenu
     data class SetKeyboardLoading(val isLoading: Boolean) : VideoToMenu
-    data object ScriptSaved : VideoToMenu
     data class SelectKeyboardKey(val oldKey: String) : VideoToMenu
 }
 
@@ -25,14 +23,19 @@ sealed interface ScreenToVideo : StreamingSharedEvent {
 // menu -> video
 sealed interface MenuToVideo : StreamingSharedEvent {
     data object SaveClicked : MenuToVideo
-    data class NextCvMode(val cvMode: CVMode) : MenuToVideo
-    data object RecordCancelled : MenuToVideo
-    data class TextFound(val text: String, val locale: String) : MenuToVideo
+    data object CancelClicked : MenuToVideo
+    data class OnCvModeClicked(val nextMode: CVMode, val recording: Boolean) : MenuToVideo
+    data class OnTextModeClicked(val recording: Boolean) : MenuToVideo
+    data class FindText(val text: String, val locale: String) : MenuToVideo
     data object KeyboardInited : MenuToVideo
-    data class KeyboardButtonEdited(val newKey: String) : MenuToVideo
+    data class KeyboardButtonEdited(val oldKey: String, val newKey: String) : MenuToVideo
     data class LocaleSaved(val locale: String) : MenuToVideo
     data class RecordNameSaved(val name: String) : MenuToVideo
     data class TimeoutSaved(val timeout: Int) : MenuToVideo
+    data class OnRecordingClicked(
+        val isControlRecording: Boolean,
+        val isKeyboardRecording: Boolean
+    ) : MenuToVideo
 }
 
 sealed interface StreamingSharedEvent

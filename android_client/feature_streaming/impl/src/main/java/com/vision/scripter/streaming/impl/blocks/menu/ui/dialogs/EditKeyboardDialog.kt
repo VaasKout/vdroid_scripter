@@ -31,7 +31,7 @@ private const val MAX_BUTTON_NAME_LENGTH = 32
 @Composable
 fun EditKeyboardDialog(
     oldKey: String,
-    onSave: (String) -> Unit,
+    onSave: (String, String) -> Unit,
     onDismiss: () -> Unit,
 ) {
     var text by remember { mutableStateOf("") }
@@ -85,7 +85,7 @@ fun EditKeyboardDialog(
                     if (text.isBlank()) {
                         isError = true
                     } else {
-                        onSave(text)
+                        onSave(oldKey, text)
                     }
                 },
             ) {
@@ -120,7 +120,7 @@ private fun EditKeyboardDialogPreview() {
     Box(modifier = Modifier.fillMaxSize()) {
         EditKeyboardDialog(
             oldKey = "Q",
-            onSave = {},
+            onSave = { _, _ -> },
             onDismiss = {},
         )
     }
@@ -132,7 +132,7 @@ private fun EditKeyboardDialogNoKeyPreview() {
     Box(modifier = Modifier.fillMaxSize()) {
         EditKeyboardDialog(
             oldKey = "",
-            onSave = {},
+            onSave = { _, _ -> },
             onDismiss = {},
         )
     }
