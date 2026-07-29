@@ -1,38 +1,28 @@
 package com.vision.scripter.scripts.impl.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.vision.scripter.main.impl.R
 import com.vision.scripter.scripts.impl.state.ScriptsUiState
 import com.vision.scripter.scripts.impl.state.ScriptsUiStateHolder
 import com.vision.scripter.ui.CustomPullToRefresh
 import com.vision.scripter.ui.DeleteDialog
-import com.vision.scripter.ui.customClickable
 
 @Composable
 internal fun ScriptsScreen(
@@ -45,6 +35,10 @@ internal fun ScriptsScreen(
 
     LaunchedEffect(Unit) {
         uiStateHolder.onLoadData(onStart = true)
+    }
+
+    BackHandler(enabled = state.showScripts) {
+        uiStateHolder.onBack()
     }
 
     if (state.isLoading) {
@@ -72,13 +66,6 @@ internal fun ScriptsScreen(
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             if (state.showScripts) {
-                item(key = "back_header") {
-                    BackHeader(
-                        node = state.selectedNode,
-                        onBack = uiStateHolder::onBack,
-                    )
-                }
-
                 items(
                     items = state.scripts,
                     key = { item -> item },
@@ -129,34 +116,6 @@ internal fun ScriptsScreen(
             onSelect = uiStateHolder::onSelectDevice,
             onConfirm = uiStateHolder::onConfirmRunScript,
             onDismiss = uiStateHolder::onDismissDevicePicker,
-        )
-    }
-}
-
-@Composable
-private fun BackHeader(
-    node: String,
-    onBack: () -> Unit,
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        Icon(
-            modifier = Modifier
-                .size(32.dp)
-                .customClickable(onClick = onBack),
-            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-            tint = MaterialTheme.colorScheme.onSurface,
-            contentDescription = "",
-        )
-        Text(
-            text = node,
-            style = TextStyle(
-                fontSize = 22.sp,
-                fontWeight = FontWeight.Bold,
-            ),
         )
     }
 }

@@ -18,10 +18,13 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.vision.scripter.main.impl.R
 import com.vision.scripter.main.impl.ui.items.MainTopBar
+import com.vision.scripter.scripts.impl.state.ScriptsUiState
 import com.vision.scripter.scripts.impl.state.ScriptsUiStateHolder
 import com.vision.scripter.scripts.impl.ui.ScriptsScreen
+import com.vision.scripter.scripts.impl.ui.ScriptsTopBar
 import com.vision.scripter.ui.ProvideSnackbarHost
 
 private const val HomeTab = 0
@@ -34,11 +37,23 @@ internal fun MainContainerScreen(
     snackbarHostState: SnackbarHostState,
 ) {
     var selectedTab by rememberSaveable { mutableIntStateOf(HomeTab) }
+    val scriptsState = scriptsUiStateHolder.uiStateFlow.collectAsStateWithLifecycle(
+        initialValue = ScriptsUiState(),
+    ).value
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
-        topBar = { MainTopBar(onSettingsClick = {}) },
+        topBar = {
+            if (selectedTab == ScriptsTab && scriptsState.showScripts) {
+                ScriptsTopBar(
+                    node = scriptsState.selectedNode,
+                    onBack = scriptsUiStateHolder::onBack,
+                )
+            } else {
+                MainTopBar(onSettingsClick = {})
+            }
+        },
         snackbarHost = { ProvideSnackbarHost(snackbarHostState) },
         bottomBar = {
             NavigationBar {
