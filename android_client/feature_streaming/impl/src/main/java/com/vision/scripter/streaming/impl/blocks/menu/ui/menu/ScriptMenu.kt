@@ -26,7 +26,7 @@ import com.vision.scripter.streaming.impl.blocks.menu.state.MenuState
 import com.vision.scripter.streaming.impl.blocks.menu.ui.MenuPreviewUiStateHolder
 import com.vision.scripter.streaming.impl.blocks.menu.ui.MenuUiStateHolder
 import com.vision.scripter.streaming.impl.blocks.menu.ui.usualMenuPreviewUiState
-import com.vision.scripter.streaming.impl.screen.main.state.DEFAULT_TIMEOUT
+import com.vision.scripter.streaming.impl.screen.state.DEFAULT_TIMEOUT
 import com.vision.scripter.ui.customClickable
 
 @Composable

@@ -18,7 +18,7 @@ import com.vision.scripter.streaming.impl.blocks.menu.ui.menu.ScriptMenu
 import com.vision.scripter.streaming.impl.blocks.menu.ui.menu.SelectingTemplateMenu
 import com.vision.scripter.streaming.impl.blocks.menu.ui.menu.SelectingTextMenu
 import com.vision.scripter.streaming.impl.blocks.menu.ui.menu.UsualMenu
-import com.vision.scripter.streaming.impl.screen.main.state.DEFAULT_TIMEOUT
+import com.vision.scripter.streaming.impl.screen.state.DEFAULT_TIMEOUT
 
 @Composable
 fun MenuBlock(

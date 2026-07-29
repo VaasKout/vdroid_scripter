@@ -24,7 +24,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.vision.scripter.streaming.impl.R
-import com.vision.scripter.streaming.impl.screen.main.state.DEFAULT_TIMEOUT
+import com.vision.scripter.streaming.impl.screen.state.DEFAULT_TIMEOUT
 import com.vision.scripter.ui.R as CoreR
 
 private const val MAX_TIMEOUT_DIGITS = 3

@@ -1,8 +1,8 @@
 package com.vision.scripter.streaming.impl.blocks.menu.state
 
-import com.vision.scripter.streaming.impl.screen.main.state.CVMode
-import com.vision.scripter.streaming.impl.screen.main.state.DEFAULT_TIMEOUT
-import com.vision.scripter.streaming.impl.screen.main.state.KeyboardState
+import com.vision.scripter.streaming.impl.screen.state.CVMode
+import com.vision.scripter.streaming.impl.screen.state.DEFAULT_TIMEOUT
+import com.vision.scripter.streaming.impl.screen.state.KeyboardState
 
 sealed interface MenuState {
     data class Usual(

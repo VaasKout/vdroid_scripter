@@ -1,4 +1,4 @@
-package com.vision.scripter.streaming.impl.screen.main.state
+package com.vision.scripter.streaming.impl.screen.state
 
 const val ENG = "eng"
 const val RUS = "rus"

@@ -13,25 +13,29 @@ import com.vision.scripter.data.api.models.Parameter
 import com.vision.scripter.data.api.models.RectangleWithText
 import com.vision.scripter.data.api.models.Script
 import com.vision.scripter.data.api.models.adjustToClient
+import com.vision.scripter.data.api.models.adjustToServer
 import com.vision.scripter.data.api.models.contains
 import com.vision.scripter.network.api.ApiResponse
 import com.vision.scripter.prefs.api.DataStoreRepository
 import com.vision.scripter.streaming.impl.blocks.video.ui.VideoUiState
 import com.vision.scripter.streaming.impl.blocks.video.ui.VideoUiStateHolder
-import com.vision.scripter.streaming.impl.screen.main.commandobservers.MenuToVideo
-import com.vision.scripter.streaming.impl.screen.main.commandobservers.ScreenToVideo
-import com.vision.scripter.streaming.impl.screen.main.commandobservers.VideoToMenu
-import com.vision.scripter.streaming.impl.screen.main.commandobservers.VideoToScreen
-import com.vision.scripter.streaming.impl.screen.main.state.CVMode
-import com.vision.scripter.streaming.impl.screen.main.state.KeyboardState
-import com.vision.scripter.streaming.impl.screen.main.state.SPACE_KEY
-import com.vision.scripter.streaming.impl.screen.main.state.TEMPLATE
-import com.vision.scripter.streaming.impl.screen.main.state.TEXT
-import com.vision.scripter.streaming.impl.screen.main.state.TYPE_TEXT
-import com.vision.scripter.streaming.impl.screen.main.state.YOLO_CLASS
-import com.vision.scripter.streaming.impl.screen.main.state.toType
-import com.vision.scripter.streaming.impl.usecases.CvUseCase
-import com.vision.scripter.streaming.impl.usecases.VideoUseCase
+import com.vision.scripter.streaming.impl.data.CvStreamerRepository
+import com.vision.scripter.streaming.impl.data.KeyboardRepository
+import com.vision.scripter.streaming.impl.data.VideoStreamerRepository
+import com.vision.scripter.streaming.impl.domain.Keyboard
+import com.vision.scripter.streaming.impl.domain.Record
+import com.vision.scripter.streaming.impl.screen.commandobservers.MenuToVideo
+import com.vision.scripter.streaming.impl.screen.commandobservers.ScreenToVideo
+import com.vision.scripter.streaming.impl.screen.commandobservers.VideoToMenu
+import com.vision.scripter.streaming.impl.screen.commandobservers.VideoToScreen
+import com.vision.scripter.streaming.impl.screen.state.CVMode
+import com.vision.scripter.streaming.impl.screen.state.KeyboardState
+import com.vision.scripter.streaming.impl.screen.state.SPACE_KEY
+import com.vision.scripter.streaming.impl.screen.state.TEMPLATE
+import com.vision.scripter.streaming.impl.screen.state.TEXT
+import com.vision.scripter.streaming.impl.screen.state.TYPE_TEXT
+import com.vision.scripter.streaming.impl.screen.state.YOLO_CLASS
+import com.vision.scripter.streaming.impl.screen.state.toType
 import com.vision.scripter.ui.CommandFlow
 import dagger.hilt.android.scopes.ViewModelScoped
 import kotlinx.coroutines.CoroutineScope
@@ -57,9 +61,10 @@ class VideoInteractor @Inject constructor(
     uiStateMapper: VideoUiStateMapper,
     private val scripterDataSource: ScripterDataSource,
     private val dataStoreRepository: DataStoreRepository,
-    private val videoUseCase: VideoUseCase,
+    private val videoRepository: VideoStreamerRepository,
     private val controlStreamer: ControlStreamer,
-    private val cvUseCase: CvUseCase,
+    private val cvRepository: CvStreamerRepository,
+    private val keyboardRepository: KeyboardRepository,
 ) : VideoUiStateHolder {
 
     private val coroutineScope: CoroutineScope =
@@ -91,19 +96,19 @@ class VideoInteractor @Inject constructor(
     }
 
     private fun startReactiveStreams() {
-        cvUseCase.observeRectangles().onEach { rectangles ->
+        cvRepository.observeRectangles().onEach { rectangles ->
             _stateFlow.update {
                 it.copy(cvRectangles = rectangles)
             }
         }.launchIn(coroutineScope)
 
-        cvUseCase.observeSelectedRectangles().onEach { selected ->
+        cvRepository.observeSelectedRectangles().onEach { selected ->
             _stateFlow.update {
                 it.copy(selectedRectangles = selected)
             }
         }.launchIn(coroutineScope)
 
-        videoUseCase.observeScreenSizes().onEach { screenSizes ->
+        videoRepository.observeScreenSizes().onEach { screenSizes ->
             _stateFlow.update {
                 it.copy(screenSizes = screenSizes)
             }
@@ -180,11 +185,11 @@ class VideoInteractor @Inject constructor(
                 }
             }
             if (cvMode == CVMode.NO_CV) {
-                cvUseCase.restoreSelectedRectangles()
+                cvRepository.restoreSelectedRectangles()
             } else {
-                cvUseCase.snapshotSelectedRectangles()
+                cvRepository.snapshotSelectedRectangles()
             }
-            cvUseCase.nextCvMode(cvMode)
+            cvRepository.nextCvMode(cvMode)
         }
     }
 
@@ -204,9 +209,9 @@ class VideoInteractor @Inject constructor(
 
                 if (parameter.type == TEMPLATE) {
                     val screenSizes = currentState.screenSizes ?: return@launch
-                    cvUseCase.nextCvMode(CVMode.NO_CV)
+                    cvRepository.nextCvMode(CVMode.NO_CV)
                     val templateName = "${currentState.record.params.size + 1}"
-                    cvUseCase.saveSelectedRectangle(
+                    cvRepository.saveSelectedRectangle(
                         serial = currentState.serial,
                         node = currentState.record.node,
                         name = currentState.record.recordName,
@@ -219,8 +224,8 @@ class VideoInteractor @Inject constructor(
 
                 if (parameter.type == YOLO_CLASS) {
                     val label =
-                        cvUseCase.observeSelectedRectangles().value.firstOrNull()?.label.orEmpty()
-                    cvUseCase.nextCvMode(CVMode.NO_CV)
+                        cvRepository.observeSelectedRectangles().value.firstOrNull()?.label.orEmpty()
+                    cvRepository.nextCvMode(CVMode.NO_CV)
                     addParam(parameter.copy(value = label))
                     return@launch
                 }
@@ -245,7 +250,7 @@ class VideoInteractor @Inject constructor(
     ) {
         streamJob = coroutineScope.launch {
             val streamingData = currentState.streamingData ?: return@launch
-            val videoConnected = videoUseCase.initConnection(
+            val videoConnected = videoRepository.initConnection(
                 host = currentState.streamingHost,
                 port = streamingData.videoPort.toInt(),
                 newSurface = newSurface,
@@ -258,7 +263,7 @@ class VideoInteractor @Inject constructor(
                 port = streamingData.controlPort.toInt(),
             )
 
-            val cvConnected = cvUseCase.initConnection(
+            val cvConnected = cvRepository.initConnection(
                 host = currentState.streamingHost,
                 port = streamingData.cvPort.toInt(),
             )
@@ -278,11 +283,11 @@ class VideoInteractor @Inject constructor(
             screenCommandsFlow.tryEmit(VideoToScreen.SuccessLoading)
 
             launch {
-                videoUseCase.decodeFramesInLoop(
+                videoRepository.decodeFramesInLoop(
                     mimeType = currentState.videoCodec.mimeType,
                 )
             }
-            cvUseCase.decodeRectanglesInLoop(
+            cvRepository.decodeRectanglesInLoop(
                 screenSizes = screenSizes,
             )
         }
@@ -305,7 +310,7 @@ class VideoInteractor @Inject constructor(
                     val tmpParam = currentState.tmpParam
                     if (tmpParam?.type == TEMPLATE || tmpParam?.type == YOLO_CLASS) {
                         if (event.action == ACTION_DOWN) {
-                            cvUseCase.selectRectangle(x = event.x.toInt(), y = event.y.toInt())
+                            cvRepository.selectRectangle(x = event.x.toInt(), y = event.y.toInt())
                         }
                         return@launch
                     }
@@ -344,7 +349,7 @@ class VideoInteractor @Inject constructor(
             mutex.withLock {
                 val parameter = currentState.tmpParam
                 val newRecordName = if (parameter != null) currentState.record.recordName else ""
-                dropState(record = VideoState.Record(recordName = newRecordName))
+                dropState(record = Record(recordName = newRecordName))
             }
         }
     }
@@ -353,7 +358,7 @@ class VideoInteractor @Inject constructor(
         coroutineScope.launch {
             mutex.withLock {
                 val screenSizes = currentState.screenSizes ?: return@launch
-                val found = cvUseCase.findTextRectangles(
+                val found = cvRepository.findTextRectangles(
                     serial = currentState.serial,
                     text = text,
                     locale = locale,
@@ -376,13 +381,13 @@ class VideoInteractor @Inject constructor(
                 _stateFlow.update {
                     it.copy(keyboard = it.keyboard.copy(mode = keyboardState))
                 }
-                cvUseCase.clearSelectedRectangles()
+                cvRepository.clearSelectedRectangles()
 
                 if (keyboardState == KeyboardState.ADD_NEW) {
-                    cvUseCase.nextCvMode(CVMode.CV_RECTS)
+                    cvRepository.nextCvMode(CVMode.CV_RECTS)
                     return@withLock
                 }
-                cvUseCase.nextCvMode(CVMode.NO_CV)
+                cvRepository.nextCvMode(CVMode.NO_CV)
             }
         }
     }
@@ -392,14 +397,16 @@ class VideoInteractor @Inject constructor(
             mutex.withLock {
                 val locale = currentState.keyboard.locale.ifEmpty { return@launch }
                 val screenSizes = currentState.screenSizes ?: return@launch
-                val success = cvUseCase.editKeyboardSelectedRectangle(
+                val tmpZone =
+                    cvRepository.observeSelectedRectangles().value.firstOrNull() ?: return@launch
+                val success = keyboardRepository.editKeyboardSelectedRectangle(
                     serial = currentState.serial,
                     locale = locale,
                     oldName = oldKey,
                     newName = newKey,
-                    screenSizes = screenSizes,
+                    rectangle = tmpZone.adjustToServer(screenSizes),
                 )
-                cvUseCase.clearSelectedRectangles()
+                cvRepository.clearSelectedRectangles()
                 if (success) {
                     getOrResetKeyboard()
                     return@launch
@@ -413,7 +420,7 @@ class VideoInteractor @Inject constructor(
         coroutineScope.launch {
             mutex.withLock {
                 _stateFlow.update {
-                    it.copy(keyboard = VideoState.Keyboard(locale = locale, mode = mode))
+                    it.copy(keyboard = Keyboard(locale = locale, mode = mode))
                 }
                 getOrResetKeyboard()
             }
@@ -457,13 +464,13 @@ class VideoInteractor @Inject constructor(
         val button = currentState.keyboard.buttons.firstOrNull {
             it.contains(x = event.x.toInt(), y = event.y.toInt())
         } ?: return
-        cvUseCase.setSelectedRectangle(button.rectangle)
+        cvRepository.setSelectedRectangle(button.rectangle)
         menuCommandsFlow.tryEmit(VideoToMenu.SelectKeyboardKey(button.text))
     }
 
     private fun selectNewKeyboardRect(event: MotionEvent) {
         if (event.action != ACTION_DOWN) return
-        cvUseCase.selectRectangle(x = event.x.toInt(), y = event.y.toInt())
+        cvRepository.selectRectangle(x = event.x.toInt(), y = event.y.toInt())
         menuCommandsFlow.tryEmit(VideoToMenu.SelectKeyboardKey(""))
     }
 
@@ -482,16 +489,16 @@ class VideoInteractor @Inject constructor(
         )
     }
 
-    private suspend fun dropState(record: VideoState.Record? = null) {
+    private suspend fun dropState(record: Record? = null) {
         _stateFlow.update {
             it.copy(
-                record = record ?: VideoState.Record(),
+                record = record ?: Record(),
                 tmpParam = null,
-                keyboard = VideoState.Keyboard(),
+                keyboard = Keyboard(),
             )
         }
-        cvUseCase.clearSelectedRectangles()
-        cvUseCase.nextCvMode(CVMode.NO_CV)
+        cvRepository.clearSelectedRectangles()
+        cvRepository.nextCvMode(CVMode.NO_CV)
     }
 
     private fun recordBytes(bytesArray: ByteArray?) {
@@ -587,9 +594,9 @@ class VideoInteractor @Inject constructor(
             streamJob?.cancel()
             streamJob = null
         }
-        videoUseCase.stop()
+        videoRepository.stop()
         controlStreamer.close()
-        cvUseCase.close()
+        cvRepository.close()
     }
 
     fun clear() {

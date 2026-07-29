@@ -20,7 +20,7 @@ import androidx.compose.ui.unit.dp
 import com.vision.scripter.streaming.impl.blocks.menu.ui.MenuPreviewUiStateHolder
 import com.vision.scripter.streaming.impl.blocks.menu.ui.MenuUiStateHolder
 import com.vision.scripter.streaming.impl.blocks.menu.ui.usualMenuPreviewUiState
-import com.vision.scripter.streaming.impl.screen.main.state.CVMode
+import com.vision.scripter.streaming.impl.screen.state.CVMode
 import com.vision.scripter.ui.customClickable
 
 @Composable

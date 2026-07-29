@@ -1,7 +1,7 @@
-package com.vision.scripter.streaming.impl.screen.main.commandobservers
+package com.vision.scripter.streaming.impl.screen.commandobservers
 
 import androidx.compose.runtime.Composable
-import com.vision.scripter.streaming.impl.screen.main.ui.StreamingUiStateHolder
+import com.vision.scripter.streaming.impl.screen.ui.StreamingUiStateHolder
 import com.vision.scripter.ui.observe
 
 @Composable

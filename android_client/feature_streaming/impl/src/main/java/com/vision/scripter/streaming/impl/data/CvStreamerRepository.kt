@@ -1,4 +1,4 @@
-package com.vision.scripter.streaming.impl.usecases
+package com.vision.scripter.streaming.impl.data
 
 import com.vision.scripter.data.api.CvStreamer
 import com.vision.scripter.data.api.ScripterDataSource
@@ -9,7 +9,7 @@ import com.vision.scripter.data.api.models.adjustToServer
 import com.vision.scripter.data.api.models.isEmpty
 import com.vision.scripter.data.api.models.smallestBy
 import com.vision.scripter.network.api.ApiResponse
-import com.vision.scripter.streaming.impl.screen.main.state.CVMode
+import com.vision.scripter.streaming.impl.screen.state.CVMode
 import dagger.hilt.android.scopes.ViewModelScoped
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -23,7 +23,7 @@ import java.util.concurrent.atomic.AtomicReference
 import javax.inject.Inject
 
 @ViewModelScoped
-class CvUseCase @Inject constructor(
+class CvStreamerRepository @Inject constructor(
     private val cvStreamer: CvStreamer,
     private val scripterDataSource: ScripterDataSource,
 ) {
@@ -118,7 +118,7 @@ class CvUseCase @Inject constructor(
             }
         }
 
-        return result is ApiResponse.Success
+        return result is ApiResponse.Success && result.data.isNotEmpty()
     }
 
     suspend fun saveSelectedRectangle(
@@ -138,33 +138,6 @@ class CvUseCase @Inject constructor(
                 rectangle = tmpZone?.adjustToServer(screenSizes),
             )
         }
-    }
-
-    suspend fun editKeyboardSelectedRectangle(
-        serial: String,
-        locale: String,
-        oldName: String,
-        newName: String,
-        screenSizes: ScreenSizes,
-    ): Boolean {
-        val tmpZone = _selectedRectangles.value.firstOrNull() ?: return false
-        if (newName.isEmpty()) return false
-
-        if (oldName.isNotEmpty()) {
-            val deleted = scripterDataSource.deleteButton(
-                serial = serial,
-                locale = locale,
-                name = oldName
-            )
-            if (!deleted) return false
-        }
-
-        return scripterDataSource.editKeyboard(
-            serial = serial,
-            locale = locale,
-            name = newName,
-            rectangle = tmpZone.adjustToServer(screenSizes),
-        )
     }
 
     fun selectRectangle(x: Int, y: Int) {

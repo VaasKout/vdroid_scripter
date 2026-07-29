@@ -16,10 +16,10 @@ import androidx.navigation.navArgument
 import com.vision.scripter.streaming.api.FeatureStreaming
 import com.vision.scripter.streaming.api.StreamingRouteWithArgs
 import com.vision.scripter.streaming.api.StreamingSerialArg
-import com.vision.scripter.streaming.impl.screen.main.commandobservers.StreamingCommandObserver
-import com.vision.scripter.streaming.impl.screen.main.commandobservers.StreamingSharedEventObserver
-import com.vision.scripter.streaming.impl.screen.main.state.StreamingViewModel
-import com.vision.scripter.streaming.impl.screen.main.ui.StreamingScreen
+import com.vision.scripter.streaming.impl.screen.commandobservers.StreamingCommandObserver
+import com.vision.scripter.streaming.impl.screen.commandobservers.StreamingSharedEventObserver
+import com.vision.scripter.streaming.impl.screen.state.StreamingViewModel
+import com.vision.scripter.streaming.impl.screen.ui.StreamingScreen
 import dagger.hilt.android.scopes.ActivityScoped
 import javax.inject.Inject
 

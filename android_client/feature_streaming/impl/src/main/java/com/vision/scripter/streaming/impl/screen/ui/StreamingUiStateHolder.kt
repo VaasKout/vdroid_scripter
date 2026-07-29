@@ -1,8 +1,8 @@
-package com.vision.scripter.streaming.impl.screen.main.ui
+package com.vision.scripter.streaming.impl.screen.ui
 
 import androidx.compose.runtime.Stable
-import com.vision.scripter.streaming.impl.screen.main.commandobservers.StreamingSharedEvent
-import com.vision.scripter.streaming.impl.screen.main.commandobservers.VideoToScreen
+import com.vision.scripter.streaming.impl.screen.commandobservers.StreamingSharedEvent
+import com.vision.scripter.streaming.impl.screen.commandobservers.VideoToScreen
 import com.vision.scripter.ui.CommandFlow
 import com.vision.scripter.ui.CommandFlow2
 import kotlinx.coroutines.flow.StateFlow

@@ -1,6 +1,6 @@
-package com.vision.scripter.streaming.impl.screen.main.state
+package com.vision.scripter.streaming.impl.screen.state
 
-import com.vision.scripter.streaming.impl.screen.main.ui.StreamingUiState
+import com.vision.scripter.streaming.impl.screen.ui.StreamingUiState
 import dagger.hilt.android.scopes.ViewModelScoped
 import javax.inject.Inject
 

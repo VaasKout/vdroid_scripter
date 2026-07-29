@@ -2,9 +2,9 @@ package com.vision.scripter.streaming.impl.blocks.video.commandobservers
 
 import androidx.compose.runtime.Composable
 import com.vision.scripter.streaming.impl.blocks.video.ui.VideoUiStateHolder
-import com.vision.scripter.streaming.impl.screen.main.commandobservers.MenuToVideo
-import com.vision.scripter.streaming.impl.screen.main.commandobservers.ScreenToVideo
-import com.vision.scripter.streaming.impl.screen.main.ui.StreamingUiStateHolder
+import com.vision.scripter.streaming.impl.screen.commandobservers.MenuToVideo
+import com.vision.scripter.streaming.impl.screen.commandobservers.ScreenToVideo
+import com.vision.scripter.streaming.impl.screen.ui.StreamingUiStateHolder
 import com.vision.scripter.ui.observe
 
 @Composable

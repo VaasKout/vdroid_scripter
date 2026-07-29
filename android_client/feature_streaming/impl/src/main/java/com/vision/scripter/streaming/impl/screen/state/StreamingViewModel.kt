@@ -1,7 +1,7 @@
-package com.vision.scripter.streaming.impl.screen.main.state
+package com.vision.scripter.streaming.impl.screen.state
 
 import androidx.lifecycle.ViewModel
-import com.vision.scripter.streaming.impl.screen.main.ui.StreamingUiStateHolder
+import com.vision.scripter.streaming.impl.screen.ui.StreamingUiStateHolder
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 

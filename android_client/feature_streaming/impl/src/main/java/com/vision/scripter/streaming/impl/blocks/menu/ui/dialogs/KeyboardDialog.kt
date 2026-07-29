@@ -21,7 +21,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.vision.scripter.streaming.impl.R
-import com.vision.scripter.streaming.impl.screen.main.state.keyboardLocales
+import com.vision.scripter.streaming.impl.screen.state.keyboardLocales
 import com.vision.scripter.ui.SimpleDropdownMenu
 import com.vision.scripter.ui.R as CoreR
 

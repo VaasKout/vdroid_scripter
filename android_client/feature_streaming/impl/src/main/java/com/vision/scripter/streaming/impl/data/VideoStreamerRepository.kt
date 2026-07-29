@@ -1,4 +1,4 @@
-package com.vision.scripter.streaming.impl.usecases
+package com.vision.scripter.streaming.impl.data
 
 import android.media.MediaCodec
 import android.media.MediaCodecInfo
@@ -14,7 +14,7 @@ import kotlinx.coroutines.flow.update
 import javax.inject.Inject
 
 @ViewModelScoped
-class VideoUseCase @Inject constructor(
+class VideoStreamerRepository @Inject constructor(
     private val videoStreamer: VideoStreamer,
 ) {
 

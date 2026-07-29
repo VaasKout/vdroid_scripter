@@ -1,7 +1,7 @@
-package com.vision.scripter.streaming.impl.screen.main.commandobservers
+package com.vision.scripter.streaming.impl.screen.commandobservers
 
-import com.vision.scripter.streaming.impl.screen.main.state.CVMode
-import com.vision.scripter.streaming.impl.screen.main.state.KeyboardState
+import com.vision.scripter.streaming.impl.screen.state.CVMode
+import com.vision.scripter.streaming.impl.screen.state.KeyboardState
 
 // video -> menu
 sealed interface VideoToMenu : StreamingSharedEvent {

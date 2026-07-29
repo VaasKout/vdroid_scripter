@@ -2,10 +2,10 @@ package com.vision.scripter.streaming.impl.blocks.video.ui
 
 import android.view.MotionEvent
 import android.view.Surface
-import com.vision.scripter.streaming.impl.screen.main.commandobservers.MenuToVideo
-import com.vision.scripter.streaming.impl.screen.main.commandobservers.ScreenToVideo
-import com.vision.scripter.streaming.impl.screen.main.commandobservers.VideoToMenu
-import com.vision.scripter.streaming.impl.screen.main.commandobservers.VideoToScreen
+import com.vision.scripter.streaming.impl.screen.commandobservers.MenuToVideo
+import com.vision.scripter.streaming.impl.screen.commandobservers.ScreenToVideo
+import com.vision.scripter.streaming.impl.screen.commandobservers.VideoToMenu
+import com.vision.scripter.streaming.impl.screen.commandobservers.VideoToScreen
 import com.vision.scripter.ui.CommandFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow

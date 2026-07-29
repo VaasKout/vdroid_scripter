@@ -1,4 +1,4 @@
-package com.vision.scripter.streaming.impl.screen.main.commandobservers
+package com.vision.scripter.streaming.impl.screen.commandobservers
 
 import android.widget.Toast
 import androidx.compose.material3.SnackbarHostState
@@ -6,8 +6,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import com.vision.scripter.streaming.impl.R
-import com.vision.scripter.streaming.impl.screen.main.ui.StreamingUiCommand
-import com.vision.scripter.streaming.impl.screen.main.ui.StreamingUiStateHolder
+import com.vision.scripter.streaming.impl.screen.ui.StreamingUiCommand
+import com.vision.scripter.streaming.impl.screen.ui.StreamingUiStateHolder
 import com.vision.scripter.ui.observe
 import com.vision.scripter.ui.R as CommonR
 
