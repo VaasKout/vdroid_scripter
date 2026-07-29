@@ -12,6 +12,7 @@ class VideoViewModel @Inject constructor(
 
     override fun onCleared() {
         super.onCleared()
+        videoInteractor.closeStreams()
         videoInteractor.clear()
     }
 }

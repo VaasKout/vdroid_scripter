@@ -13,10 +13,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.vision.scripter.streaming.impl.R
+import com.vision.scripter.streaming.impl.blocks.menu.commandobservers.MenuSharedCommandObserver
+import com.vision.scripter.streaming.impl.blocks.menu.state.MenuViewModel
 import com.vision.scripter.streaming.impl.blocks.menu.ui.MenuBlock
+import com.vision.scripter.streaming.impl.blocks.video.commandobservers.VideoSharedCommandObserver
+import com.vision.scripter.streaming.impl.blocks.video.state.VideoViewModel
 import com.vision.scripter.streaming.impl.blocks.video.ui.VideoBlock
 import com.vision.scripter.ui.CustomButton
 import com.vision.scripter.ui.ProvideSnackbarHost
@@ -28,21 +33,35 @@ internal fun StreamingScreen(
     snackbarHostState: SnackbarHostState,
     navController: NavController,
 ) {
-    val state = uiStateHolder.uiStateFlow.collectAsStateWithLifecycle(
-        initialValue = StreamingUiState(),
-    ).value ?: StreamingUiState()
-
-    LaunchedEffect(Unit) {
-        uiStateHolder.onLoadData(serial = serial)
+    val state = uiStateHolder.uiStateFlow.collectAsStateWithLifecycle().value
+    val menuUiStateHolder = hiltViewModel<MenuViewModel>()
+    val videoUiStateHolder = hiltViewModel<VideoViewModel>()
+    LaunchedEffect(serial) {
+        videoUiStateHolder.init(serial)
     }
 
+    VideoSharedCommandObserver(
+        videoUiStateHolder = videoUiStateHolder,
+        streamingUiStateHolder = uiStateHolder,
+    )
+
+    MenuSharedCommandObserver(
+        menuUiStateHolder = menuUiStateHolder,
+        streamingUiStateHolder = uiStateHolder,
+    )
+
     Box(modifier = Modifier.fillMaxSize()) {
-        VideoBlock(modifier = Modifier.fillMaxSize())
+        VideoBlock(
+            modifier = Modifier.fillMaxSize(),
+            uiStateHolder = videoUiStateHolder,
+        )
+
         MenuBlock(
             modifier = Modifier
                 .align(Alignment.TopEnd)
                 .padding(top = 128.dp),
             navController = navController,
+            uiStateHolder = menuUiStateHolder,
         )
     }
 
@@ -64,7 +83,7 @@ internal fun StreamingScreen(
                         .padding(horizontal = 16.dp)
                         .align(Alignment.Center),
                     text = stringResource(R.string.retry),
-                    onClick = { uiStateHolder.onLoadData(serial) },
+                    onClick = uiStateHolder::onRefresh,
                 )
                 return@Scaffold
             }

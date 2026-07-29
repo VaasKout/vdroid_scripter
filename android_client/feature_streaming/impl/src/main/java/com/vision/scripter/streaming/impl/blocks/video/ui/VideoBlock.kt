@@ -2,20 +2,18 @@ package com.vision.scripter.streaming.impl.blocks.video.ui
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.vision.scripter.streaming.impl.blocks.video.state.VideoViewModel
 import com.vision.scripter.streaming.impl.blocks.video.ui.items.RectanglesCanvas
 import com.vision.scripter.streaming.impl.blocks.video.ui.items.VideoSurface
 
 @Composable
 fun VideoBlock(
     modifier: Modifier = Modifier,
+    uiStateHolder: VideoUiStateHolder,
 ) {
-    val uiStateHolder = hiltViewModel<VideoViewModel>()
     val state = uiStateHolder.uiStateFlow.collectAsStateWithLifecycle().value
-
     if (state.streamingIsLoading) return
+
     VideoSurface(
         modifier = modifier,
         onSurfaceCreated = uiStateHolder::onVideoSurfaceCreated,

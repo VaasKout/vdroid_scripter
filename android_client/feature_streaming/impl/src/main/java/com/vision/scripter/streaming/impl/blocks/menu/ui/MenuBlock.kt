@@ -3,13 +3,11 @@ package com.vision.scripter.streaming.impl.blocks.menu.ui
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.vision.scripter.streaming.impl.blocks.menu.commandobservers.MenuCommandObserver
 import com.vision.scripter.streaming.impl.blocks.menu.state.DialogState
 import com.vision.scripter.streaming.impl.blocks.menu.state.MenuState
-import com.vision.scripter.streaming.impl.blocks.menu.state.MenuViewModel
 import com.vision.scripter.streaming.impl.blocks.menu.ui.dialogs.EditKeyboardDialog
 import com.vision.scripter.streaming.impl.blocks.menu.ui.dialogs.KeyboardDialog
 import com.vision.scripter.streaming.impl.blocks.menu.ui.dialogs.RecordDialog
@@ -26,19 +24,18 @@ import com.vision.scripter.streaming.impl.screen.main.state.DEFAULT_TIMEOUT
 fun MenuBlock(
     modifier: Modifier = Modifier,
     navController: NavController,
+    uiStateHolder: MenuUiStateHolder,
 ) {
-    val menuUiStateHolder = hiltViewModel<MenuViewModel>()
-    val state = menuUiStateHolder.uiStateFlow.collectAsStateWithLifecycle().value
-
+    val state = uiStateHolder.uiStateFlow.collectAsStateWithLifecycle().value
     MenuCommandObserver(
-        uiStateHolder = menuUiStateHolder,
+        uiStateHolder = uiStateHolder,
         navController = navController,
     )
 
     MenuContent(
         modifier = modifier,
         state = state,
-        uiStateHolder = menuUiStateHolder,
+        uiStateHolder = uiStateHolder,
     )
 }
 

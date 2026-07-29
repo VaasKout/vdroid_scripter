@@ -1,5 +1,7 @@
 package com.vision.scripter.streaming.impl.blocks.menu.ui
 
+import com.vision.scripter.streaming.impl.screen.main.commandobservers.MenuToVideo
+import com.vision.scripter.streaming.impl.screen.main.commandobservers.VideoToMenu
 import com.vision.scripter.ui.CommandFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -10,6 +12,8 @@ internal class MenuPreviewUiStateHolder(state: MenuUiState) : MenuUiStateHolder 
     override val uiCommandsFlow: CommandFlow<MenuUiCommand>
         get() = throw UnsupportedOperationException()
     override val uiStateFlow: StateFlow<MenuUiState> = MutableStateFlow(state)
+    override val videoCommandsFlow: CommandFlow<MenuToVideo>
+        get() = throw UnsupportedOperationException()
 
     override fun onScriptModeClicked() {}
     override fun onCvModeClicked() {}
@@ -18,6 +22,7 @@ internal class MenuPreviewUiStateHolder(state: MenuUiState) : MenuUiStateHolder 
     override fun onKeyboardClicked() {}
     override fun onKeyboardModeClicked() {}
     override fun onEditKeyboardButtonSaved(oldKey: String, newKey: String) {}
+    override fun onSharedEvent(event: VideoToMenu) {}
     override fun onRecordingClicked() {}
     override fun onSaveClicked() {}
     override fun onExpandClicked() {}

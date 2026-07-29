@@ -16,8 +16,6 @@ fun MenuCommandObserver(
             is MenuUiCommand.ExitCommand -> {
                 navController.popBackStack()
             }
-
-            else -> Unit
         }
     }
 }

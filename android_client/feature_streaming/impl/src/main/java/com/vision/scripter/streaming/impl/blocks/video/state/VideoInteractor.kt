@@ -18,6 +18,10 @@ import com.vision.scripter.network.api.ApiResponse
 import com.vision.scripter.prefs.api.DataStoreRepository
 import com.vision.scripter.streaming.impl.blocks.video.ui.VideoUiState
 import com.vision.scripter.streaming.impl.blocks.video.ui.VideoUiStateHolder
+import com.vision.scripter.streaming.impl.screen.main.commandobservers.MenuToVideo
+import com.vision.scripter.streaming.impl.screen.main.commandobservers.ScreenToVideo
+import com.vision.scripter.streaming.impl.screen.main.commandobservers.VideoToMenu
+import com.vision.scripter.streaming.impl.screen.main.commandobservers.VideoToScreen
 import com.vision.scripter.streaming.impl.screen.main.state.CVMode
 import com.vision.scripter.streaming.impl.screen.main.state.KeyboardState
 import com.vision.scripter.streaming.impl.screen.main.state.SPACE_KEY
@@ -26,13 +30,9 @@ import com.vision.scripter.streaming.impl.screen.main.state.TEXT
 import com.vision.scripter.streaming.impl.screen.main.state.TYPE_TEXT
 import com.vision.scripter.streaming.impl.screen.main.state.YOLO_CLASS
 import com.vision.scripter.streaming.impl.screen.main.state.toType
-import com.vision.scripter.streaming.impl.shared.MenuToVideo
-import com.vision.scripter.streaming.impl.shared.ScreenToVideo
-import com.vision.scripter.streaming.impl.shared.StreamingSharedEventsHolder
-import com.vision.scripter.streaming.impl.shared.VideoToMenu
-import com.vision.scripter.streaming.impl.shared.VideoToScreen
 import com.vision.scripter.streaming.impl.usecases.CvUseCase
 import com.vision.scripter.streaming.impl.usecases.VideoUseCase
+import com.vision.scripter.ui.CommandFlow
 import dagger.hilt.android.scopes.ViewModelScoped
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -60,7 +60,6 @@ class VideoInteractor @Inject constructor(
     private val videoUseCase: VideoUseCase,
     private val controlStreamer: ControlStreamer,
     private val cvUseCase: CvUseCase,
-    private val sharedEvents: StreamingSharedEventsHolder,
 ) : VideoUiStateHolder {
 
     private val coroutineScope: CoroutineScope =
@@ -76,9 +75,8 @@ class VideoInteractor @Inject constructor(
         .map(uiStateMapper::map)
         .stateIn(coroutineScope, SharingStarted.Eagerly, VideoUiState())
 
-    fun clear() {
-        coroutineScope.cancel()
-    }
+    override val menuCommandsFlow: CommandFlow<VideoToMenu> = CommandFlow(coroutineScope)
+    override val screenCommandsFlow: CommandFlow<VideoToScreen> = CommandFlow(coroutineScope)
 
     private val mutex = Mutex()
     private val touchMutex = Mutex()
@@ -110,23 +108,22 @@ class VideoInteractor @Inject constructor(
                 it.copy(screenSizes = screenSizes)
             }
         }.launchIn(coroutineScope)
-
-        sharedEvents.sharedEventsFlow.onEach { event ->
-            when (event) {
-                is ScreenToVideo -> handleScreenToVideo(event)
-                is MenuToVideo -> handleMenuToVideo(event)
-                else -> Unit
-            }
-        }.launchIn(coroutineScope)
     }
 
-    private fun handleScreenToVideo(event: ScreenToVideo) {
+    override fun init(serial: String) {
+        _stateFlow.update {
+            it.copy(serial = serial)
+        }
+        onLoadData()
+    }
+
+    override fun onSharedEvent(event: ScreenToVideo) {
         when (event) {
-            is ScreenToVideo.StartLoading -> onLoadData(event.serial)
+            is ScreenToVideo.Refresh -> onLoadData()
         }
     }
 
-    private fun handleMenuToVideo(event: MenuToVideo) {
+    override fun onSharedEvent(event: MenuToVideo) {
         when (event) {
             is MenuToVideo.SaveClicked -> onSaveClicked()
             is MenuToVideo.OnCvModeClicked -> nextCvMode(event.nextMode, event.recording)
@@ -150,11 +147,8 @@ class VideoInteractor @Inject constructor(
         }
     }
 
-    private fun onLoadData(serial: String) {
+    private fun onLoadData() {
         coroutineScope.launch {
-            _stateFlow.update {
-                it.copy(serial = serial)
-            }
             when (val result = scripterDataSource.startSockets(currentState.serial)) {
                 is ApiResponse.Success -> {
                     val fullServerUri = dataStoreRepository.getServerUrl().toUri()
@@ -167,7 +161,7 @@ class VideoInteractor @Inject constructor(
                 }
 
                 is ApiResponse.Error -> {
-                    sharedEvents.emit(VideoToScreen.ShowNetworkError)
+                    screenCommandsFlow.tryEmit(VideoToScreen.ShowNetworkError)
                 }
             }
         }
@@ -277,11 +271,11 @@ class VideoInteractor @Inject constructor(
                 _stateFlow.update {
                     it.copy(streamingData = null)
                 }
-                sharedEvents.emit(VideoToScreen.ShowNetworkError)
+                screenCommandsFlow.tryEmit(VideoToScreen.ShowNetworkError)
                 return@launch
             }
 
-            sharedEvents.emit(VideoToScreen.SuccessLoading)
+            screenCommandsFlow.tryEmit(VideoToScreen.SuccessLoading)
 
             launch {
                 videoUseCase.decodeFramesInLoop(
@@ -366,7 +360,7 @@ class VideoInteractor @Inject constructor(
                     screenSizes = screenSizes,
                 )
                 if (!found) {
-                    sharedEvents.emit(VideoToScreen.ShowNetworkError)
+                    screenCommandsFlow.tryEmit(VideoToScreen.ShowNetworkError)
                     return@launch
                 }
                 _stateFlow.update {
@@ -410,7 +404,7 @@ class VideoInteractor @Inject constructor(
                     getOrResetKeyboard()
                     return@launch
                 }
-                sharedEvents.emit(VideoToScreen.ShowNetworkError)
+                screenCommandsFlow.tryEmit(VideoToScreen.ShowNetworkError)
             }
         }
     }
@@ -464,13 +458,13 @@ class VideoInteractor @Inject constructor(
             it.contains(x = event.x.toInt(), y = event.y.toInt())
         } ?: return
         cvUseCase.setSelectedRectangle(button.rectangle)
-        sharedEvents.emit(VideoToMenu.SelectKeyboardKey(button.text))
+        menuCommandsFlow.tryEmit(VideoToMenu.SelectKeyboardKey(button.text))
     }
 
     private fun selectNewKeyboardRect(event: MotionEvent) {
         if (event.action != ACTION_DOWN) return
         cvUseCase.selectRectangle(x = event.x.toInt(), y = event.y.toInt())
-        sharedEvents.emit(VideoToMenu.SelectKeyboardKey(""))
+        menuCommandsFlow.tryEmit(VideoToMenu.SelectKeyboardKey(""))
     }
 
     private suspend fun saveKeyboard() {
@@ -546,14 +540,14 @@ class VideoInteractor @Inject constructor(
         )
         if (!success) return
 
-        sharedEvents.emit(VideoToScreen.ShowScriptSavedSnackbar)
+        screenCommandsFlow.tryEmit(VideoToScreen.ShowScriptSavedSnackbar)
         startRecordingTime = 0L
         dropState()
     }
 
     private suspend fun getOrResetKeyboard() {
         val locale = currentState.keyboard.locale.ifEmpty { return }
-        sharedEvents.emit(VideoToMenu.SetKeyboardLoading(true))
+        menuCommandsFlow.tryEmit(VideoToMenu.SetKeyboardLoading(true))
         val keyboardResult = scripterDataSource.getKeyboard(
             serial = currentState.serial,
             locale = locale,
@@ -571,8 +565,8 @@ class VideoInteractor @Inject constructor(
             setupKeyboardRects(resetResult.data)
             return
         }
-        sharedEvents.emit(VideoToMenu.SetKeyboardLoading(false))
-        sharedEvents.emit(VideoToScreen.ShowNetworkError)
+        menuCommandsFlow.tryEmit(VideoToMenu.SetKeyboardLoading(false))
+        screenCommandsFlow.tryEmit(VideoToScreen.ShowNetworkError)
     }
 
     private fun setupKeyboardRects(data: List<RectangleWithText>) {
@@ -585,7 +579,7 @@ class VideoInteractor @Inject constructor(
         _stateFlow.update {
             it.copy(keyboard = it.keyboard.copy(buttons = buttons))
         }
-        sharedEvents.emit(VideoToMenu.SetKeyboardLoading(false))
+        menuCommandsFlow.tryEmit(VideoToMenu.SetKeyboardLoading(false))
     }
 
     fun closeStreams() {
@@ -596,5 +590,9 @@ class VideoInteractor @Inject constructor(
         videoUseCase.stop()
         controlStreamer.close()
         cvUseCase.close()
+    }
+
+    fun clear() {
+        coroutineScope.cancel()
     }
 }

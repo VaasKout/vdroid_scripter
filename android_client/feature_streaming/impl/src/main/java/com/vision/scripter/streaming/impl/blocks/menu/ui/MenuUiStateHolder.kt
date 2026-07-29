@@ -1,6 +1,8 @@
 package com.vision.scripter.streaming.impl.blocks.menu.ui
 
 import androidx.compose.runtime.Stable
+import com.vision.scripter.streaming.impl.screen.main.commandobservers.MenuToVideo
+import com.vision.scripter.streaming.impl.screen.main.commandobservers.VideoToMenu
 import com.vision.scripter.ui.CommandFlow
 import kotlinx.coroutines.flow.StateFlow
 
@@ -9,6 +11,9 @@ interface MenuUiStateHolder {
 
     val uiCommandsFlow: CommandFlow<MenuUiCommand>
     val uiStateFlow: StateFlow<MenuUiState>
+    val videoCommandsFlow: CommandFlow<MenuToVideo>
+
+    fun onSharedEvent(event: VideoToMenu)
 
     fun onScriptModeClicked()
     fun onCvModeClicked()

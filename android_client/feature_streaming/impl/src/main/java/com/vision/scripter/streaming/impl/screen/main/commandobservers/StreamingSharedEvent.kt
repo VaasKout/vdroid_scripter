@@ -1,4 +1,4 @@
-package com.vision.scripter.streaming.impl.shared
+package com.vision.scripter.streaming.impl.screen.main.commandobservers
 
 import com.vision.scripter.streaming.impl.screen.main.state.CVMode
 import com.vision.scripter.streaming.impl.screen.main.state.KeyboardState
@@ -18,7 +18,7 @@ sealed interface VideoToScreen : StreamingSharedEvent {
 
 // screen -> video
 sealed interface ScreenToVideo : StreamingSharedEvent {
-    data class StartLoading(val serial: String) : ScreenToVideo
+    data object Refresh : ScreenToVideo
 }
 
 // menu -> video
