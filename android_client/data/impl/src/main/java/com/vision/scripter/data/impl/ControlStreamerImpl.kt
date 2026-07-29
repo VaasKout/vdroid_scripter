@@ -30,6 +30,7 @@ class ControlStreamerImpl @Inject constructor() : ControlStreamer {
     ): Boolean {
         try {
             socket = SocketFactory.getDefault().createSocket()
+            socket?.tcpNoDelay = true
             val address = InetSocketAddress(host, port)
             socket?.connect(address, SOCKET_TIMEOUT_MS)
         } catch (e: IOException) {
