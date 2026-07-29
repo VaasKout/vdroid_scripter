@@ -2,7 +2,7 @@ package com.vision.scripter.streaming.impl.blocks.menu.state
 
 import com.vision.scripter.streaming.impl.screen.state.CVMode
 import com.vision.scripter.streaming.impl.screen.state.DEFAULT_TIMEOUT
-import com.vision.scripter.streaming.impl.screen.state.KeyboardState
+import com.vision.scripter.streaming.impl.screen.state.KeyboardMode
 
 sealed interface MenuState {
     data class Usual(
@@ -25,7 +25,7 @@ sealed interface MenuState {
 
     data class Keyboard(
         val isLoading: Boolean = true,
-        val mode: KeyboardState = KeyboardState.TYPING,
+        val mode: KeyboardMode = KeyboardMode.TYPING,
         val fromUsual: Boolean = false,
     ) : MenuState
 }

@@ -7,7 +7,7 @@ import com.vision.scripter.streaming.impl.blocks.menu.ui.MenuUiStateHolder
 import com.vision.scripter.streaming.impl.screen.commandobservers.MenuToVideo
 import com.vision.scripter.streaming.impl.screen.commandobservers.VideoToMenu
 import com.vision.scripter.streaming.impl.screen.state.CVMode
-import com.vision.scripter.streaming.impl.screen.state.KeyboardState
+import com.vision.scripter.streaming.impl.screen.state.KeyboardMode
 import com.vision.scripter.streaming.impl.screen.state.increment
 import com.vision.scripter.streaming.impl.screen.state.toggleDetection
 import com.vision.scripter.ui.CommandFlow
@@ -223,14 +223,12 @@ class MenuInteractor @Inject constructor(
     override fun onSaveLocale(locale: String) {
         hideDialog()
         val updated = when (_menuState.value) {
-            is MenuState.Recording -> MenuState.Keyboard(mode = KeyboardState.TYPING)
-            is MenuState.Usual -> MenuState.Keyboard(fromUsual = true, mode = KeyboardState.EDIT)
+            is MenuState.Recording -> MenuState.Keyboard(mode = KeyboardMode.TYPING)
+            is MenuState.Usual -> MenuState.Keyboard(fromUsual = true, mode = KeyboardMode.TYPING)
             else -> return
         }
         _menuState.update { updated }
-        videoCommandsFlow.tryEmit(
-            MenuToVideo.KeyboardLocaleSaved(locale = locale, mode = updated.mode)
-        )
+        videoCommandsFlow.tryEmit(MenuToVideo.KeyboardLocaleSaved(locale = locale))
     }
 
     override fun onDialogDismissed() {
@@ -254,7 +252,7 @@ class MenuInteractor @Inject constructor(
 
     private fun onEditKeyboardRectangleSelected(oldKey: String) {
         val state = _menuState.value
-        if (state is MenuState.Keyboard && state.mode != KeyboardState.TYPING) {
+        if (state is MenuState.Keyboard && state.mode != KeyboardMode.TYPING) {
             _dialogState.update { DialogState.EditKeyboard(oldKey) }
         }
     }

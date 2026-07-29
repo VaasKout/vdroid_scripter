@@ -3,11 +3,13 @@ package com.vision.scripter.streaming.impl.blocks.video.state
 import android.annotation.SuppressLint
 import android.media.MediaFormat
 import com.vision.scripter.data.api.models.CvRectangle
+import com.vision.scripter.data.api.models.Event
 import com.vision.scripter.data.api.models.Parameter
+import com.vision.scripter.data.api.models.RectangleWithText
 import com.vision.scripter.data.api.models.ScreenSizes
 import com.vision.scripter.data.api.models.StreamingData
-import com.vision.scripter.streaming.impl.domain.Keyboard
-import com.vision.scripter.streaming.impl.domain.Record
+import com.vision.scripter.streaming.impl.screen.state.DEFAULT_TIMEOUT
+import com.vision.scripter.streaming.impl.screen.state.NEW_SCRIPTS_NODE
 
 data class VideoState(
     val serial: String = "",
@@ -16,13 +18,22 @@ data class VideoState(
     val streamingHost: String = "",
     val videoCodec: VideoCodec = VideoCodec.H264,
     val streamingData: StreamingData? = null,
+    val tmpParam: Parameter? = null,
+
     val cvRectangles: List<CvRectangle> = listOf(),
     val selectedRectangles: List<CvRectangle> = listOf(),
-
+    val keyboardButtons: List<RectangleWithText> = listOf(),
     val record: Record = Record(),
-    val keyboard: Keyboard = Keyboard(),
-    val tmpParam: Parameter? = null,
-)
+) {
+    data class Record(
+        val controlRecording: Boolean = false,
+        val name: String = "",
+        val node: String = NEW_SCRIPTS_NODE,
+        val params: List<Parameter> = listOf(),
+        val events: List<Event> = listOf(),
+        val timeout: Int = DEFAULT_TIMEOUT,
+    )
+}
 
 enum class VideoCodec(
     val id: Int,

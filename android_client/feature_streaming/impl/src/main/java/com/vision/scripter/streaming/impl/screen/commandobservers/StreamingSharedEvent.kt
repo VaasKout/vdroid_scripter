@@ -1,7 +1,7 @@
 package com.vision.scripter.streaming.impl.screen.commandobservers
 
 import com.vision.scripter.streaming.impl.screen.state.CVMode
-import com.vision.scripter.streaming.impl.screen.state.KeyboardState
+import com.vision.scripter.streaming.impl.screen.state.KeyboardMode
 
 // video -> menu
 sealed interface VideoToMenu : StreamingSharedEvent {
@@ -28,9 +28,9 @@ sealed interface MenuToVideo : StreamingSharedEvent {
     data class OnCvModeClicked(val nextMode: CVMode, val recording: Boolean) : MenuToVideo
     data class OnTextModeClicked(val recording: Boolean) : MenuToVideo
     data class FindText(val text: String, val locale: String) : MenuToVideo
-    data class KeyboardStateChanged(val keyboardState: KeyboardState) : MenuToVideo
+    data class KeyboardStateChanged(val keyboardMode: KeyboardMode) : MenuToVideo
     data class KeyboardButtonEdited(val oldKey: String, val newKey: String) : MenuToVideo
-    data class KeyboardLocaleSaved(val locale: String, val mode: KeyboardState) : MenuToVideo
+    data class KeyboardLocaleSaved(val locale: String) : MenuToVideo
     data class RecordNameSaved(val name: String) : MenuToVideo
     data class TimeoutSaved(val timeout: Int) : MenuToVideo
     data class OnRecordingClicked(val isControlRecording: Boolean) : MenuToVideo

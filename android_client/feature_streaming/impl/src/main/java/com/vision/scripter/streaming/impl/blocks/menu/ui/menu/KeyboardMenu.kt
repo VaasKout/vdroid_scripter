@@ -25,7 +25,7 @@ import com.vision.scripter.streaming.impl.blocks.menu.state.MenuState
 import com.vision.scripter.streaming.impl.blocks.menu.ui.MenuPreviewUiStateHolder
 import com.vision.scripter.streaming.impl.blocks.menu.ui.MenuUiStateHolder
 import com.vision.scripter.streaming.impl.blocks.menu.ui.usualMenuPreviewUiState
-import com.vision.scripter.streaming.impl.screen.state.KeyboardState
+import com.vision.scripter.streaming.impl.screen.state.KeyboardMode
 import com.vision.scripter.ui.customClickable
 
 @Composable
@@ -54,9 +54,9 @@ fun KeyboardMenu(
                 .size(32.dp)
                 .customClickable(onClick = uiStateHolder::onKeyboardModeClicked),
             imageVector = when (menuState.mode) {
-                KeyboardState.TYPING -> Icons.Filled.Keyboard
-                KeyboardState.EDIT -> Icons.Filled.Edit
-                KeyboardState.ADD_NEW -> Icons.Filled.Add
+                KeyboardMode.TYPING -> Icons.Filled.Keyboard
+                KeyboardMode.EDIT -> Icons.Filled.Edit
+                KeyboardMode.ADD_NEW -> Icons.Filled.Add
             },
             tint = Color.Red,
             contentDescription = "",
@@ -97,7 +97,7 @@ private fun KeyboardMenuEditPreview() {
     KeyboardMenu(
         menuState = MenuState.Keyboard(
             isLoading = false,
-            mode = KeyboardState.EDIT,
+            mode = KeyboardMode.EDIT,
         ),
         uiStateHolder = MenuPreviewUiStateHolder(usualMenuPreviewUiState),
     )
@@ -109,7 +109,7 @@ private fun KeyboardMenuAddNewPreview() {
     KeyboardMenu(
         menuState = MenuState.Keyboard(
             isLoading = false,
-            mode = KeyboardState.ADD_NEW,
+            mode = KeyboardMode.ADD_NEW,
         ),
         uiStateHolder = MenuPreviewUiStateHolder(usualMenuPreviewUiState),
     )

@@ -12,7 +12,7 @@ class VideoUiStateMapper @Inject constructor() {
             streamingIsLoading = state.streamingData == null,
             rectangles = state.cvRectangles.toPersistentList(),
             selectedRectangles = state.selectedRectangles.toPersistentList(),
-            keyboardButtons = state.keyboard.buttons.toPersistentList(),
+            keyboardButtons = state.keyboardButtons.toPersistentList(),
         )
     }
 }
