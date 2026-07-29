@@ -107,15 +107,15 @@ class KeyboardRepository @Inject constructor(
     }
 
     fun recordLetters(x: Int, y: Int) {
-        val keyboard = currentState
-        if (currentState.locale.isEmpty()) return
-        val letter = currentState.buttons.firstOrNull {
+        val state = currentState
+        if (state.locale.isEmpty()) return
+        val letter = state.buttons.firstOrNull {
             it.contains(x = x, y = y)
         }?.text ?: return
         if (letter.isEmpty()) return
 
         val updatedText = buildString {
-            append(keyboard.typedText)
+            append(state.typedText)
             if (letter == SPACE_KEY) append(" ")
             else append(letter)
         }

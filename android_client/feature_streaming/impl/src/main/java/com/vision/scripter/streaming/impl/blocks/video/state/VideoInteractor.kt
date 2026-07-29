@@ -291,10 +291,14 @@ class VideoInteractor @Inject constructor(
     ) {
         if (event == null) return
         val screenSizes = currentState.screenSizes ?: return
+        val keyboardButtons = currentState.keyboardButtons
+        val record = currentState.record
+        val keyboardMode = keyboardRepository.getMode()
+        val tmpParam = currentState.tmpParam
+
         coroutineScope.launch {
             touchMutex.withLock {
                 try {
-                    val tmpParam = currentState.tmpParam
                     if (tmpParam?.type == TEMPLATE || tmpParam?.type == YOLO_CLASS) {
                         if (event.action == ACTION_DOWN) {
                             cvRepository.selectRectangle(x = event.x.toInt(), y = event.y.toInt())
@@ -302,11 +306,9 @@ class VideoInteractor @Inject constructor(
                         return@launch
                     }
 
-                    val keyboardMode = keyboardRepository.getMode()
-                    val record = currentState.record
-                    if (currentState.keyboardButtons.isNotEmpty()) {
+                    if (keyboardButtons.isNotEmpty()) {
                         when (keyboardMode) {
-                            KeyboardMode.TYPING -> recordLetters(event)
+                            KeyboardMode.TYPING -> recordLetters(event, record.name)
                             KeyboardMode.EDIT -> selectKeyboardKey(event)
                             KeyboardMode.ADD_NEW -> selectNewKeyboardRect(event)
                         }
@@ -331,8 +333,8 @@ class VideoInteractor @Inject constructor(
         }
     }
 
-    private fun recordLetters(event: MotionEvent) {
-        if (event.action != ACTION_UP || currentState.record.name.isEmpty()) return
+    private fun recordLetters(event: MotionEvent, recordName: String) {
+        if (event.action != ACTION_UP || recordName.isEmpty()) return
         keyboardRepository.recordLetters(event.x.toInt(), event.y.toInt())
     }
 
