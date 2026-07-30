@@ -7,9 +7,7 @@ import androidx.core.net.toUri
 import com.vision.scripter.coroutines.api.CoroutineScopeFactory
 import com.vision.scripter.data.api.ControlStreamer
 import com.vision.scripter.data.api.ScripterDataSource
-import com.vision.scripter.data.api.models.Event
 import com.vision.scripter.data.api.models.Parameter
-import com.vision.scripter.data.api.models.Script
 import com.vision.scripter.data.api.models.adjustToServer
 import com.vision.scripter.network.api.ApiResponse
 import com.vision.scripter.prefs.api.DataStoreRepository
@@ -17,6 +15,7 @@ import com.vision.scripter.streaming.impl.blocks.video.ui.VideoUiState
 import com.vision.scripter.streaming.impl.blocks.video.ui.VideoUiStateHolder
 import com.vision.scripter.streaming.impl.data.CvStreamerRepository
 import com.vision.scripter.streaming.impl.data.KeyboardRepository
+import com.vision.scripter.streaming.impl.data.RecordRepository
 import com.vision.scripter.streaming.impl.data.VideoStreamerRepository
 import com.vision.scripter.streaming.impl.screen.commandobservers.MenuToVideo
 import com.vision.scripter.streaming.impl.screen.commandobservers.ScreenToVideo
@@ -57,6 +56,7 @@ class VideoInteractor @Inject constructor(
     private val controlStreamer: ControlStreamer,
     private val cvRepository: CvStreamerRepository,
     private val keyboardRepository: KeyboardRepository,
+    private val recordRepository: RecordRepository,
 ) : VideoUiStateHolder {
 
     private val coroutineScope: CoroutineScope =
@@ -81,8 +81,6 @@ class VideoInteractor @Inject constructor(
     @Volatile
     private var streamJob: Job? = null
 
-    private var startRecordingTime = 0L
-
     init {
         startReactiveStreams()
     }
@@ -93,13 +91,15 @@ class VideoInteractor @Inject constructor(
             cvRepository.observeSelectedRectangles(),
             videoRepository.observeScreenSizes(),
             keyboardRepository.observeKeyboardButtons(),
-        ) { rectangles, selectedRects, screenSizes, keyboardButtons ->
+            recordRepository.observeRecord(),
+        ) { rectangles, selectedRects, screenSizes, keyboardButtons, record ->
             _stateFlow.update {
                 it.copy(
                     cvRectangles = rectangles,
                     selectedRectangles = selectedRects,
                     screenSizes = screenSizes,
                     keyboardButtons = keyboardButtons,
+                    record = record,
                 )
             }
         }.launchIn(coroutineScope)
@@ -224,9 +224,7 @@ class VideoInteractor @Inject constructor(
     }
 
     private fun onRecordingClicked(isControlRecording: Boolean) {
-        _stateFlow.update {
-            it.copy(record = it.record.copy(controlRecording = isControlRecording))
-        }
+        recordRepository.setControlRecording(isControlRecording)
     }
 
     override fun onVideoSurfaceCreated(
@@ -292,7 +290,6 @@ class VideoInteractor @Inject constructor(
         val screenSizes = currentState.screenSizes ?: return
         val record = currentState.record
         val tmpParam = currentState.tmpParam
-        val keyboardButtons = currentState.keyboardButtons
 
         coroutineScope.launch {
             touchMutex.withLock {
@@ -321,12 +318,7 @@ class VideoInteractor @Inject constructor(
                         event = event,
                     )
 
-                    if (
-                        record.controlRecording ||
-                        keyboardButtons.isNotEmpty() && record.name.isNotEmpty()
-                    ) {
-                        recordBytes(bytesArray)
-                    }
+                    recordRepository.recordBytes(bytesArray)
                 } finally {
                     event.recycle()
                 }
@@ -338,8 +330,8 @@ class VideoInteractor @Inject constructor(
         coroutineScope.launch {
             mutex.withLock {
                 val parameter = currentState.tmpParam
-                val newRecordName = if (parameter != null) currentState.record.name else ""
-                dropState(record = VideoState.Record(name = newRecordName))
+                recordRepository.clear(parameter != null)
+                dropState()
             }
         }
     }
@@ -411,86 +403,45 @@ class VideoInteractor @Inject constructor(
     }
 
     private fun saveTimeoutClicked(timeout: Int) {
-        _stateFlow.update {
-            it.copy(record = it.record.copy(timeout = timeout))
-        }
+        recordRepository.updateTimeout(timeout)
     }
 
     private fun saveRecordNameClicked(name: String) {
-        _stateFlow.update {
-            it.copy(record = it.record.copy(name = name))
-        }
+        recordRepository.updateName(name)
     }
 
     private suspend fun saveTypedText() {
         val param = keyboardRepository.extractParameter()
         if (param == null) {
+            recordRepository.clear()
             dropState()
             return
         }
         addParam(param)
     }
 
-    private suspend fun dropState(record: VideoState.Record? = null) {
+    private suspend fun dropState() {
         _stateFlow.update {
-            it.copy(
-                record = record ?: VideoState.Record(),
-                tmpParam = null,
-            )
+            it.copy(tmpParam = null)
         }
         cvRepository.clearSelectedRectangles()
         cvRepository.nextCvMode(CVMode.NO_CV)
         keyboardRepository.clear()
     }
 
-    private fun recordBytes(bytesArray: ByteArray?) {
-        if (bytesArray == null) return
-
-        val elapsedMs = if (startRecordingTime == 0L) {
-            startRecordingTime = System.nanoTime()
-            0L
-        } else {
-            (System.nanoTime() - startRecordingTime) / 1_000_000L
-        }
-
-        val newEvent = Event(
-            time = elapsedMs,
-            data = bytesArray,
-        )
-
-        _stateFlow.update {
-            it.copy(
-                record = it.record.copy(
-                    events = it.record.events + newEvent
-                )
-            )
-        }
-    }
-
     private fun addParam(param: Parameter) {
         coroutineScope.launch {
-            val updatedRecord = currentState.record.copy(
-                params = currentState.record.params + param,
-            )
-            dropState(record = updatedRecord)
+            recordRepository.addParam(param)
+            dropState()
         }
     }
 
     private suspend fun saveScript() {
-        val record = currentState.record
-        val success = scripterDataSource.saveScript(
-            Script(
-                name = record.name,
-                node = record.node,
-                params = record.params,
-                events = record.events,
-                timeout = record.timeout,
-            ),
-        )
+        val success = recordRepository.saveScript()
         if (!success) return
 
         screenCommandsFlow.tryEmit(VideoToScreen.ShowScriptSavedSnackbar)
-        startRecordingTime = 0L
+        recordRepository.clear()
         dropState()
     }
 
