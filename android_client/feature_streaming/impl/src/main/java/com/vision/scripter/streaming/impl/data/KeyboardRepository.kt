@@ -1,5 +1,8 @@
 package com.vision.scripter.streaming.impl.data
 
+import android.view.MotionEvent
+import android.view.MotionEvent.ACTION_DOWN
+import android.view.MotionEvent.ACTION_UP
 import com.vision.scripter.data.api.ScripterDataSource
 import com.vision.scripter.data.api.models.CvRectangle
 import com.vision.scripter.data.api.models.Parameter
@@ -8,10 +11,10 @@ import com.vision.scripter.data.api.models.ScreenSizes
 import com.vision.scripter.data.api.models.adjustToClient
 import com.vision.scripter.data.api.models.contains
 import com.vision.scripter.network.api.ApiResponse
+import com.vision.scripter.streaming.impl.StreamingScope
 import com.vision.scripter.streaming.impl.screen.state.KeyboardMode
 import com.vision.scripter.streaming.impl.screen.state.SPACE_KEY
 import com.vision.scripter.streaming.impl.screen.state.TYPE_TEXT
-import dagger.hilt.android.scopes.ViewModelScoped
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
@@ -19,9 +22,10 @@ import kotlinx.coroutines.flow.update
 import javax.inject.Inject
 
 
-@ViewModelScoped
+@StreamingScope
 class KeyboardRepository @Inject constructor(
     private val scripterDataSource: ScripterDataSource,
+    private val cvRepository: CvStreamerRepository
 ) {
 
     private val _stateFlow = MutableStateFlow(Keyboard())
@@ -53,6 +57,25 @@ class KeyboardRepository @Inject constructor(
             return true
         }
         return false
+    }
+
+    fun handleTouchEvent(
+        event: MotionEvent,
+        recordName: String,
+    ): String? {
+        val state = currentState
+        if (state.buttons.isNotEmpty()) {
+            when (state.mode) {
+                KeyboardMode.TYPING -> {
+                    if (event.action != ACTION_UP || recordName.isEmpty()) return null
+                    recordLetters(event.x.toInt(), event.y.toInt())
+                }
+
+                KeyboardMode.EDIT -> return selectKeyboardKey(event)
+                KeyboardMode.ADD_NEW -> return selectNewKeyboardRect(event)
+            }
+        }
+        return null
     }
 
     private fun setupKeyboardRects(
@@ -124,10 +147,19 @@ class KeyboardRepository @Inject constructor(
         }
     }
 
-    fun selectKeyboardKey(x: Int, y: Int): RectangleWithText? {
-        return currentState.buttons.firstOrNull {
-            it.contains(x = x, y = y)
-        }
+    fun selectKeyboardKey(event: MotionEvent): String? {
+        if (event.action != ACTION_DOWN) return null
+        val button = currentState.buttons.firstOrNull {
+            it.contains(x = event.x.toInt(), y = event.y.toInt())
+        } ?: return null
+        cvRepository.setSelectedRectangle(button.rectangle)
+        return button.text
+    }
+
+    fun selectNewKeyboardRect(event: MotionEvent): String? {
+        if (event.action != ACTION_DOWN) return null
+        cvRepository.selectRectangle(x = event.x.toInt(), y = event.y.toInt())
+        return ""
     }
 
     fun extractParameter(): Parameter? {
@@ -148,8 +180,6 @@ class KeyboardRepository @Inject constructor(
             )
         }
     }
-
-    fun getMode() = currentState.mode
 }
 
 data class Keyboard(

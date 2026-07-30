@@ -9,8 +9,8 @@ import com.vision.scripter.data.api.models.adjustToServer
 import com.vision.scripter.data.api.models.isEmpty
 import com.vision.scripter.data.api.models.smallestBy
 import com.vision.scripter.network.api.ApiResponse
+import com.vision.scripter.streaming.impl.StreamingScope
 import com.vision.scripter.streaming.impl.screen.state.CVMode
-import dagger.hilt.android.scopes.ViewModelScoped
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -22,7 +22,7 @@ import kotlinx.serialization.json.Json
 import java.util.concurrent.atomic.AtomicReference
 import javax.inject.Inject
 
-@ViewModelScoped
+@StreamingScope
 class CvStreamerRepository @Inject constructor(
     private val cvStreamer: CvStreamer,
     private val scripterDataSource: ScripterDataSource,

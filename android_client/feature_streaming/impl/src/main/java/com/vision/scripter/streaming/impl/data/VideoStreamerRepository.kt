@@ -6,14 +6,14 @@ import android.media.MediaFormat
 import android.view.Surface
 import com.vision.scripter.data.api.VideoStreamer
 import com.vision.scripter.data.api.models.ScreenSizes
-import dagger.hilt.android.scopes.ViewModelScoped
+import com.vision.scripter.streaming.impl.StreamingScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import javax.inject.Inject
 
-@ViewModelScoped
+@StreamingScope
 class VideoStreamerRepository @Inject constructor(
     private val videoStreamer: VideoStreamer,
 ) {

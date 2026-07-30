@@ -2,7 +2,6 @@ package com.vision.scripter.streaming.impl.blocks.video.state
 
 import android.view.MotionEvent
 import android.view.MotionEvent.ACTION_DOWN
-import android.view.MotionEvent.ACTION_UP
 import android.view.Surface
 import androidx.core.net.toUri
 import com.vision.scripter.coroutines.api.CoroutineScopeFactory
@@ -291,10 +290,9 @@ class VideoInteractor @Inject constructor(
     ) {
         if (event == null) return
         val screenSizes = currentState.screenSizes ?: return
-        val keyboardButtons = currentState.keyboardButtons
         val record = currentState.record
-        val keyboardMode = keyboardRepository.getMode()
         val tmpParam = currentState.tmpParam
+        val keyboardButtons = currentState.keyboardButtons
 
         coroutineScope.launch {
             touchMutex.withLock {
@@ -306,13 +304,16 @@ class VideoInteractor @Inject constructor(
                         return@launch
                     }
 
-                    if (keyboardButtons.isNotEmpty()) {
-                        when (keyboardMode) {
-                            KeyboardMode.TYPING -> recordLetters(event, record.name)
-                            KeyboardMode.EDIT -> selectKeyboardKey(event)
-                            KeyboardMode.ADD_NEW -> selectNewKeyboardRect(event)
-                        }
-                        if (keyboardMode != KeyboardMode.TYPING) return@launch
+                    val newButton = keyboardRepository.handleTouchEvent(
+                        event,
+                        record.name,
+                    )
+
+                    if (newButton != null) {
+                        menuCommandsFlow.tryEmit(
+                            VideoToMenu.SelectKeyboardKey(newButton),
+                        )
+                        return@launch
                     }
 
                     val bytesArray = controlStreamer.sendControlData(
@@ -322,7 +323,7 @@ class VideoInteractor @Inject constructor(
 
                     if (
                         record.controlRecording ||
-                        keyboardMode == KeyboardMode.TYPING && record.name.isNotEmpty()
+                        keyboardButtons.isNotEmpty() && record.name.isNotEmpty()
                     ) {
                         recordBytes(bytesArray)
                     }
@@ -331,17 +332,6 @@ class VideoInteractor @Inject constructor(
                 }
             }
         }
-    }
-
-    private fun recordLetters(event: MotionEvent, recordName: String) {
-        if (event.action != ACTION_UP || recordName.isEmpty()) return
-        keyboardRepository.recordLetters(event.x.toInt(), event.y.toInt())
-    }
-
-    private fun selectNewKeyboardRect(event: MotionEvent) {
-        if (event.action != ACTION_DOWN) return
-        cvRepository.selectRectangle(x = event.x.toInt(), y = event.y.toInt())
-        menuCommandsFlow.tryEmit(VideoToMenu.SelectKeyboardKey(""))
     }
 
     private fun onCancelClicked() {
@@ -430,15 +420,6 @@ class VideoInteractor @Inject constructor(
         _stateFlow.update {
             it.copy(record = it.record.copy(name = name))
         }
-    }
-
-    private fun selectKeyboardKey(event: MotionEvent) {
-        if (event.action != ACTION_DOWN) return
-        val button = keyboardRepository.selectKeyboardKey(
-            event.x.toInt(), event.y.toInt(),
-        ) ?: return
-        cvRepository.setSelectedRectangle(button.rectangle)
-        menuCommandsFlow.tryEmit(VideoToMenu.SelectKeyboardKey(button.text))
     }
 
     private suspend fun saveTypedText() {
