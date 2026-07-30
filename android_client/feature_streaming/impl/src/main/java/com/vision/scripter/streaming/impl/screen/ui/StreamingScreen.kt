@@ -17,10 +17,8 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.vision.scripter.streaming.impl.R
-import com.vision.scripter.streaming.impl.blocks.menu.commandobservers.MenuSharedCommandObserver
 import com.vision.scripter.streaming.impl.blocks.menu.state.MenuViewModel
 import com.vision.scripter.streaming.impl.blocks.menu.ui.MenuBlock
-import com.vision.scripter.streaming.impl.blocks.video.commandobservers.VideoSharedCommandObserver
 import com.vision.scripter.streaming.impl.blocks.video.state.VideoViewModel
 import com.vision.scripter.streaming.impl.blocks.video.ui.VideoBlock
 import com.vision.scripter.ui.CustomButton
@@ -37,18 +35,9 @@ internal fun StreamingScreen(
     val menuUiStateHolder = hiltViewModel<MenuViewModel>()
     val videoUiStateHolder = hiltViewModel<VideoViewModel>()
     LaunchedEffect(serial) {
+        menuUiStateHolder.init(serial)
         videoUiStateHolder.init(serial)
     }
-
-    VideoSharedCommandObserver(
-        videoUiStateHolder = videoUiStateHolder,
-        streamingUiStateHolder = uiStateHolder,
-    )
-
-    MenuSharedCommandObserver(
-        menuUiStateHolder = menuUiStateHolder,
-        streamingUiStateHolder = uiStateHolder,
-    )
 
     Box(modifier = Modifier.fillMaxSize()) {
         VideoBlock(
@@ -83,7 +72,10 @@ internal fun StreamingScreen(
                         .padding(horizontal = 16.dp)
                         .align(Alignment.Center),
                     text = stringResource(R.string.retry),
-                    onClick = uiStateHolder::onRefresh,
+                    onClick = {
+                        uiStateHolder.onRefresh()
+                        videoUiStateHolder.onRefresh()
+                    },
                 )
                 return@Scaffold
             }

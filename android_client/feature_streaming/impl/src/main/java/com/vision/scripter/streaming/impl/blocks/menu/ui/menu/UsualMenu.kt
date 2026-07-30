@@ -25,7 +25,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import com.vision.scripter.streaming.impl.blocks.menu.state.MenuState
+import com.vision.scripter.streaming.impl.blocks.menu.state.MenuType
 import com.vision.scripter.streaming.impl.blocks.menu.ui.MenuPreviewUiStateHolder
 import com.vision.scripter.streaming.impl.blocks.menu.ui.MenuUiStateHolder
 import com.vision.scripter.streaming.impl.blocks.menu.ui.usualMenuPreviewUiState
@@ -35,10 +35,10 @@ import com.vision.scripter.ui.customClickable
 @Composable
 fun UsualMenu(
     modifier: Modifier = Modifier,
-    menuState: MenuState.Usual,
+    menuType: MenuType.Usual,
     uiStateHolder: MenuUiStateHolder,
 ) {
-    if (menuState.expanded) {
+    if (menuType.expanded) {
         Column(
             modifier = modifier
                 .background(
@@ -64,8 +64,8 @@ fun UsualMenu(
                 modifier = Modifier
                     .size(32.dp)
                     .customClickable(onClick = uiStateHolder::onCvModeClicked),
-                imageVector = detectionIcon(menuState.localCvMode),
-                tint = if (menuState.localCvMode != CVMode.NO_CV) Color.Red
+                imageVector = detectionIcon(menuType.localCvMode),
+                tint = if (menuType.localCvMode != CVMode.NO_CV) Color.Red
                 else MaterialTheme.colorScheme.onSurface,
                 contentDescription = "",
             )
@@ -75,7 +75,7 @@ fun UsualMenu(
                     .size(32.dp)
                     .customClickable(onClick = uiStateHolder::onTextModeClicked),
                 imageVector = Icons.Filled.TextFields,
-                tint = if (menuState.textHighlighted) Color.Red
+                tint = if (menuType.textHighlighted) Color.Red
                 else MaterialTheme.colorScheme.onSurface,
                 contentDescription = "",
             )
@@ -85,7 +85,7 @@ fun UsualMenu(
                     .size(32.dp)
                     .customClickable(onClick = uiStateHolder::onKeyboardClicked),
                 imageVector = Icons.Filled.Keyboard,
-                tint = if (menuState.keyboardHighlighted) Color.Red
+                tint = if (menuType.keyboardHighlighted) Color.Red
                 else MaterialTheme.colorScheme.onSurface,
                 contentDescription = "",
             )
@@ -138,7 +138,7 @@ fun detectionIcon(cvMode: CVMode): ImageVector = when (cvMode) {
 @Composable
 private fun UsualMenuPreview() {
     UsualMenu(
-        menuState = MenuState.Usual(),
+        menuType = MenuType.Usual(),
         uiStateHolder = MenuPreviewUiStateHolder(usualMenuPreviewUiState),
     )
 }
@@ -147,7 +147,7 @@ private fun UsualMenuPreview() {
 @Composable
 private fun UsualExpandedMenuPreview() {
     UsualMenu(
-        menuState = MenuState.Usual(expanded = true),
+        menuType = MenuType.Usual(expanded = true),
         uiStateHolder = MenuPreviewUiStateHolder(usualMenuPreviewUiState),
     )
 }
@@ -156,7 +156,7 @@ private fun UsualExpandedMenuPreview() {
 @Composable
 private fun UsualExpandedHighlightedTextPreview() {
     UsualMenu(
-        menuState = MenuState.Usual(
+        menuType = MenuType.Usual(
             expanded = true,
             localCvMode = CVMode.CV_RECTS,
         ),

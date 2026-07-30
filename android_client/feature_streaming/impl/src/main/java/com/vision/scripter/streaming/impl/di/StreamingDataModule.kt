@@ -3,6 +3,7 @@ package com.vision.scripter.streaming.impl.di
 import com.vision.scripter.streaming.impl.data.CvStreamerRepository
 import com.vision.scripter.streaming.impl.data.KeyboardRepository
 import com.vision.scripter.streaming.impl.data.RecordRepository
+import com.vision.scripter.streaming.impl.screen.StreamingEventsHolder
 import com.vision.scripter.streaming.impl.data.VideoStreamerRepository
 import dagger.Module
 import dagger.Provides
@@ -18,6 +19,7 @@ interface StreamingDataEntryPoint {
     fun cvStreamerRepository(): CvStreamerRepository
     fun keyboardRepository(): KeyboardRepository
     fun recordRepository(): RecordRepository
+    fun streamingEventRepository(): StreamingEventsHolder
 }
 
 @Module
@@ -43,6 +45,11 @@ object StreamingDataModule {
     fun provideRecordRepository(
         manager: StreamingComponentManager,
     ): RecordRepository = entryPoint(manager).recordRepository()
+
+    @Provides
+    fun provideStreamingEventRepository(
+        manager: StreamingComponentManager,
+    ): StreamingEventsHolder = entryPoint(manager).streamingEventRepository()
 
     private fun entryPoint(manager: StreamingComponentManager): StreamingDataEntryPoint =
         EntryPoints.get(manager.getComponent(), StreamingDataEntryPoint::class.java)

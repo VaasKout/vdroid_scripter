@@ -3,7 +3,6 @@ package com.vision.scripter.streaming.impl.blocks.video.state
 import android.annotation.SuppressLint
 import android.media.MediaFormat
 import com.vision.scripter.data.api.models.CvRectangle
-import com.vision.scripter.data.api.models.Parameter
 import com.vision.scripter.data.api.models.RectangleWithText
 import com.vision.scripter.data.api.models.ScreenSizes
 import com.vision.scripter.data.api.models.StreamingData
@@ -16,7 +15,6 @@ data class VideoState(
     val streamingHost: String = "",
     val videoCodec: VideoCodec = VideoCodec.H264,
     val streamingData: StreamingData? = null,
-    val tmpParam: Parameter? = null,
 
     val cvRectangles: List<CvRectangle> = listOf(),
     val selectedRectangles: List<CvRectangle> = listOf(),

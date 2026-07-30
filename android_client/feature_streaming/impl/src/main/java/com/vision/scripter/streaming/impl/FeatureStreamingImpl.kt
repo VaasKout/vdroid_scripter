@@ -17,7 +17,6 @@ import com.vision.scripter.streaming.api.FeatureStreaming
 import com.vision.scripter.streaming.api.StreamingRouteWithArgs
 import com.vision.scripter.streaming.api.StreamingSerialArg
 import com.vision.scripter.streaming.impl.screen.commandobservers.StreamingCommandObserver
-import com.vision.scripter.streaming.impl.screen.commandobservers.StreamingSharedEventObserver
 import com.vision.scripter.streaming.impl.screen.state.StreamingViewModel
 import com.vision.scripter.streaming.impl.screen.ui.StreamingScreen
 import dagger.hilt.android.scopes.ActivityScoped
@@ -64,10 +63,6 @@ class FeatureStreamingImpl @Inject constructor() : FeatureStreaming {
             StreamingCommandObserver(
                 uiStateHolder = streamingViewModel,
                 snackbarHostState = snackbarHostState,
-            )
-
-            StreamingSharedEventObserver(
-                uiStateHolder = streamingViewModel,
             )
 
             StreamingScreen(

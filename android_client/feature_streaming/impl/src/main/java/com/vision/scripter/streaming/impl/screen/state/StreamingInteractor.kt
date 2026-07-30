@@ -1,14 +1,12 @@
 package com.vision.scripter.streaming.impl.screen.state
 
 import com.vision.scripter.coroutines.api.CoroutineScopeFactory
-import com.vision.scripter.streaming.impl.screen.commandobservers.ScreenToVideo
-import com.vision.scripter.streaming.impl.screen.commandobservers.StreamingSharedEvent
-import com.vision.scripter.streaming.impl.screen.commandobservers.VideoToScreen
+import com.vision.scripter.streaming.impl.screen.StreamingEvent
+import com.vision.scripter.streaming.impl.screen.StreamingEventsHolder
 import com.vision.scripter.streaming.impl.screen.ui.StreamingUiCommand
 import com.vision.scripter.streaming.impl.screen.ui.StreamingUiState
 import com.vision.scripter.streaming.impl.screen.ui.StreamingUiStateHolder
 import com.vision.scripter.ui.CommandFlow
-import com.vision.scripter.ui.CommandFlow2
 import dagger.hilt.android.scopes.ViewModelScoped
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.cancel
@@ -20,12 +18,14 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @ViewModelScoped
 class StreamingInteractor @Inject constructor(
     coroutineScopeFactory: CoroutineScopeFactory,
     private val uiStateMapper: StreamingUiStateMapper,
+    private val eventRepository: StreamingEventsHolder,
 ) : StreamingUiStateHolder {
 
     private val coroutineScope: CoroutineScope =
@@ -40,19 +40,22 @@ class StreamingInteractor @Inject constructor(
         )
 
     override val uiCommandsFlow: CommandFlow<StreamingUiCommand> = CommandFlow(coroutineScope)
-    override val sharedCommandsFlow: CommandFlow2<StreamingSharedEvent> = CommandFlow2()
 
-    override fun onSharedEvent(event: VideoToScreen) {
-        when (event) {
-            is VideoToScreen.ShowNetworkError -> showNetworkError()
-            is VideoToScreen.ShowScriptSavedSnackbar -> showStepSavedSnackbar()
-            is VideoToScreen.SuccessLoading -> doneLoading()
+    init {
+        coroutineScope.launch {
+            eventRepository.eventsFlow.collect { event ->
+                when (event) {
+                    is StreamingEvent.ShowNetworkError -> showNetworkError()
+                    is StreamingEvent.ShowScriptSavedSnackbar -> showStepSavedSnackbar()
+                    is StreamingEvent.SuccessLoading -> doneLoading()
+                    else -> Unit
+                }
+            }
         }
     }
 
     override fun onRefresh() {
         _stateFlow.update { it.copy(loading = true, isError = false) }
-        sharedCommandsFlow.tryEmit(ScreenToVideo.Refresh)
     }
 
     private fun showStepSavedSnackbar() {

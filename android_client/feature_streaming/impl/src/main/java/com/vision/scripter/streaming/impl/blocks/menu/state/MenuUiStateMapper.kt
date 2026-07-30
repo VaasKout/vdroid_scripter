@@ -11,7 +11,7 @@ class MenuUiStateMapper @Inject constructor() {
         dialogState: DialogState,
     ): MenuUiState {
         return MenuUiState(
-            menuState = state,
+            menuType = state.type,
             dialogState = dialogState,
         )
     }

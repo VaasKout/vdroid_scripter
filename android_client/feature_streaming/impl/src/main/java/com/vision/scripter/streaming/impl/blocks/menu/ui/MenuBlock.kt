@@ -7,7 +7,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.vision.scripter.streaming.impl.blocks.menu.commandobservers.MenuCommandObserver
 import com.vision.scripter.streaming.impl.blocks.menu.state.DialogState
-import com.vision.scripter.streaming.impl.blocks.menu.state.MenuState
+import com.vision.scripter.streaming.impl.blocks.menu.state.MenuType
 import com.vision.scripter.streaming.impl.blocks.menu.ui.dialogs.EditKeyboardDialog
 import com.vision.scripter.streaming.impl.blocks.menu.ui.dialogs.KeyboardDialog
 import com.vision.scripter.streaming.impl.blocks.menu.ui.dialogs.RecordDialog
@@ -45,42 +45,42 @@ private fun MenuContent(
     state: MenuUiState,
     uiStateHolder: MenuUiStateHolder,
 ) {
-    when (state.menuState) {
-        is MenuState.Usual -> {
+    when (state.menuType) {
+        is MenuType.Usual -> {
             UsualMenu(
                 modifier = modifier,
-                menuState = state.menuState,
+                menuType = state.menuType,
                 uiStateHolder = uiStateHolder,
             )
         }
 
-        is MenuState.SelectingCV -> {
+        is MenuType.SelectingCV -> {
             SelectingTemplateMenu(
                 modifier = modifier,
-                cvMode = state.menuState.localCvMode,
+                cvMode = state.menuType.localCvMode,
                 uiStateHolder = uiStateHolder,
             )
         }
 
-        is MenuState.SelectingText -> {
+        is MenuType.SelectingText -> {
             SelectingTextMenu(
                 modifier = modifier,
                 uiStateHolder = uiStateHolder,
             )
         }
 
-        is MenuState.Recording -> {
+        is MenuType.Recording -> {
             ScriptMenu(
                 modifier = modifier,
-                menuState = state.menuState,
+                menuType = state.menuType,
                 uiStateHolder = uiStateHolder,
             )
         }
 
-        is MenuState.Keyboard -> {
+        is MenuType.Keyboard -> {
             KeyboardMenu(
                 modifier = modifier,
-                menuState = state.menuState,
+                menuType = state.menuType,
                 uiStateHolder = uiStateHolder,
             )
         }
@@ -120,7 +120,7 @@ private fun MenuContent(
 
         is DialogState.Timeout -> {
             TimeoutDialog(
-                initialTimeout = (state.menuState as? MenuState.Recording)?.recordTimeout
+                initialTimeout = (state.menuType as? MenuType.Recording)?.recordTimeout
                     ?: DEFAULT_TIMEOUT,
                 onSave = uiStateHolder::onTimeoutSaved,
                 onDismiss = uiStateHolder::onDialogDismissed,

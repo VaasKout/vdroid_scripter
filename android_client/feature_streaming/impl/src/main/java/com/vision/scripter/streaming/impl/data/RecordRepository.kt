@@ -1,6 +1,5 @@
 package com.vision.scripter.streaming.impl.data
 
-import com.vision.scripter.coroutines.api.CoroutineScopeFactory
 import com.vision.scripter.data.api.ScripterDataSource
 import com.vision.scripter.data.api.models.Event
 import com.vision.scripter.data.api.models.Parameter
@@ -8,7 +7,6 @@ import com.vision.scripter.data.api.models.Script
 import com.vision.scripter.streaming.impl.di.StreamingScope
 import com.vision.scripter.streaming.impl.screen.state.DEFAULT_TIMEOUT
 import com.vision.scripter.streaming.impl.screen.state.NEW_SCRIPTS_NODE
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -20,22 +18,19 @@ import javax.inject.Inject
 class RecordRepository @Inject constructor(
     private val scripterDataSource: ScripterDataSource,
     private val keyboardRepository: KeyboardRepository,
-    coroutineScopeFactory: CoroutineScopeFactory,
 ) {
 
     private val _stateFlow = MutableStateFlow(Record())
     fun observeRecord(): StateFlow<Record> = _stateFlow.asStateFlow()
-
-    private val coroutineScope = coroutineScopeFactory.createBackgroundScope("RecordRepository")
 
     private val currentState: Record
         get() = _stateFlow.value
 
     private var startRecordingTime = 0L
 
-    fun setControlRecording(isControlRecording: Boolean) {
+    fun switchControlRecording() {
         _stateFlow.update {
-            it.copy(controlRecording = isControlRecording)
+            it.copy(controlRecording = !it.controlRecording)
         }
     }
 
@@ -53,7 +48,13 @@ class RecordRepository @Inject constructor(
 
     fun addParam(param: Parameter) {
         _stateFlow.update {
-            it.copy(params = it.params + param)
+            it.copy(params = it.params + param, tmpParam = null)
+        }
+    }
+
+    fun updateTmpParam(param: Parameter?) {
+        _stateFlow.update {
+            it.copy(tmpParam = param)
         }
     }
 
@@ -98,10 +99,6 @@ class RecordRepository @Inject constructor(
         startRecordingTime = 0L
         _stateFlow.update { Record(name = if (saveName) it.name else "") }
     }
-
-    fun cancel() {
-        coroutineScope.cancel()
-    }
 }
 
 data class Record(
@@ -111,4 +108,5 @@ data class Record(
     val params: List<Parameter> = listOf(),
     val events: List<Event> = listOf(),
     val timeout: Int = DEFAULT_TIMEOUT,
+    val tmpParam: Parameter? = null,
 )

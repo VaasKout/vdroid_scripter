@@ -22,7 +22,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import com.vision.scripter.streaming.impl.blocks.menu.state.MenuState
+import com.vision.scripter.streaming.impl.blocks.menu.state.MenuType
 import com.vision.scripter.streaming.impl.blocks.menu.ui.MenuPreviewUiStateHolder
 import com.vision.scripter.streaming.impl.blocks.menu.ui.MenuUiStateHolder
 import com.vision.scripter.streaming.impl.blocks.menu.ui.usualMenuPreviewUiState
@@ -32,7 +32,7 @@ import com.vision.scripter.ui.customClickable
 @Composable
 fun ScriptMenu(
     modifier: Modifier = Modifier,
-    menuState: MenuState.Recording,
+    menuType: MenuType.Recording,
     uiStateHolder: MenuUiStateHolder,
 ) {
     Column(
@@ -53,7 +53,7 @@ fun ScriptMenu(
                 ),
             imageVector = Icons.Filled.RadioButtonChecked,
             tint =
-                if (menuState.controlRecording) Color.Red
+                if (menuType.controlRecording) Color.Red
                 else MaterialTheme.colorScheme.onSurface,
             contentDescription = ""
         )
@@ -91,7 +91,7 @@ fun ScriptMenu(
                 .customClickable(onClick = uiStateHolder::onTimeoutClicked),
             imageVector = Icons.Filled.Timer,
             tint =
-                if (menuState.recordTimeout != DEFAULT_TIMEOUT) Color.Red
+                if (menuType.recordTimeout != DEFAULT_TIMEOUT) Color.Red
                 else MaterialTheme.colorScheme.onSurface,
             contentDescription = ""
         )
@@ -120,7 +120,7 @@ fun ScriptMenu(
 @Composable
 private fun ScriptMenuDefaultPreview() {
     ScriptMenu(
-        menuState = MenuState.Recording(),
+        menuType = MenuType.Recording(),
         uiStateHolder = MenuPreviewUiStateHolder(usualMenuPreviewUiState),
     )
 }
@@ -129,7 +129,7 @@ private fun ScriptMenuDefaultPreview() {
 @Composable
 private fun ScriptMenuRecordingPreview() {
     ScriptMenu(
-        menuState = MenuState.Recording(
+        menuType = MenuType.Recording(
             controlRecording = true,
             recordTimeout = DEFAULT_TIMEOUT + 1,
         ),

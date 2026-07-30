@@ -21,7 +21,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import com.vision.scripter.streaming.impl.blocks.menu.state.MenuState
+import com.vision.scripter.streaming.impl.blocks.menu.state.MenuType
 import com.vision.scripter.streaming.impl.blocks.menu.ui.MenuPreviewUiStateHolder
 import com.vision.scripter.streaming.impl.blocks.menu.ui.MenuUiStateHolder
 import com.vision.scripter.streaming.impl.blocks.menu.ui.usualMenuPreviewUiState
@@ -31,7 +31,7 @@ import com.vision.scripter.ui.customClickable
 @Composable
 fun KeyboardMenu(
     modifier: Modifier = Modifier,
-    menuState: MenuState.Keyboard,
+    menuType: MenuType.Keyboard,
     uiStateHolder: MenuUiStateHolder,
 ) {
     Column(
@@ -44,7 +44,7 @@ fun KeyboardMenu(
         horizontalAlignment = Alignment.End,
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        if (menuState.isLoading) {
+        if (menuType.isLoading) {
             CircularProgressIndicator(modifier = Modifier.size(32.dp))
             return
         }
@@ -53,7 +53,7 @@ fun KeyboardMenu(
             modifier = Modifier
                 .size(32.dp)
                 .customClickable(onClick = uiStateHolder::onKeyboardModeClicked),
-            imageVector = when (menuState.mode) {
+            imageVector = when (menuType.mode) {
                 KeyboardMode.TYPING -> Icons.Filled.Keyboard
                 KeyboardMode.EDIT -> Icons.Filled.Edit
                 KeyboardMode.ADD_NEW -> Icons.Filled.Add
@@ -86,7 +86,7 @@ fun KeyboardMenu(
 @Composable
 private fun KeyboardMenuTypingPreview() {
     KeyboardMenu(
-        menuState = MenuState.Keyboard(isLoading = false),
+        menuType = MenuType.Keyboard(isLoading = false),
         uiStateHolder = MenuPreviewUiStateHolder(usualMenuPreviewUiState),
     )
 }
@@ -95,7 +95,7 @@ private fun KeyboardMenuTypingPreview() {
 @Composable
 private fun KeyboardMenuEditPreview() {
     KeyboardMenu(
-        menuState = MenuState.Keyboard(
+        menuType = MenuType.Keyboard(
             isLoading = false,
             mode = KeyboardMode.EDIT,
         ),
@@ -107,7 +107,7 @@ private fun KeyboardMenuEditPreview() {
 @Composable
 private fun KeyboardMenuAddNewPreview() {
     KeyboardMenu(
-        menuState = MenuState.Keyboard(
+        menuType = MenuType.Keyboard(
             isLoading = false,
             mode = KeyboardMode.ADD_NEW,
         ),
