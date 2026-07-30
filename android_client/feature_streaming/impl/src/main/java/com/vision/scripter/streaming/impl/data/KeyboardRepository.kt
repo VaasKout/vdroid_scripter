@@ -12,6 +12,8 @@ import com.vision.scripter.data.api.models.adjustToClient
 import com.vision.scripter.data.api.models.contains
 import com.vision.scripter.network.api.ApiResponse
 import com.vision.scripter.streaming.impl.di.StreamingScope
+import com.vision.scripter.streaming.impl.screen.StreamingEvent
+import com.vision.scripter.streaming.impl.screen.StreamingEventsHolder
 import com.vision.scripter.streaming.impl.screen.state.KeyboardMode
 import com.vision.scripter.streaming.impl.screen.state.SPACE_KEY
 import com.vision.scripter.streaming.impl.screen.state.TYPE_TEXT
@@ -25,7 +27,8 @@ import javax.inject.Inject
 @StreamingScope
 class KeyboardRepository @Inject constructor(
     private val scripterDataSource: ScripterDataSource,
-    private val cvRepository: CvStreamerRepository
+    private val cvRepository: CvStreamerRepository,
+    private val eventsHolder: StreamingEventsHolder,
 ) {
 
     private val _stateFlow = MutableStateFlow(Keyboard())
@@ -71,8 +74,21 @@ class KeyboardRepository @Inject constructor(
                     recordLetters(event.x.toInt(), event.y.toInt())
                 }
 
-                KeyboardMode.EDIT -> return selectKeyboardKey(event)
-                KeyboardMode.ADD_NEW -> return selectNewKeyboardRect(event)
+                KeyboardMode.EDIT -> {
+                    val newButton = selectKeyboardKey(event)
+                    if (newButton != null) {
+                        eventsHolder.sendEvent(StreamingEvent.SelectKeyboardKey(newButton))
+                    }
+                    return newButton
+                }
+
+                KeyboardMode.ADD_NEW -> {
+                    val newButton = selectNewKeyboardRect(event)
+                    if (newButton != null) {
+                        eventsHolder.sendEvent(StreamingEvent.SelectKeyboardKey(newButton))
+                    }
+                    return newButton
+                }
             }
         }
         return null

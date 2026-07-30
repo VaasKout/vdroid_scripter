@@ -199,10 +199,7 @@ class VideoInteractor @Inject constructor(
                         record.name,
                     )
 
-                    if (newButton != null) {
-                        eventsHolder.sendEvent(StreamingEvent.SelectKeyboardKey(newButton))
-                        return@launch
-                    }
+                    if (newButton != null) return@launch
 
                     val bytesArray = controlStreamer.sendControlData(
                         screenSizes = screenSizes,
