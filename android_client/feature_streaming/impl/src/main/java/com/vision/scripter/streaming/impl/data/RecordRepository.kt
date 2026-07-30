@@ -5,7 +5,7 @@ import com.vision.scripter.data.api.ScripterDataSource
 import com.vision.scripter.data.api.models.Event
 import com.vision.scripter.data.api.models.Parameter
 import com.vision.scripter.data.api.models.Script
-import com.vision.scripter.streaming.impl.StreamingScope
+import com.vision.scripter.streaming.impl.di.StreamingScope
 import com.vision.scripter.streaming.impl.screen.state.DEFAULT_TIMEOUT
 import com.vision.scripter.streaming.impl.screen.state.NEW_SCRIPTS_NODE
 import kotlinx.coroutines.cancel

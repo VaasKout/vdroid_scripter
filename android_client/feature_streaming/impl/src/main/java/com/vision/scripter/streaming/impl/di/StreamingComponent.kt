@@ -1,4 +1,4 @@
-package com.vision.scripter.streaming.impl
+package com.vision.scripter.streaming.impl.di
 
 import dagger.hilt.DefineComponent
 import dagger.hilt.components.SingletonComponent

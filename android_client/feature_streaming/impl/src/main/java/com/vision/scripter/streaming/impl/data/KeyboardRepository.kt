@@ -11,7 +11,7 @@ import com.vision.scripter.data.api.models.ScreenSizes
 import com.vision.scripter.data.api.models.adjustToClient
 import com.vision.scripter.data.api.models.contains
 import com.vision.scripter.network.api.ApiResponse
-import com.vision.scripter.streaming.impl.StreamingScope
+import com.vision.scripter.streaming.impl.di.StreamingScope
 import com.vision.scripter.streaming.impl.screen.state.KeyboardMode
 import com.vision.scripter.streaming.impl.screen.state.SPACE_KEY
 import com.vision.scripter.streaming.impl.screen.state.TYPE_TEXT

@@ -9,7 +9,7 @@ import com.vision.scripter.data.api.models.adjustToServer
 import com.vision.scripter.data.api.models.isEmpty
 import com.vision.scripter.data.api.models.smallestBy
 import com.vision.scripter.network.api.ApiResponse
-import com.vision.scripter.streaming.impl.StreamingScope
+import com.vision.scripter.streaming.impl.di.StreamingScope
 import com.vision.scripter.streaming.impl.screen.state.CVMode
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow

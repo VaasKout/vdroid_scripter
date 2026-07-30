@@ -6,7 +6,7 @@ import android.media.MediaFormat
 import android.view.Surface
 import com.vision.scripter.data.api.VideoStreamer
 import com.vision.scripter.data.api.models.ScreenSizes
-import com.vision.scripter.streaming.impl.StreamingScope
+import com.vision.scripter.streaming.impl.di.StreamingScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
