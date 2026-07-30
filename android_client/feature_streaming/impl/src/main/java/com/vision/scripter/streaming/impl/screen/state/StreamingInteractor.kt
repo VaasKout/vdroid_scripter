@@ -48,7 +48,6 @@ class StreamingInteractor @Inject constructor(
                     is StreamingEvent.ShowNetworkError -> showNetworkError()
                     is StreamingEvent.ShowScriptSavedSnackbar -> showStepSavedSnackbar()
                     is StreamingEvent.SuccessLoading -> doneLoading()
-                    else -> Unit
                 }
             }
         }

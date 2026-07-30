@@ -18,5 +18,4 @@ sealed interface StreamingEvent {
     data object ShowNetworkError : StreamingEvent
     data object ShowScriptSavedSnackbar : StreamingEvent
     data object SuccessLoading : StreamingEvent
-    data class SelectKeyboardKey(val oldKey: String) : StreamingEvent
 }

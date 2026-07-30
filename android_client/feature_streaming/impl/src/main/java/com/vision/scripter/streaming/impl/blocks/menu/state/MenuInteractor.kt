@@ -73,13 +73,6 @@ class MenuInteractor @Inject constructor(
 
     init {
         startReactiveStreams()
-        coroutineScope.launch {
-            eventRepository.eventsFlow.collect { event ->
-                if (event is StreamingEvent.SelectKeyboardKey) {
-                    onEditKeyboardRectangleSelected(event.oldKey)
-                }
-            }
-        }
     }
 
     override fun init(serial: String) {
@@ -95,6 +88,10 @@ class MenuInteractor @Inject constructor(
                 if (type !is MenuType.Recording) return@update it
                 it.copy(type = type.copy(controlRecording = record.controlRecording))
             }
+        }.launchIn(coroutineScope)
+
+        keyboardRepository.observeSelectedButton().onEach { oldKey ->
+            onEditKeyboardRectangleSelected(oldKey)
         }.launchIn(coroutineScope)
     }
 

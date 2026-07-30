@@ -12,13 +12,14 @@ import com.vision.scripter.data.api.models.adjustToClient
 import com.vision.scripter.data.api.models.contains
 import com.vision.scripter.network.api.ApiResponse
 import com.vision.scripter.streaming.impl.di.StreamingScope
-import com.vision.scripter.streaming.impl.screen.StreamingEvent
-import com.vision.scripter.streaming.impl.screen.StreamingEventsHolder
 import com.vision.scripter.streaming.impl.screen.state.KeyboardMode
 import com.vision.scripter.streaming.impl.screen.state.SPACE_KEY
 import com.vision.scripter.streaming.impl.screen.state.TYPE_TEXT
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import javax.inject.Inject
@@ -28,11 +29,13 @@ import javax.inject.Inject
 class KeyboardRepository @Inject constructor(
     private val scripterDataSource: ScripterDataSource,
     private val cvRepository: CvStreamerRepository,
-    private val eventsHolder: StreamingEventsHolder,
 ) {
 
     private val _stateFlow = MutableStateFlow(Keyboard())
     fun observeKeyboardButtons(): Flow<List<RectangleWithText>> = _stateFlow.map { it.buttons }
+
+    private val _selectedButtonFlow = MutableSharedFlow<String>(replay = 1)
+    fun observeSelectedButton(): SharedFlow<String> = _selectedButtonFlow.asSharedFlow()
 
     private val currentState: Keyboard
         get() = _stateFlow.value
@@ -76,17 +79,13 @@ class KeyboardRepository @Inject constructor(
 
                 KeyboardMode.EDIT -> {
                     val newButton = selectKeyboardKey(event)
-                    if (newButton != null) {
-                        eventsHolder.sendEvent(StreamingEvent.SelectKeyboardKey(newButton))
-                    }
+                    if (newButton != null) _selectedButtonFlow.tryEmit(newButton)
                     return newButton
                 }
 
                 KeyboardMode.ADD_NEW -> {
                     val newButton = selectNewKeyboardRect(event)
-                    if (newButton != null) {
-                        eventsHolder.sendEvent(StreamingEvent.SelectKeyboardKey(newButton))
-                    }
+                    if (newButton != null) _selectedButtonFlow.tryEmit(newButton)
                     return newButton
                 }
             }
