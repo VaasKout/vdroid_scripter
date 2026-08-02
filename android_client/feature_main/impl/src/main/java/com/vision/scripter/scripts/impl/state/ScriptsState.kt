@@ -8,10 +8,13 @@ data class ScriptsState(
     val nodes: List<String> = listOf(),
     val selectedNode: String = "",
     val scripts: List<String> = listOf(),
-    val deleteTarget: String = "",
-    val deleteIsNode: Boolean = false,
-    val scriptToRun: String = "",
-    val devices: List<AdbDevice> = listOf(),
-    val isDevicesLoading: Boolean = false,
-    val selectedSerial: String = "",
-)
+    val itemToDelete: String = "",
+    val bottomSheetData: BottomSheetData? = null,
+) {
+    data class BottomSheetData(
+        val isLoading: Boolean = true,
+        val selectedScript: String = "",
+        val selectedDevice: String = "",
+        val devices: List<AdbDevice> = listOf(),
+    )
+}

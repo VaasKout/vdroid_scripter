@@ -1,6 +1,7 @@
 package com.vision.scripter.scripts.impl.state
 
 import com.vision.scripter.data.api.models.AdbDevice
+import com.vision.scripter.scripts.impl.state.ScriptsState.BottomSheetData
 import com.vision.scripter.ui.states.LoadingState
 import dagger.hilt.android.scopes.ViewModelScoped
 import kotlinx.collections.immutable.toImmutableList
@@ -12,31 +13,30 @@ class ScriptsUiStateMapper @Inject constructor() {
         return ScriptsUiState(
             isLoading = state.loadingState == LoadingState.LoadingOnStart,
             isRefreshing = state.loadingState == LoadingState.RefreshLoading,
-            showScripts = state.selectedNode.isNotEmpty(),
             selectedNode = state.selectedNode,
             nodes = state.nodes.toImmutableList(),
             scripts = state.scripts.toImmutableList(),
-            deleteDialog = DeleteDialogData(
-                show = state.deleteTarget.isNotEmpty(),
-                name = state.deleteTarget,
-                isNode = state.deleteIsNode,
-            ),
-            devicePickerData = DevicePickerBottomSheetData(
-                showDevicePicker = state.scriptToRun.isNotEmpty(),
-                isDevicesLoading = state.isDevicesLoading,
-                devices = state.devices.map {
-                    UiScriptDevice(
-                        serial = it.serial,
-                        title = it.pickerTitle(),
-                    )
-                }.toImmutableList(),
-                selectedSerial = state.selectedSerial,
-            ),
+            itemToDelete = state.itemToDelete,
+            bottomSheetUiData = state.bottomSheetData?.toDevicePickerData(),
         )
     }
 }
 
-private fun AdbDevice.pickerTitle(): String {
+private fun BottomSheetData.toDevicePickerData(): BottomSheetUiData? {
+    if (selectedScript.isEmpty()) return null
+    return BottomSheetUiData(
+        isLoading = isLoading,
+        devices = devices.map {
+            DeviceToPick(
+                serial = it.serial,
+                title = it.bottomSheetTitle(),
+                selected = it.serial == selectedDevice,
+            )
+        }.toImmutableList(),
+    )
+}
+
+private fun AdbDevice.bottomSheetTitle(): String {
     val name = listOf(brand, model).filter { it.isNotBlank() }.joinToString(" ")
     if (name.isBlank()) return serial
     return "$name ($serial)"

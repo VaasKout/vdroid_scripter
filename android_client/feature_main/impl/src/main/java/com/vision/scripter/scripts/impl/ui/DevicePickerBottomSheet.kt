@@ -22,16 +22,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.vision.scripter.main.impl.R
-import com.vision.scripter.scripts.impl.state.UiScriptDevice
+import com.vision.scripter.scripts.impl.state.DeviceToPick
 import com.vision.scripter.ui.customClickable
 import kotlinx.collections.immutable.ImmutableList
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun DevicePickerSheet(
+internal fun DevicePickerBottomSheet(
     isLoading: Boolean,
-    devices: ImmutableList<UiScriptDevice>,
-    selectedSerial: String,
+    devices: ImmutableList<DeviceToPick>,
     onSelect: (String) -> Unit,
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
@@ -75,7 +74,6 @@ internal fun DevicePickerSheet(
                 else -> devices.forEach { device ->
                     DeviceRow(
                         device = device,
-                        selected = device.serial == selectedSerial,
                         onSelect = { onSelect(device.serial) },
                     )
                 }
@@ -83,7 +81,7 @@ internal fun DevicePickerSheet(
 
             Button(
                 modifier = Modifier.fillMaxWidth(),
-                enabled = selectedSerial.isNotEmpty(),
+                enabled = devices.isNotEmpty(),
                 onClick = onConfirm,
             ) {
                 Text(
@@ -101,8 +99,7 @@ internal fun DevicePickerSheet(
 
 @Composable
 private fun DeviceRow(
-    device: UiScriptDevice,
-    selected: Boolean,
+    device: DeviceToPick,
     onSelect: () -> Unit,
 ) {
     Row(
@@ -114,7 +111,7 @@ private fun DeviceRow(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         RadioButton(
-            selected = selected,
+            selected = device.selected,
             onClick = null,
         )
         Text(

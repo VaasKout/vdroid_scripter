@@ -27,9 +27,7 @@ internal class ScriptsScreenUiStateHolderPreview(state: ScriptsUiState) : Script
     override fun onPlayScript(name: String) {}
     override fun onSelectDevice(serial: String) {}
     override fun onConfirmRunScript() {}
-    override fun onDismissDevicePicker() {}
-    override fun onDeleteNode(node: String) {}
-    override fun onDeleteScript(name: String) {}
-    override fun onDismissDeleteDialog() {}
+    override fun onDismiss() {}
+    override fun onDeleteItem(item: String) {}
     override fun onConfirmDelete() {}
 }

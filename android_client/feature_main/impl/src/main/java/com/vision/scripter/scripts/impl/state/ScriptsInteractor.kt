@@ -29,6 +29,7 @@ internal class ScriptsInteractor @Inject constructor(
 
     private val _stateFlow = MutableStateFlow(ScriptsState())
     private val stateFlow: StateFlow<ScriptsState> = _stateFlow.asStateFlow()
+
     private val coroutineScope: CoroutineScope =
         coroutineScopeFactory.createBackgroundScope("scripts_interactor")
 
@@ -87,40 +88,56 @@ internal class ScriptsInteractor @Inject constructor(
     override fun onPlayScript(name: String) {
         _stateFlow.update {
             it.copy(
-                scriptToRun = name,
-                selectedSerial = "",
-                devices = listOf(),
-                isDevicesLoading = true,
+                bottomSheetData = ScriptsState.BottomSheetData(
+                    selectedScript = name,
+                ),
+                itemToDelete = "",
             )
         }
 
         coroutineScope.launch {
             when (val result = scripterDataSource.getDevices()) {
                 is ApiResponse.Success -> {
+                    val bottomSheetState = currentState.bottomSheetData ?: return@launch
+                    val selectedDevice = result.data.firstOrNull()?.serial ?: ""
                     _stateFlow.update {
                         it.copy(
-                            devices = result.data,
-                            selectedSerial = result.data.firstOrNull()?.serial ?: "",
-                            isDevicesLoading = false,
+                            bottomSheetData = bottomSheetState.copy(
+                                isLoading = false,
+                                selectedDevice = selectedDevice,
+                                devices = result.data,
+                            )
                         )
                     }
                 }
 
                 is ApiResponse.Error -> {
                     uiCommandsFlow.tryEmit(ScriptsUiCommand.ShowNetworkError)
-                    _stateFlow.update { it.copy(isDevicesLoading = false) }
+                    val bottomSheetState = currentState.bottomSheetData ?: return@launch
+                    _stateFlow.update {
+                        it.copy(
+                            bottomSheetData = bottomSheetState.copy(
+                                isLoading = false,
+                            )
+                        )
+                    }
                 }
             }
         }
     }
 
     override fun onSelectDevice(serial: String) {
-        _stateFlow.update { it.copy(selectedSerial = serial) }
+        if (serial.isEmpty()) return
+        val bottomSheetData = currentState.bottomSheetData ?: return
+        _stateFlow.update {
+            it.copy(bottomSheetData = bottomSheetData.copy(selectedDevice = serial))
+        }
     }
 
     override fun onConfirmRunScript() {
-        val serial = currentState.selectedSerial
-        val name = currentState.scriptToRun
+        val bottomSheetState = currentState.bottomSheetData ?: return
+        val serial = bottomSheetState.selectedDevice
+        val name = bottomSheetState.selectedScript
         val node = currentState.selectedNode
         if (serial.isEmpty() || name.isEmpty() || node.isEmpty()) return
 
@@ -128,47 +145,36 @@ internal class ScriptsInteractor @Inject constructor(
             val started = scripterDataSource.runScript(serial = serial, node = node, name = name)
             if (!started) uiCommandsFlow.tryEmit(ScriptsUiCommand.ShowNetworkError)
         }
-        onDismissDevicePicker()
+        onDismiss()
     }
 
-    override fun onDismissDevicePicker() {
+    override fun onDismiss() {
         _stateFlow.update {
             it.copy(
-                scriptToRun = "",
-                selectedSerial = "",
-                devices = listOf(),
-                isDevicesLoading = false,
+                bottomSheetData = null,
+                itemToDelete = "",
             )
         }
     }
 
-    override fun onDeleteNode(node: String) {
+    override fun onDeleteItem(item: String) {
         _stateFlow.update {
-            it.copy(deleteTarget = node, deleteIsNode = true)
-        }
-    }
-
-    override fun onDeleteScript(name: String) {
-        _stateFlow.update {
-            it.copy(deleteTarget = name, deleteIsNode = false)
-        }
-    }
-
-    override fun onDismissDeleteDialog() {
-        _stateFlow.update {
-            it.copy(deleteTarget = "", deleteIsNode = false)
+            it.copy(itemToDelete = item)
         }
     }
 
     override fun onConfirmDelete() {
-        val target = currentState.deleteTarget
-        val isNode = currentState.deleteIsNode
-        val node = currentState.selectedNode
+        val selectedNode = currentState.selectedNode
+        val targetName = currentState.itemToDelete.ifEmpty { return }
         coroutineScope.launch {
-            val deleted = if (isNode) scripterDataSource.deleteNode(node = target)
-            else scripterDataSource.deleteScript(node = node, name = target)
+            val deleted = if (selectedNode.isNotEmpty()) {
+                scripterDataSource.deleteScript(node = selectedNode, name = targetName)
+            } else {
+                scripterDataSource.deleteNode(node = targetName)
+            }
+
             if (!deleted) uiCommandsFlow.tryEmit(ScriptsUiCommand.ShowNetworkError)
-            onDismissDeleteDialog()
+            onDismiss()
             onLoadData(onStart = false)
         }
     }

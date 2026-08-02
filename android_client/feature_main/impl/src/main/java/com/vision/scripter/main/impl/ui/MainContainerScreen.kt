@@ -45,7 +45,7 @@ internal fun MainContainerScreen(
         modifier = Modifier.fillMaxSize(),
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
-            if (selectedTab == ScriptsTab && scriptsState.showScripts) {
+            if (selectedTab == ScriptsTab && scriptsState.selectedNode.isNotEmpty()) {
                 ScriptsTopBar(
                     node = scriptsState.selectedNode,
                     onBack = scriptsUiStateHolder::onBack,

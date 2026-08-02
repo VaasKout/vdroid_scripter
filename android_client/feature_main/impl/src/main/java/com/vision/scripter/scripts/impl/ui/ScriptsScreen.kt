@@ -12,6 +12,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.Stable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -37,7 +38,7 @@ internal fun ScriptsScreen(
         uiStateHolder.onLoadData(onStart = true)
     }
 
-    BackHandler(enabled = state.showScripts) {
+    BackHandler(enabled = state.selectedNode.isNotEmpty()) {
         uiStateHolder.onBack()
     }
 
@@ -65,16 +66,16 @@ internal fun ScriptsScreen(
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            if (state.showScripts) {
+            if (state.selectedNode.isNotEmpty()) {
                 items(
                     items = state.scripts,
-                    key = { item -> item },
+                    key = @Stable { item -> item },
                 ) {
                     ScriptItem(
                         modifier = Modifier.fillMaxWidth(),
                         name = it,
                         onPlayClick = uiStateHolder::onPlayScript,
-                        onDeleteClick = uiStateHolder::onDeleteScript,
+                        onDeleteClick = uiStateHolder::onDeleteItem,
                     )
                 }
                 return@LazyColumn
@@ -88,34 +89,34 @@ internal fun ScriptsScreen(
                     modifier = Modifier.fillMaxWidth(),
                     name = it,
                     onClick = uiStateHolder::onNodeClick,
-                    onDeleteClick = uiStateHolder::onDeleteNode,
+                    onDeleteClick = uiStateHolder::onDeleteItem,
                 )
             }
         }
     }
 
-    if (state.deleteDialog.show) {
-        val text = if (state.deleteDialog.isNode) {
-            stringResource(R.string.node_delete_dialog_text, state.deleteDialog.name)
+    if (state.itemToDelete.isNotEmpty()) {
+        val text = if (state.selectedNode.isNotEmpty()) {
+            stringResource(R.string.script_delete_dialog_text, state.itemToDelete)
         } else {
-            stringResource(R.string.script_delete_dialog_text, state.deleteDialog.name)
+            stringResource(R.string.node_delete_dialog_text, state.itemToDelete)
         }
         DeleteDialog(
             title = stringResource(R.string.script_delete_dialog_title),
             text = text,
-            onDismiss = uiStateHolder::onDismissDeleteDialog,
+            onDismiss = uiStateHolder::onDismiss,
             onConfirm = uiStateHolder::onConfirmDelete,
         )
     }
 
-    if (state.devicePickerData.showDevicePicker) {
-        DevicePickerSheet(
-            isLoading = state.devicePickerData.isDevicesLoading,
-            devices = state.devicePickerData.devices,
-            selectedSerial = state.devicePickerData.selectedSerial,
+    val bottomSheetData = state.bottomSheetUiData
+    if (bottomSheetData != null) {
+        DevicePickerBottomSheet(
+            isLoading = bottomSheetData.isLoading,
+            devices = bottomSheetData.devices,
             onSelect = uiStateHolder::onSelectDevice,
             onConfirm = uiStateHolder::onConfirmRunScript,
-            onDismiss = uiStateHolder::onDismissDevicePicker,
+            onDismiss = uiStateHolder::onDismiss,
         )
     }
 }

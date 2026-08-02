@@ -48,7 +48,6 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
@@ -172,60 +171,32 @@ fun DeleteDialog(
         icon = {
             Icon(
                 imageVector = Icons.Filled.Delete,
-                tint = Color.Red,
+                tint = MaterialTheme.colorScheme.error,
                 contentDescription = null,
             )
         },
         title = {
-            Text(
-                text = title,
-                style = TextStyle(
-                    color = Color.Black,
-                    fontSize = 24.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            )
+            Text(text = title)
         },
         text = {
-            Text(
-                text = text,
-                style = TextStyle(
-                    color = Color.DarkGray,
-                    fontSize = 18.sp,
-                    textAlign = TextAlign.Center,
-                    fontWeight = FontWeight.Normal
-                )
-            )
+            Text(text = text)
         },
-        onDismissRequest = {
-            onDismiss()
-        },
+        onDismissRequest = onDismiss,
         confirmButton = {
             TextButton(
                 onClick = onConfirm,
+                colors = ButtonDefaults.textButtonColors(
+                    contentColor = MaterialTheme.colorScheme.error,
+                ),
             ) {
-                Text(
-                    text = stringResource(R.string.ok),
-                    style = TextStyle(
-                        color = Color.Red,
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                )
+                Text(text = stringResource(R.string.ok))
             }
         },
         dismissButton = {
             TextButton(
                 onClick = onDismiss,
             ) {
-                Text(
-                    text = stringResource(R.string.cancel),
-                    style = TextStyle(
-                        color = Color.DarkGray,
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                )
+                Text(text = stringResource(R.string.cancel))
             }
         }
     )

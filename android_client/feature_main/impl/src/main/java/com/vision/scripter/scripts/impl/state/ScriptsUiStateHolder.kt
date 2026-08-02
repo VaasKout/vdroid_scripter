@@ -17,11 +17,8 @@ interface ScriptsUiStateHolder {
     fun onPlayScript(name: String)
     fun onSelectDevice(serial: String)
     fun onConfirmRunScript()
-    fun onDismissDevicePicker()
 
-    fun onDeleteNode(node: String)
-    fun onDeleteScript(name: String)
-
-    fun onDismissDeleteDialog()
+    fun onDismiss()
+    fun onDeleteItem(item: String)
     fun onConfirmDelete()
 }
