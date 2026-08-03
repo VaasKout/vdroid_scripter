@@ -69,6 +69,7 @@ func (s *serverImpl) handleScriptsFunctions() {
 			s.handleRunScript(w, r)
 			return
 		}
+		http.Error(w, "use GET method", http.StatusMethodNotAllowed)
 	})
 
 	http.HandleFunc(SaveRectangle, func(w http.ResponseWriter, r *http.Request) {

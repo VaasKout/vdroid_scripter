@@ -101,6 +101,7 @@ func (s *serverImpl) handleEditKeyboard(w http.ResponseWriter, r *http.Request) 
 
 	if !result {
 		http.Error(w, "Something went wrong", http.StatusInternalServerError)
+		return
 	}
 
 	s.sendStatusOk(w)
@@ -139,6 +140,7 @@ func (s *serverImpl) handleDeleteButton(w http.ResponseWriter, r *http.Request) 
 	result := s.interactor.DeleteButton(serial, locale, name)
 	if !result {
 		http.Error(w, "Something went wrong", http.StatusInternalServerError)
+		return
 	}
 
 	s.sendStatusOk(w)
