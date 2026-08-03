@@ -7,7 +7,7 @@ plugins {
 android {
     namespace = "com.vision.scripter.coroutines.impl"
     compileSdk {
-        version = release(36)
+        version = release(37)
     }
 
     defaultConfig {

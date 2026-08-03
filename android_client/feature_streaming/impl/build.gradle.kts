@@ -9,7 +9,7 @@ plugins {
 android {
     namespace = "com.vision.scripter.streaming.impl"
     compileSdk {
-        version = release(36)
+        version = release(37)
     }
 
     defaultConfig {
