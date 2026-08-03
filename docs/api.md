@@ -38,7 +38,7 @@ This document describes every HTTP endpoint exposed by the server, defined in
 | GET | `/nodes/{node}/{name}` | Get a single script |
 | DELETE | `/nodes/{node}/{name}` | Delete a script |
 | GET | `/nodes/{node}/{name}/run?serial=` | Run a script on a device |
-| POST | `/save_rectangle` | Save a selected zone (rectangle) |
+| POST | `/save_rectangle` | Crop and save a template image from the device screen |
 | POST | `/save_script` | Create or replace a script |
 | GET | `/devices/{serial}/find_text` | OCR: locate text on the current screen |
 | GET | `/devices/{serial}/keyboard` | Detect on-screen keyboard keys |
@@ -84,7 +84,7 @@ Returns all ADB devices currently visible to the server.
 Scripts are organised into **nodes** — a node is a screen, and the scripts under
 it are the interactions recorded on that screen. A script is identified by its
 `node` + `name` pair. On disk it lives at `scripts/<node>/<name>/run.json`, with
-template images stored next to it as `<param.id>.png`.
+template images stored next to it as `<param.value>.png`.
 
 Nodes and scripts are stored server-wide: listing, fetching, and deleting are
 device-independent. Only running a script targets a specific device.
@@ -153,18 +153,25 @@ instead types its `value` on the on-screen keyboard. If `params` is empty and
 
 ### `POST /save_rectangle`
 
-Saves a selected screen zone (rectangle) for the device.
+Takes a screenshot of the device, crops the given rectangle out of it, and
+saves it as `<value>.png` in the script's directory
+(`scripts/<node>/<name>/`, created if missing). This is the template image
+that a `template` parameter with the same `value` is matched against.
 
 - **Request body:**
   ```json
   {
     "serial": "ABCD1234",
+    "node": "main_screen",
+    "name": "open_profile",
+    "value": "login_button",
     "rectangle": { "left_x": 100, "right_x": 300, "top_y": 200, "bottom_y": 260 }
   }
   ```
-  `serial` is required.
+  All fields are required; `rectangle` must be non-empty.
 - **Response `200`:** `{ "status": "ok" }`
-- **Errors:** `400` on invalid JSON or empty `serial`, `500` if not saved.
+- **Errors:** `400` on invalid JSON or a missing field, `500` if the screenshot
+  or crop fails.
 
 ### `POST /save_script`
 
@@ -185,13 +192,12 @@ The body is a whole [`Script`](#script) object.
     "timeout": 15
   }
   ```
-  `name` and `node` are required. The server assigns the **last** parameter's
-  `id` (set to the number of parameters); earlier parameters keep the `id` you
-  send. `timeout` is optional (seconds to keep locating a parameter's target
-  before failing; defaults to `15` when omitted or `<= 0`).
-- **Template images:** if the **last** parameter is a `template`, a pending zone
-  saved via [`POST /save_rectangle`](#post-save_rectangle) is committed to it as
-  `<param.id>.png` in the script's directory.
+  `name` and `node` are required (both are trimmed). The body is stored as-is
+  to `scripts/<node>/<name>/run.json`. `timeout` is optional (seconds to keep
+  locating a parameter's target before failing; values omitted or `<= 0` fall
+  back to `15` at run time). Template images referenced by `template`
+  parameters are saved separately via
+  [`POST /save_rectangle`](#post-save_rectangle).
 - **Response `200`:** `{ "status": "ok" }`
 - **Errors:** `400` on invalid JSON or empty `node`/`name`, `500` if not saved.
 
@@ -356,9 +362,8 @@ applied to the last one's region.
 
 | Field | JSON | Type | Notes |
 | ----- | ---- | ---- | ----- |
-| ID | `id` | int | Template images are named `<id>.png`; on save the server sets the last parameter's `id` |
 | Type | `type` | string | One of `template`, `text`, `type_text`, `yolo_class`, `command` |
-| Value | `value` | string | OCR text for `text`, YOLO class name for `yolo_class`, text to type for `type_text`; unused for `template` (matched by `<id>.png`) |
+| Value | `value` | string | Template image name for `template` (matched against `<value>.png`), OCR text for `text`, YOLO class name for `yolo_class`, text to type for `type_text` |
 | Locale | `locale` | string | omitempty; OCR language/locale, and the keyboard locale for `type_text` |
 
 ### Event
