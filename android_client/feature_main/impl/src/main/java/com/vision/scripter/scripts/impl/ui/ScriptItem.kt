@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -29,6 +30,7 @@ fun ScriptItem(
     modifier: Modifier = Modifier,
     name: String,
     onPlayClick: (String) -> Unit,
+    onEditClick: (String) -> Unit,
     onDeleteClick: (String) -> Unit,
 ) {
     Box(
@@ -52,6 +54,14 @@ fun ScriptItem(
             modifier = Modifier.align(Alignment.CenterEnd),
             horizontalArrangement = Arrangement.spacedBy(4.dp),
         ) {
+            Icon(
+                modifier = Modifier
+                    .size(32.dp)
+                    .customClickable(onClick = { onEditClick(name) }),
+                imageVector = Icons.Filled.Edit,
+                tint = Color.Gray,
+                contentDescription = ""
+            )
             Icon(
                 modifier = Modifier
                     .size(32.dp)
@@ -120,6 +130,7 @@ private fun ScriptItemPreview() {
         modifier = Modifier.fillMaxWidth(),
         name = "test_1",
         onPlayClick = {},
+        onEditClick = {},
         onDeleteClick = {},
     )
 }

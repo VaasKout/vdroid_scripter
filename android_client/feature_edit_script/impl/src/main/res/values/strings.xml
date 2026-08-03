@@ -1,0 +1,9 @@
+<resources>
+    <string name="node_hint">Node</string>
+    <string name="next_node_hint">Next node</string>
+    <string name="timeout_hint">Timeout</string>
+    <string name="save_button">Save</string>
+    <string name="events_count">Events: %1$d</string>
+    <string name="save_dialog_title">Confirmation</string>
+    <string name="save_dialog_text">Save script %1$s?</string>
+</resources>

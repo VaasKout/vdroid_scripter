@@ -4,6 +4,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import com.vision.scripter.editscript.api.FeatureEditScript
 import com.vision.scripter.main.api.FeatureMain
 import com.vision.scripter.streaming.api.FeatureStreaming
 import com.vision.scripter.welcome.api.FeatureWelcome
@@ -23,6 +24,9 @@ class MainActivity : ComponentActivity() {
     @Inject
     lateinit var featureStreaming: Lazy<FeatureStreaming>
 
+    @Inject
+    lateinit var featureEditScript: Lazy<FeatureEditScript>
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -31,6 +35,7 @@ class MainActivity : ComponentActivity() {
                 featureWelcome = featureWelcome,
                 featureMain = featureMain,
                 featureStreaming = featureStreaming,
+                featureEditScript = featureEditScript,
             )
         }
     }

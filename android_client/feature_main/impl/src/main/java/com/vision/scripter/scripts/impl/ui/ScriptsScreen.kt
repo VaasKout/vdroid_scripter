@@ -75,6 +75,7 @@ internal fun ScriptsScreen(
                         modifier = Modifier.fillMaxWidth(),
                         name = it,
                         onPlayClick = uiStateHolder::onPlayScript,
+                        onEditClick = uiStateHolder::onEditScript,
                         onDeleteClick = uiStateHolder::onDeleteItem,
                     )
                 }

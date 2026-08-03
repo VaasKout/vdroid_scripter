@@ -99,6 +99,8 @@ dependencies {
     implementation(project(":feature_main:impl"))
     implementation(project(":feature_streaming:api"))
     implementation(project(":feature_streaming:impl"))
+    implementation(project(":feature_edit_script:api"))
+    implementation(project(":feature_edit_script:impl"))
     implementation(project(":core:ui"))
     implementation(project(":core:coroutines:api"))
     implementation(project(":core:coroutines:impl"))

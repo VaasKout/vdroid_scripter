@@ -126,6 +126,12 @@ internal class ScriptsInteractor @Inject constructor(
         }
     }
 
+    override fun onEditScript(name: String) {
+        val node = currentState.selectedNode
+        if (node.isEmpty() || name.isEmpty()) return
+        uiCommandsFlow.tryEmit(ScriptsUiCommand.OpenEditScript(node = node, name = name))
+    }
+
     override fun onSelectDevice(serial: String) {
         if (serial.isEmpty()) return
         val bottomSheetData = currentState.bottomSheetData ?: return

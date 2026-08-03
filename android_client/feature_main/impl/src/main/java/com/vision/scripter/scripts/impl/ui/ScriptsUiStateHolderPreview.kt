@@ -25,6 +25,7 @@ internal class ScriptsScreenUiStateHolderPreview(state: ScriptsUiState) : Script
     override fun onNodeClick(node: String) {}
     override fun onBack() {}
     override fun onPlayScript(name: String) {}
+    override fun onEditScript(name: String) {}
     override fun onSelectDevice(serial: String) {}
     override fun onConfirmRunScript() {}
     override fun onDismiss() {}

@@ -15,6 +15,7 @@ interface ScriptsUiStateHolder {
     fun onBack()
 
     fun onPlayScript(name: String)
+    fun onEditScript(name: String)
     fun onSelectDevice(serial: String)
     fun onConfirmRunScript()
 

@@ -36,6 +36,7 @@ class FeatureMainImpl @Inject constructor() : FeatureMain {
 
             ScriptsCommandObserver(
                 uiStateHolder = scriptsViewModel,
+                navController = navController,
                 snackbarHostState = snackbarHostState,
             )
 

@@ -6,7 +6,7 @@ plugins {
 }
 
 android {
-    namespace = "com.vision.scripter.main.impl"
+    namespace = "com.vision.scripter.editscript.impl"
     compileSdk {
         version = release(37)
     }
@@ -36,8 +36,6 @@ android {
 kotlin {
     compilerOptions {
         languageVersion = org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_2_0
-        // Optional: Set jvmTarget
-        // jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_11
     }
 }
 
@@ -57,7 +55,6 @@ dependencies {
     implementation(libs.androidx.activity.compose)
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.navigation.compose)
-    implementation(libs.coil3.coil.compose)
     implementation(libs.androidx.compose.material.icons.extended)
     implementation(libs.androidx.compose.runtime)
     implementation(libs.kotlinx.collections.immutable)
@@ -77,7 +74,5 @@ dependencies {
     implementation(project(":core:coroutines:api"))
     implementation(project(":core:network:api"))
     implementation(project(":data:api"))
-    implementation(project(":feature_main:api"))
-    implementation(project(":feature_streaming:api"))
     implementation(project(":feature_edit_script:api"))
 }
