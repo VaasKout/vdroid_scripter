@@ -52,10 +52,11 @@ class ControlStreamerImpl @Inject constructor() : ControlStreamer {
         return true
     }
 
+    @OptIn(ExperimentalUnsignedTypes::class)
     override fun sendControlData(
         screenSizes: ScreenSizes,
         event: MotionEvent?,
-    ): ByteArray? {
+    ): UByteArray? {
         try {
             val buffer = ByteBuffer.allocate(32)
             event ?: return null
@@ -77,7 +78,7 @@ class ControlStreamerImpl @Inject constructor() : ControlStreamer {
 
             output?.write(buffer.array())
             output?.flush()
-            return buffer.array()
+            return buffer.array().toUByteArray()
         } catch (e: Exception) {
             e.printStackTrace()
         }

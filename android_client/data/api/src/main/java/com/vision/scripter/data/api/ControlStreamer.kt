@@ -9,10 +9,11 @@ interface ControlStreamer {
         port: Int,
     ): Boolean
 
+    @OptIn(ExperimentalUnsignedTypes::class)
     fun sendControlData(
         screenSizes: ScreenSizes,
         event: MotionEvent?,
-    ): ByteArray?
+    ): UByteArray?
 
     fun close()
 }

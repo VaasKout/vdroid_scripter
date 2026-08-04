@@ -58,7 +58,8 @@ class RecordRepository @Inject constructor(
         }
     }
 
-    suspend fun recordBytes(bytesArray: ByteArray?) {
+    @OptIn(ExperimentalUnsignedTypes::class)
+    suspend fun recordBytes(bytesArray: UByteArray?) {
         if (bytesArray == null) return
         val keyboardButtons = keyboardRepository.observeKeyboardButtons().firstOrNull().orEmpty()
         val record = currentState

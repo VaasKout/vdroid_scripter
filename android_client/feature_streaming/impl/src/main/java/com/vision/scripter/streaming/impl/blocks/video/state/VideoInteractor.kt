@@ -174,6 +174,7 @@ class VideoInteractor @Inject constructor(
         closeStreams()
     }
 
+    @OptIn(ExperimentalUnsignedTypes::class)
     override fun onTouchEvent(
         viewWidth: Int,
         viewHeight: Int,

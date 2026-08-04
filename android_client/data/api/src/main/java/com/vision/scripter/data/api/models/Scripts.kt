@@ -38,7 +38,7 @@ data class Event(
     @SerialName("time")
     val time: Long = 0L,
     @SerialName("data")
-    val data: ByteArray? = null,
+    val data: UByteArray? = null,
 )
 
 @Serializable
