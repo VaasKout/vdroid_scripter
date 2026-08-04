@@ -39,7 +39,7 @@ type Script struct {
 	Name     string      `json:"name"`
 	Node     string      `json:"node"`
 	NextNode string      `json:"next_node,omitempty"`
-	Params   []Parameter `json:"params"`
+	Params   []Parameter `json:"params,omitempty"`
 	Events   []Event     `json:"events,omitempty"`
 	Timeout  int         `json:"timeout"`
 }
