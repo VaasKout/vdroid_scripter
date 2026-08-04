@@ -3,7 +3,11 @@
     <string name="next_node_hint">Next node</string>
     <string name="timeout_hint">Timeout</string>
     <string name="save_button">Save</string>
-    <string name="events_count">Events: %1$d</string>
+    <string name="params_title">Parameters</string>
+    <string name="events_title">Events: %1$d</string>
+    <string name="delete_events_button">Delete events</string>
+    <string name="delete_button">Delete</string>
     <string name="save_dialog_title">Confirmation</string>
     <string name="save_dialog_text">Save script %1$s?</string>
+    <string name="delete_dialog_text">Delete script %1$s?</string>
 </resources>

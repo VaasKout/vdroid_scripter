@@ -18,8 +18,8 @@ interface EditScriptUiStateHolder {
     fun onDeleteParam(id: Int)
     fun onDeleteEvents()
 
-    fun onSaveClicked()
-    fun onConfirmSave()
+    fun onTopbarActionClicked()
+    fun onConfirmDialog()
     fun onDismissDialog()
     fun onBackClicked()
 }

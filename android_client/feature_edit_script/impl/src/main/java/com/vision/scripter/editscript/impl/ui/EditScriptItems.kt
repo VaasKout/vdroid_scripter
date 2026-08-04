@@ -9,20 +9,32 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.vision.scripter.editscript.impl.R
 import com.vision.scripter.ui.customClickable
+
+@Composable
+internal fun SectionTitle(
+    modifier: Modifier = Modifier,
+    text: String,
+) {
+    Text(
+        modifier = modifier.padding(top = 8.dp),
+        text = text,
+        style = MaterialTheme.typography.titleMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+}
 
 @Composable
 internal fun ParamCard(
@@ -33,29 +45,27 @@ internal fun ParamCard(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .background(color = Color.White, shape = RoundedCornerShape(16.dp))
+            .background(
+                color = MaterialTheme.colorScheme.surfaceContainer,
+                shape = RoundedCornerShape(16.dp),
+            )
             .padding(16.dp),
     ) {
         Column(
             modifier = Modifier
                 .align(Alignment.CenterStart)
-                .padding(end = 40.dp),
+                .padding(end = 48.dp),
         ) {
             Text(
                 text = param.title,
-                style = TextStyle(
-                    color = Color.Black,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold,
-                ),
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface,
             )
             if (param.locale.isNotEmpty()) {
                 Text(
                     text = param.locale,
-                    style = TextStyle(
-                        color = Color.DarkGray,
-                        fontSize = 14.sp,
-                    ),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }
@@ -66,46 +76,36 @@ internal fun ParamCard(
                 .size(32.dp)
                 .customClickable(onClick = { onDeleteClick(param.id) }),
             imageVector = Icons.Filled.Delete,
-            tint = Color.Red,
+            tint = MaterialTheme.colorScheme.error,
             contentDescription = "",
         )
     }
 }
 
 @Composable
-internal fun EventsCard(
+internal fun DeleteEventsButton(
     modifier: Modifier = Modifier,
-    count: Int,
-    onDeleteClick: () -> Unit,
+    enabled: Boolean,
+    onClick: () -> Unit,
 ) {
-    Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .background(color = Color.White, shape = RoundedCornerShape(16.dp))
-            .padding(16.dp),
+    Button(
+        modifier = modifier,
+        enabled = enabled,
+        shape = RoundedCornerShape(16.dp),
+        colors = ButtonDefaults.buttonColors(
+            containerColor = MaterialTheme.colorScheme.error,
+            contentColor = MaterialTheme.colorScheme.onError,
+        ),
+        onClick = onClick,
     ) {
-        Text(
-            modifier = Modifier
-                .align(Alignment.CenterStart)
-                .padding(end = 40.dp),
-            text = stringResource(R.string.events_count, count),
-            style = TextStyle(
-                color = Color.Black,
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold,
-            ),
-        )
-
-        Icon(
-            modifier = Modifier
-                .align(Alignment.CenterEnd)
-                .size(32.dp)
-                .customClickable(onClick = onDeleteClick),
-            imageVector = Icons.Filled.Delete,
-            tint = Color.Red,
-            contentDescription = "",
-        )
+        Text(text = stringResource(R.string.delete_events_button))
     }
+}
+
+@Preview
+@Composable
+private fun SectionTitlePreview() {
+    SectionTitle(text = "Parameters")
 }
 
 @Preview
@@ -120,10 +120,20 @@ private fun ParamCardPreview() {
 
 @Preview
 @Composable
-private fun EventsCardPreview() {
-    EventsCard(
+private fun DeleteEventsButtonPreview() {
+    DeleteEventsButton(
         modifier = Modifier.fillMaxWidth(),
-        count = 24,
-        onDeleteClick = {},
+        enabled = true,
+        onClick = {},
+    )
+}
+
+@Preview
+@Composable
+private fun DeleteEventsButtonDisabledPreview() {
+    DeleteEventsButton(
+        modifier = Modifier.fillMaxWidth(),
+        enabled = false,
+        onClick = {},
     )
 }

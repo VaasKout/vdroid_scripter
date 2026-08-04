@@ -10,13 +10,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.remember
@@ -28,6 +26,8 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.vision.scripter.editscript.impl.R
+import com.vision.scripter.ui.CommonDialog
+import com.vision.scripter.ui.DeleteDialog
 import com.vision.scripter.ui.ProvideSnackbarHost
 import com.vision.scripter.ui.R as CommonR
 
@@ -45,8 +45,9 @@ internal fun EditScriptScreen(
         topBar = {
             EditScriptTopBar(
                 name = state.name,
+                deleteMode = state.deleteMode,
                 onBackClick = uiStateHolder::onBackClicked,
-                onSaveClick = uiStateHolder::onSaveClicked,
+                onActionClick = uiStateHolder::onTopbarActionClicked,
             )
         },
         snackbarHost = {
@@ -100,6 +101,15 @@ internal fun EditScriptScreen(
                 )
             }
 
+            if (state.params.isNotEmpty()) {
+                item(key = "params_title") {
+                    SectionTitle(
+                        modifier = Modifier.fillMaxWidth(),
+                        text = stringResource(R.string.params_title),
+                    )
+                }
+            }
+
             items(
                 items = state.params,
                 key = @Stable { param -> "param_${param.id}" },
@@ -111,23 +121,29 @@ internal fun EditScriptScreen(
                 )
             }
 
-            if (state.eventsCount > 0) {
-                item(key = "events_card") {
-                    EventsCard(
-                        modifier = Modifier.fillMaxWidth(),
-                        count = state.eventsCount,
-                        onDeleteClick = uiStateHolder::onDeleteEvents,
-                    )
-                }
+            item(key = "events_title") {
+                SectionTitle(
+                    modifier = Modifier.fillMaxWidth(),
+                    text = stringResource(R.string.events_title, state.eventsCount),
+                )
+            }
+
+            item(key = "delete_events_button") {
+                DeleteEventsButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = state.eventsCount > 0,
+                    onClick = uiStateHolder::onDeleteEvents,
+                )
             }
         }
     }
 
-    if (state.showSaveDialog) {
-        SaveScriptDialog(
+    if (state.showDialog) {
+        Dialog(
             name = state.name,
+            deleteMode = state.deleteMode,
             onDismiss = uiStateHolder::onDismissDialog,
-            onConfirm = uiStateHolder::onConfirmSave,
+            onConfirm = uiStateHolder::onConfirmDialog,
         )
     }
 }
@@ -153,29 +169,29 @@ private fun ScriptEditField(
 }
 
 @Composable
-private fun SaveScriptDialog(
+private fun Dialog(
     name: String,
+    deleteMode: Boolean,
     onDismiss: () -> Unit,
     onConfirm: () -> Unit,
 ) {
-    AlertDialog(
-        title = {
-            Text(text = stringResource(R.string.save_dialog_title))
-        },
-        text = {
-            Text(text = stringResource(R.string.save_dialog_text, name))
-        },
-        onDismissRequest = onDismiss,
-        confirmButton = {
-            TextButton(onClick = onConfirm) {
-                Text(text = stringResource(CommonR.string.ok))
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(text = stringResource(CommonR.string.cancel))
-            }
-        },
+    if (deleteMode) {
+        DeleteDialog(
+            title = stringResource(R.string.save_dialog_title),
+            text = stringResource(R.string.delete_dialog_text, name),
+            onDismiss = onDismiss,
+            onConfirm = onConfirm,
+        )
+        return
+    }
+
+    CommonDialog(
+        title = stringResource(R.string.save_dialog_title),
+        text = stringResource(R.string.save_dialog_text, name),
+        confirmButtonText = stringResource(CommonR.string.ok),
+        dismissButtonText = stringResource(CommonR.string.cancel),
+        onDismiss = onDismiss,
+        onConfirm = onConfirm,
     )
 }
 

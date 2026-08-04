@@ -3,6 +3,7 @@ package com.vision.scripter.editscript.impl.state
 import com.vision.scripter.coroutines.api.CoroutineScopeFactory
 import com.vision.scripter.data.api.ScripterDataSource
 import com.vision.scripter.data.api.models.Script
+import com.vision.scripter.data.api.models.isEmpty
 import com.vision.scripter.editscript.impl.ui.EditScriptUiCommand
 import com.vision.scripter.editscript.impl.ui.EditScriptUiState
 import com.vision.scripter.editscript.impl.ui.EditScriptUiStateHolder
@@ -46,12 +47,11 @@ class EditScriptInteractor @Inject constructor(
     override val uiCommandsFlow: CommandFlow<EditScriptUiCommand> = CommandFlow(coroutineScope)
 
     override fun init(node: String, name: String) {
-        if (currentState.scriptName.isNotEmpty()) return
-
+        if (name.isEmpty()) return
         _stateFlow.update {
             it.copy(
                 initialNode = node,
-                scriptName = name,
+                script = Script(name = name),
             )
         }
 
@@ -60,11 +60,7 @@ class EditScriptInteractor @Inject constructor(
                 is ApiResponse.Success -> _stateFlow.update {
                     it.copy(
                         loadingState = LoadingState.None,
-                        node = result.data.node,
-                        nextNode = result.data.nextNode,
-                        timeout = result.data.timeout.toString(),
-                        params = result.data.params,
-                        events = result.data.events,
+                        script = result.data,
                     )
                 }
 
@@ -77,56 +73,61 @@ class EditScriptInteractor @Inject constructor(
     }
 
     override fun onNodeChanged(value: String) {
-        _stateFlow.update { it.copy(node = value) }
+        val updatedScript = currentState.script?.copy(node = value.trim()) ?: return
+        _stateFlow.update { it.copy(script = updatedScript) }
     }
 
     override fun onNextNodeChanged(value: String) {
-        _stateFlow.update { it.copy(nextNode = value) }
+        val updatedScript = currentState.script?.copy(nextNode = value.trim()) ?: return
+        _stateFlow.update { it.copy(script = updatedScript) }
     }
 
     override fun onTimeoutChanged(value: String) {
-        _stateFlow.update { it.copy(timeout = value.filter(Char::isDigit)) }
+        val script = currentState.script ?: return
+        val newTimeout = value.filter(Char::isDigit).toIntOrNull() ?: 0
+        val updatedScript = script.copy(timeout = newTimeout)
+        _stateFlow.update { it.copy(script = updatedScript) }
     }
 
     override fun onDeleteParam(id: Int) {
+        val script = currentState.script ?: return
+        val updatedParams = script.params.filterIndexed { index, _ -> index != id }
+        val updatedScript = script.copy(params = updatedParams)
         _stateFlow.update {
-            it.copy(params = it.params.filterIndexed { index, _ -> index != id })
+            it.copy(script = updatedScript)
         }
     }
 
     override fun onDeleteEvents() {
-        _stateFlow.update { it.copy(events = listOf()) }
+        val updatedScript = currentState.script?.copy(events = listOf()) ?: return
+        _stateFlow.update { it.copy(script = updatedScript) }
     }
 
-    override fun onSaveClicked() {
-        if (currentState.node.isBlank()) return
+    override fun onTopbarActionClicked() {
+        val state = currentState
+        if (state.loadingState != LoadingState.None) return
+        val script = currentState.script ?: return
+        if (script.node.isEmpty()) return
         _stateFlow.update { it.copy(showDialog = true) }
     }
 
-    override fun onConfirmSave() {
-        val state = currentState
+    override fun onConfirmDialog() {
         _stateFlow.update { it.copy(showDialog = false) }
-
+        val script = currentState.script ?: return
+        val state = currentState
         coroutineScope.launch {
-            val script = Script(
-                name = state.scriptName,
-                node = state.node.trim(),
-                nextNode = state.nextNode.trim(),
-                params = state.params,
-                events = state.events,
-                timeout = state.timeout.toIntOrNull() ?: 0,
-            )
-
-            val saved = scripterDataSource.saveScript(script)
-            if (!saved) {
-                uiCommandsFlow.tryEmit(EditScriptUiCommand.ShowNetworkError)
-                return@launch
+            if (!script.isEmpty()) {
+                val saved = scripterDataSource.saveScript(script)
+                if (!saved) {
+                    uiCommandsFlow.tryEmit(EditScriptUiCommand.ShowNetworkError)
+                    return@launch
+                }
             }
 
-            if (script.node != state.initialNode) {
+            if (script.node != currentState.initialNode) {
                 val deleted = scripterDataSource.deleteScript(
                     node = state.initialNode,
-                    name = state.scriptName,
+                    name = script.name,
                 )
                 if (!deleted) {
                     uiCommandsFlow.tryEmit(EditScriptUiCommand.ShowNetworkError)

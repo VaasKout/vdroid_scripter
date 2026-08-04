@@ -203,6 +203,36 @@ fun DeleteDialog(
 }
 
 @Composable
+fun CommonDialog(
+    title: String,
+    text: String,
+    confirmButtonText: String,
+    dismissButtonText: String,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit,
+) {
+    AlertDialog(
+        title = {
+            Text(text = title)
+        },
+        text = {
+            Text(text = text)
+        },
+        onDismissRequest = onDismiss,
+        confirmButton = {
+            TextButton(onClick = onConfirm) {
+                Text(text = confirmButtonText)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(text = dismissButtonText)
+            }
+        },
+    )
+}
+
+@Composable
 fun TopBar(
     modifier: Modifier = Modifier,
     startContent: @Composable () -> Unit = {},

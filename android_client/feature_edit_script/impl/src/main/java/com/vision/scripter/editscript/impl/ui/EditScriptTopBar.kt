@@ -11,6 +11,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -24,8 +25,9 @@ import com.vision.scripter.ui.customClickable
 @Composable
 internal fun EditScriptTopBar(
     name: String,
+    deleteMode: Boolean,
     onBackClick: () -> Unit,
-    onSaveClick: () -> Unit,
+    onActionClick: () -> Unit,
 ) {
     TopBar(
         startContent = {
@@ -49,9 +51,12 @@ internal fun EditScriptTopBar(
         endContent = {
             Text(
                 modifier = Modifier
-                    .customClickable(onClick = onSaveClick)
+                    .customClickable(onClick = onActionClick)
                     .padding(horizontal = 8.dp, vertical = 4.dp),
-                text = stringResource(R.string.save_button),
+                text = stringResource(
+                    if (deleteMode) R.string.delete_button else R.string.save_button,
+                ),
+                color = if (deleteMode) MaterialTheme.colorScheme.error else Color.Unspecified,
                 style = TextStyle(
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
@@ -66,7 +71,19 @@ internal fun EditScriptTopBar(
 private fun EditScriptTopBarPreview() {
     EditScriptTopBar(
         name = "login_tap",
+        deleteMode = false,
         onBackClick = {},
-        onSaveClick = {},
+        onActionClick = {},
+    )
+}
+
+@Preview
+@Composable
+private fun EditScriptTopBarDeleteModePreview() {
+    EditScriptTopBar(
+        name = "login_tap",
+        deleteMode = true,
+        onBackClick = {},
+        onActionClick = {},
     )
 }

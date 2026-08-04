@@ -13,7 +13,8 @@ data class EditScriptUiState(
     val timeout: String = "",
     val params: ImmutableList<ParamUiData> = persistentListOf(),
     val eventsCount: Int = 0,
-    val showSaveDialog: Boolean = false,
+    val deleteMode: Boolean = false,
+    val showDialog: Boolean = false,
 )
 
 @Immutable
