@@ -124,7 +124,7 @@ class EditScriptInteractor @Inject constructor(
                 }
             }
 
-            if (script.node != currentState.initialNode) {
+            if (script.isEmpty() || script.node != currentState.initialNode) {
                 val deleted = scripterDataSource.deleteScript(
                     node = state.initialNode,
                     name = script.name,
