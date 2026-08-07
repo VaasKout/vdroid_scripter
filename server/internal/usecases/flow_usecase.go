@@ -4,6 +4,7 @@ import (
 	"android_vision_scripter/pkg/models"
 	"errors"
 	"fmt"
+	"math/rand/v2"
 	"slices"
 	"strings"
 )
@@ -66,6 +67,9 @@ func (i *interactorImpl) getAllScripts() (map[string][]models.Script, error) {
 		if err != nil {
 			return nil, err
 		}
+		if len(names) == 0 {
+			continue
+		}
 
 		var scripts = make([]models.Script, 0, len(names))
 		for _, name := range names {
@@ -90,7 +94,7 @@ func (i *interactorImpl) findScriptsPath(
 	startNode string,
 	endNode string,
 ) []models.Script {
-	var visited = map[string]models.Script{startNode: {}}
+	var visited = map[string]models.Script{}
 	var queue = []string{startNode}
 
 	for len(queue) > 0 {
@@ -101,6 +105,7 @@ func (i *interactorImpl) findScriptsPath(
 			return buildScriptsPath(visited, startNode, endNode)
 		}
 
+		var candidates = map[string][]models.Script{}
 		for _, script := range scriptsByNode[node] {
 			var next = strings.TrimSpace(script.NextNode)
 			if next == "" {
@@ -109,7 +114,11 @@ func (i *interactorImpl) findScriptsPath(
 			if _, ok := visited[next]; ok {
 				continue
 			}
-			visited[next] = script
+			candidates[next] = append(candidates[next], script)
+		}
+
+		for next, scripts := range candidates {
+			visited[next] = scripts[rand.IntN(len(scripts))]
 			queue = append(queue, next)
 		}
 	}
@@ -122,8 +131,11 @@ func buildScriptsPath(
 	endNode string,
 ) []models.Script {
 	var path = make([]models.Script, 0, len(visited))
-	for node := endNode; node != startNode; { // iterate until node != startNode
-		var script = visited[node]
+	for node := endNode; node != startNode; {
+		script, ok := visited[node]
+		if !ok {
+			return nil
+		}
 		path = append(path, script)
 		node = script.Node
 	}
