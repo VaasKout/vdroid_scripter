@@ -44,6 +44,28 @@ type Script struct {
 	Timeout  int         `json:"timeout"`
 }
 
+// ToJSON ...
+func (s *Script) ToJSON() []byte {
+	result, err := json.Marshal(s)
+	if err != nil {
+		fmt.Println("Script ToJson " + err.Error())
+		return []byte{}
+	}
+	return result
+}
+
+// GetTimeout ...
+func (s *Script) GetTimeout() time.Duration {
+	if s == nil || s.Timeout <= 0 {
+		return time.Duration(DefaultTimeout) * time.Second
+	}
+	return time.Duration(s.Timeout) * time.Second
+}
+
+func (s *Script) IsEmpty() bool {
+	return s == nil || s.Name == "" || (len(s.Events) == 0 && len(s.Params) == 0)
+}
+
 // Parameter ...
 type Parameter struct {
 	Type   string `json:"type"`
@@ -69,22 +91,4 @@ func ExtractTapEvents(events []Event) []Event {
 		}
 	}
 	return events
-}
-
-// ToJSON ...
-func (s *Script) ToJSON() []byte {
-	result, err := json.Marshal(s)
-	if err != nil {
-		fmt.Println("Script ToJson " + err.Error())
-		return []byte{}
-	}
-	return result
-}
-
-// GetTimeout ...
-func (s *Script) GetTimeout() time.Duration {
-	if s == nil || s.Timeout <= 0 {
-		return time.Duration(DefaultTimeout) * time.Second
-	}
-	return time.Duration(s.Timeout) * time.Second
 }
