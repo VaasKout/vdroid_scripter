@@ -21,6 +21,7 @@ type FlowUseCase interface {
 		endNode string,
 		basePort int,
 	) error
+	BuildFlow(startNode string, endNode string) []models.Script
 }
 
 func (i *interactorImpl) RunFlow(
@@ -40,19 +41,23 @@ func (i *interactorImpl) RunFlow(
 		return errors.New(FlowIsEmptyError)
 	}
 
-	scriptsByNode, err := i.getAllScripts()
-	if err != nil {
-		return err
-	}
-
-	flowScripts := i.findScriptsPath(scriptsByNode, startNode, endNode)
-	if flowScripts == nil {
+	flowScripts := i.BuildFlow(startNode, endNode)
+	if len(flowScripts) == 0 {
 		return errors.New(FlowPathNotFoundError)
 	}
 
 	i.logger.Info(fmt.Sprintf("flow: %v", flowScripts))
 
 	return nil
+}
+
+func (i *interactorImpl) BuildFlow(startNode string, endNode string) []models.Script {
+	scriptsByNode, err := i.getAllScripts()
+	if err != nil {
+		i.logger.Error(err.Error())
+		return []models.Script{}
+	}
+	return i.findScriptsPath(scriptsByNode, startNode, endNode)
 }
 
 func (i *interactorImpl) getAllScripts() (map[string][]models.Script, error) {
