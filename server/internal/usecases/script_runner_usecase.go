@@ -66,7 +66,10 @@ func (i *interactorImpl) startVideoListener(
 
 	go func() {
 		defer close(doneCh)
-		i.executeScript(serial, script, newConnection)
+		if newConnection {
+			go i.scrcpy.ReadVideoStream(serial, nil)
+		}
+		i.executeScript(serial, script)
 	}()
 
 	<-doneCh
@@ -78,29 +81,24 @@ func (i *interactorImpl) startVideoListener(
 func (i *interactorImpl) executeScript(
 	serial string,
 	script *models.Script,
-	newConnection bool,
-) {
+) bool {
 	var clientConnection *ClientConnection
 	if result, ok := i.clientsCache.Get(serial); ok {
 		clientConnection = &result
 	}
 	if clientConnection == nil || clientConnection.VideoPort == 0 {
 		i.logger.Error(fmt.Sprintf("no connection to %s", serial))
-		return
+		return false
 	}
 	if script == nil || script.Name == "" {
 		i.logger.Error("script is empty")
-		return
+		return false
 	}
 
 	scriptDir := i.filesDB.CreateScriptDir(script.Node, script.Name)
 	if scriptDir == "" {
 		i.logger.Error(fmt.Sprintf("scriptDir not found %s", script.Name))
-		return
-	}
-
-	if newConnection {
-		go i.scrcpy.ReadVideoStream(serial, nil)
+		return false
 	}
 
 	i.logger.Info(fmt.Sprintf("running script %s... ⏳", script.Name))
@@ -116,7 +114,7 @@ func (i *interactorImpl) executeScript(
 			err := i.typeText(serial, timeout, &param, script.Events)
 			if err != nil {
 				i.logger.Error(err.Error())
-				return
+				return false
 			}
 			continue
 		}
@@ -125,10 +123,10 @@ func (i *interactorImpl) executeScript(
 			foundRect, err := i.findRectangle(serial, &param, timeout, scriptDir)
 			if err != nil {
 				i.logger.Error(err.Error())
-				return
+				return false
 			}
 			if foundRect == nil {
-				return
+				return false
 			}
 		}
 
@@ -136,13 +134,14 @@ func (i *interactorImpl) executeScript(
 			foundRect, err := i.findRectangle(serial, &param, timeout, scriptDir)
 			if err != nil {
 				i.logger.Error(err.Error())
-				return
+				return false
 			}
 			i.playEvent(serial, foundRect, script.Events)
 		}
 	}
 
 	i.logger.Info(fmt.Sprintf("script %s is COMPLETE ✅", script.Name))
+	return true
 }
 
 func (i *interactorImpl) findRectangle(

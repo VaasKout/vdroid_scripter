@@ -17,21 +17,21 @@ const (
 
 // Type of strategies
 const (
-	OnSuccess = "on_success"
 	OnFailure = "on_failure"
 )
 
 // Hardcoded names of actions
 const (
-	InitialAction = "init"
+	InitialScript = "init"
 )
 
 // DefaultTimeout ...
 const DefaultTimeout int = 15
 
+// Actions
 const (
-	actionDown byte = 0
-	actionUp   byte = 1
+	ActionDown byte = 0
+	ActionUp   byte = 1
 )
 
 // Script ...
@@ -86,7 +86,7 @@ func ExtractTapEvents(events []Event) []Event {
 		if len(downData) != ControlBytesSize || len(upData) != ControlBytesSize {
 			continue
 		}
-		if downData[1] == actionDown && upData[1] == actionUp {
+		if downData[1] == ActionDown && upData[1] == ActionUp {
 			return []Event{events[index], events[index+1]}
 		}
 	}

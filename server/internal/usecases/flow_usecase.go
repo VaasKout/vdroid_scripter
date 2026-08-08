@@ -21,7 +21,7 @@ type FlowUseCase interface {
 		endNode string,
 		basePort int,
 	) error
-	BuildFlow(startNode string, endNode string) []models.Script
+	BuildFlow(startNode string, endNode string) []string
 }
 
 func (i *interactorImpl) RunFlow(
@@ -41,12 +41,12 @@ func (i *interactorImpl) RunFlow(
 		return errors.New(FlowIsEmptyError)
 	}
 
-	flowScripts := i.BuildFlow(startNode, endNode)
-	if len(flowScripts) == 0 {
+	nodes := i.BuildFlow(startNode, endNode)
+	if len(nodes) == 0 {
 		return errors.New(FlowPathNotFoundError)
 	}
 
-	i.logger.Info(fmt.Sprintf("flow: %v", flowScripts))
+	i.logger.Info(fmt.Sprintf("flow: %v", nodes))
 
 	var newConnection = false
 	if _, ok := i.clientsCache.Get(serial); !ok {
@@ -58,22 +58,32 @@ func (i *interactorImpl) RunFlow(
 		newConnection = started
 	}
 
-	go i.startFlowListener(serial, flowScripts, newConnection)
+	go i.startFlow(serial, nodes, newConnection)
 	return nil
 }
 
-func (i *interactorImpl) startFlowListener(
+func (i *interactorImpl) BuildFlow(startNode string, endNode string) []string {
+	scriptsByNode, err := i.getAllScripts()
+	if err != nil {
+		i.logger.Error(err.Error())
+		return []string{}
+	}
+	return i.findNodesPath(scriptsByNode, startNode, endNode)
+}
+
+func (i *interactorImpl) startFlow(
 	serial string,
-	scripts []models.Script,
+	nodes []string,
 	newConnection bool,
 ) {
 	var doneCh = make(chan struct{})
 
 	go func() {
 		defer close(doneCh)
-		for index := range scripts {
-			i.executeScript(serial, &scripts[index], newConnection && index == 0)
+		if newConnection {
+			go i.scrcpy.ReadVideoStream(serial, nil)
 		}
+		i.executeFlow(serial, nodes)
 	}()
 
 	<-doneCh
@@ -82,13 +92,49 @@ func (i *interactorImpl) startFlowListener(
 	}
 }
 
-func (i *interactorImpl) BuildFlow(startNode string, endNode string) []models.Script {
-	scriptsByNode, err := i.getAllScripts()
-	if err != nil {
-		i.logger.Error(err.Error())
-		return []models.Script{}
+func (i *interactorImpl) executeFlow(
+	serial string,
+	nodes []string,
+) {
+	for index, node := range nodes {
+
+		var scripts = scriptsByNode[node]
+
+		for index := range scripts {
+			if scripts[index].Name == models.InitialScript {
+				var initScript = scripts[index]
+				if initScript.IsEmpty() {
+					return
+				}
+				completed := i.executeScript(serial, &initScript)
+				if !completed {
+					return
+				}
+			}
+		}
+
+		if index == len(nodes)-1 {
+			return
+		}
+
+		var nextNode = nodes[index+1]
+		var candidates = []models.Script{}
+		for _, script := range scripts {
+			if script.Name == models.InitialScript {
+				continue
+			}
+			if strings.TrimSpace(script.NextNode) == nextNode {
+				candidates = append(candidates, script)
+			}
+		}
+		if len(candidates) == 0 {
+			i.logger.Error(fmt.Sprintf("no script leads from %s to %s", node, nextNode))
+			return
+		}
+
+		var script = candidates[rand.IntN(len(candidates))]
+		i.executeScript(serial, &script)
 	}
-	return i.findScriptsPath(scriptsByNode, startNode, endNode)
 }
 
 func (i *interactorImpl) getAllScripts() (map[string][]models.Script, error) {
@@ -99,16 +145,16 @@ func (i *interactorImpl) getAllScripts() (map[string][]models.Script, error) {
 
 	var scriptsByNode = make(map[string][]models.Script, len(nodes))
 	for _, node := range nodes {
-		names, err := i.GetNodes(node) //take all nodes
+		scriptNames, err := i.GetNodes(node) //take all nodes
 		if err != nil {
 			return nil, err
 		}
-		if len(names) == 0 {
+		if len(scriptNames) == 0 {
 			continue
 		}
 
-		var scripts = make([]models.Script, 0, len(names))
-		for _, name := range names {
+		var scripts = make([]models.Script, 0, len(scriptNames))
+		for _, name := range scriptNames {
 			script, err := i.GetScript(node, name) //take all scripts by name ""
 			if err != nil {
 				i.logger.Error(err.Error())
@@ -125,11 +171,11 @@ func (i *interactorImpl) getAllScripts() (map[string][]models.Script, error) {
 }
 
 // start from the endNode, check all scripts to have nextNode: lastNode
-func (i *interactorImpl) findScriptsPath(
+func (i *interactorImpl) findNodesPath(
 	scriptsByNode map[string][]models.Script,
 	startNode string,
 	endNode string,
-) []models.Script {
+) []string {
 	var visited = map[string]models.Script{}
 	var queue = []string{startNode}
 
@@ -138,10 +184,9 @@ func (i *interactorImpl) findScriptsPath(
 		queue = queue[1:] // pop node
 
 		if node == endNode {
-			return buildScriptsPath(visited, startNode, endNode)
+			return buildNodesPath(visited, startNode, endNode)
 		}
 
-		var candidates = map[string][]models.Script{}
 		for _, script := range scriptsByNode[node] {
 			var next = strings.TrimSpace(script.NextNode)
 			if next == "" {
@@ -150,30 +195,26 @@ func (i *interactorImpl) findScriptsPath(
 			if _, ok := visited[next]; ok {
 				continue
 			}
-			candidates[next] = append(candidates[next], script)
-		}
-
-		for next, scripts := range candidates {
-			visited[next] = scripts[rand.IntN(len(scripts))]
+			visited[next] = script
 			queue = append(queue, next)
 		}
 	}
 	return nil
 }
 
-func buildScriptsPath(
+func buildNodesPath(
 	visited map[string]models.Script,
 	startNode string,
 	endNode string,
-) []models.Script {
-	var path = make([]models.Script, 0, len(visited))
+) []string {
+	var path = []string{endNode}
 	for node := endNode; node != startNode; {
 		script, ok := visited[node]
 		if !ok {
 			return nil
 		}
-		path = append(path, script)
 		node = script.Node
+		path = append(path, node)
 	}
 	slices.Reverse(path)
 	return path

@@ -95,10 +95,5 @@ func TestBuildFlow(t *testing.T) {
 	if len(flow) == 0 {
 		t.Fatal("empty flow")
 	}
-
-	var names = make([]string, 0, len(flow))
-	for _, script := range flow {
-		names = append(names, script.Name)
-	}
-	t.Log(names)
+	t.Log(flow)
 }
