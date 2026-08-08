@@ -48,7 +48,38 @@ func (i *interactorImpl) RunFlow(
 
 	i.logger.Info(fmt.Sprintf("flow: %v", flowScripts))
 
+	var newConnection = false
+	if _, ok := i.clientsCache.Get(serial); !ok {
+		started := i.StartScrcpyServer(serial, basePort)
+		if !started {
+			var errMsg = fmt.Sprintf("couldn't start scrcpy server for %s", serial)
+			return errors.New(errMsg)
+		}
+		newConnection = started
+	}
+
+	go i.startFlowListener(serial, flowScripts, newConnection)
 	return nil
+}
+
+func (i *interactorImpl) startFlowListener(
+	serial string,
+	scripts []models.Script,
+	newConnection bool,
+) {
+	var doneCh = make(chan struct{})
+
+	go func() {
+		defer close(doneCh)
+		for index := range scripts {
+			i.executeScript(serial, &scripts[index], newConnection && index == 0)
+		}
+	}()
+
+	<-doneCh
+	if newConnection {
+		i.CloseConnection(serial)
+	}
 }
 
 func (i *interactorImpl) BuildFlow(startNode string, endNode string) []models.Script {
