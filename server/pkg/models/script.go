@@ -42,6 +42,7 @@ type Script struct {
 	Params   []Parameter `json:"params,omitempty"`
 	Events   []Event     `json:"events,omitempty"`
 	Timeout  int         `json:"timeout"`
+	CanSkip  bool        `json:"can_skip,omitempty"`
 }
 
 // ToJSON ...

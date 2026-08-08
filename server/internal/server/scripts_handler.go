@@ -101,7 +101,7 @@ func (s *serverImpl) handleScriptsFunctions() {
 }
 
 func (s *serverImpl) handleGetNodes(w http.ResponseWriter, r *http.Request) {
-	names, err := s.interactor.GetNodes("")
+	names, err := s.interactor.GetNodes()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -113,7 +113,7 @@ func (s *serverImpl) handleGetNodes(w http.ResponseWriter, r *http.Request) {
 
 func (s *serverImpl) handleGetScripts(w http.ResponseWriter, r *http.Request) {
 	var node = r.PathValue(NodeKey)
-	names, err := s.interactor.GetNodes(node)
+	names, err := s.interactor.GetScriptNames(node)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

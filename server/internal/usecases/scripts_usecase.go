@@ -36,7 +36,8 @@ func (s *SaveZoneDto) Valid() bool {
 
 // ScriptsUseCase ...
 type ScriptsUseCase interface {
-	GetNodes(node string) ([]string, error)
+	GetNodes() ([]string, error)
+	GetScriptNames(node string) ([]string, error)
 	GetScript(node string, scriptName string) (*models.Script, error)
 	DeleteScript(node string, scriptName string) error
 	RunScript(serial string, node string, scriptName string, basePort int) error
@@ -126,16 +127,34 @@ func (i *interactorImpl) FindText(
 	return result
 }
 
-func (i *interactorImpl) GetNodes(node string) ([]string, error) {
+func (i *interactorImpl) GetNodes() ([]string, error) {
+	return i.getFromScriptDirs(), nil
+}
+
+func (i *interactorImpl) GetScriptNames(node string) ([]string, error) {
 	node = strings.TrimSpace(node)
-	scriptsDir := i.filesDB.CreateScriptDir(node)
+	if node == "" {
+		nodes := i.getFromScriptDirs()
+		var allScripts = []string{}
+		for _, node := range nodes {
+			names := i.getFromScriptDirs(node)
+			allScripts = append(allScripts, names...)
+		}
+		return allScripts, nil
+	}
+
+	return i.getFromScriptDirs(node), nil
+}
+
+func (i *interactorImpl) getFromScriptDirs(args ...string) []string {
+	scriptsDir := i.filesDB.CreateScriptDir(args...)
 	dirs := i.filesDB.GetDirs(scriptsDir, false)
 	names := make([]string, 0, len(dirs))
 	for _, script := range dirs {
 		name := filepath.Base(script)
 		names = append(names, name)
 	}
-	return names, nil
+	return names
 }
 
 func (i *interactorImpl) GetScript(node string, scriptName string) (*models.Script, error) {
@@ -157,6 +176,19 @@ func (i *interactorImpl) GetScript(node string, scriptName string) (*models.Scri
 	var script = &models.Script{}
 	_ = json.Unmarshal(bytes, script)
 	return script, nil
+}
+
+func (i *interactorImpl) getAllScriptsFromNode(node string) []models.Script {
+	names := i.getFromScriptDirs(node)
+	scripts := []models.Script{}
+	for _, name := range names {
+		script, err := i.GetScript(node, name)
+		if err != nil || script.IsEmpty() {
+			continue
+		}
+		scripts = append(scripts, *script)
+	}
+	return scripts
 }
 
 func (i *interactorImpl) DeleteScript(node string, scriptName string) error {
