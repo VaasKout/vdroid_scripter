@@ -103,6 +103,11 @@ class EditScriptInteractor @Inject constructor(
         _stateFlow.update { it.copy(script = updatedScript) }
     }
 
+    override fun onCanSkipChanged(value: Boolean) {
+        val updatedScript = currentState.script?.copy(canSkip = value) ?: return
+        _stateFlow.update { it.copy(script = updatedScript) }
+    }
+
     override fun onTopbarActionClicked() {
         val state = currentState
         if (state.loadingState != LoadingState.None) return

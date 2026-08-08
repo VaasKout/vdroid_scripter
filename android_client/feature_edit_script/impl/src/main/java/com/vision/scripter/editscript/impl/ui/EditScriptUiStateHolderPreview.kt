@@ -30,6 +30,7 @@ internal class EditScriptUiStateHolderPreview(state: EditScriptUiState) : EditSc
     override fun onTimeoutChanged(value: String) {}
     override fun onDeleteParam(id: Int) {}
     override fun onDeleteEvents() {}
+    override fun onCanSkipChanged(value: Boolean) {}
     override fun onTopbarActionClicked() {}
     override fun onConfirmDialog() {}
     override fun onDismissDialog() {}

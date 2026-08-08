@@ -135,6 +135,14 @@ internal fun EditScriptScreen(
                     onClick = uiStateHolder::onDeleteEvents,
                 )
             }
+
+            item(key = "can_skip_toggle") {
+                CanSkipToggle(
+                    modifier = Modifier.fillMaxWidth(),
+                    checked = state.canSkip,
+                    onCheckedChange = uiStateHolder::onCanSkipChanged,
+                )
+            }
         }
     }
 

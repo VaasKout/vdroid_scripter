@@ -17,6 +17,7 @@ interface EditScriptUiStateHolder {
 
     fun onDeleteParam(id: Int)
     fun onDeleteEvents()
+    fun onCanSkipChanged(value: Boolean)
 
     fun onTopbarActionClicked()
     fun onConfirmDialog()
