@@ -3,7 +3,6 @@ package com.vision.scripter.editscript.impl.ui
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -14,7 +13,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -104,34 +102,6 @@ internal fun DeleteEventsButton(
     }
 }
 
-@Composable
-internal fun CanSkipToggle(
-    modifier: Modifier = Modifier,
-    checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit,
-) {
-    Row(
-        modifier = modifier
-            .background(
-                color = MaterialTheme.colorScheme.surfaceContainer,
-                shape = RoundedCornerShape(16.dp),
-            )
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            modifier = Modifier.weight(1f),
-            text = stringResource(R.string.can_skip_toggle),
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.onSurface,
-        )
-        Switch(
-            checked = checked,
-            onCheckedChange = onCheckedChange,
-        )
-    }
-}
-
 @Preview
 @Composable
 private fun SectionTitlePreview() {
@@ -165,15 +135,5 @@ private fun DeleteEventsButtonDisabledPreview() {
         modifier = Modifier.fillMaxWidth(),
         enabled = false,
         onClick = {},
-    )
-}
-
-@Preview
-@Composable
-private fun CanSkipTogglePreview() {
-    CanSkipToggle(
-        modifier = Modifier.fillMaxWidth(),
-        checked = true,
-        onCheckedChange = {},
     )
 }

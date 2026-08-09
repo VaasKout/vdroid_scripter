@@ -178,19 +178,6 @@ func (i *interactorImpl) GetScript(node string, scriptName string) (*models.Scri
 	return script, nil
 }
 
-func (i *interactorImpl) getAllScriptsFromNode(node string) []models.Script {
-	names := i.getFromScriptDirs(node)
-	scripts := []models.Script{}
-	for _, name := range names {
-		script, err := i.GetScript(node, name)
-		if err != nil || script.IsEmpty() {
-			continue
-		}
-		scripts = append(scripts, *script)
-	}
-	return scripts
-}
-
 func (i *interactorImpl) DeleteScript(node string, scriptName string) error {
 	scriptName = strings.TrimSpace(scriptName)
 	nodeDir := i.filesDB.CreateScriptDir(node)

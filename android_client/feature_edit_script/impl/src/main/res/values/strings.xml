@@ -6,7 +6,6 @@
     <string name="params_title">Parameters</string>
     <string name="events_title">Events: %1$d</string>
     <string name="delete_events_button">Delete events</string>
-    <string name="can_skip_toggle">Can skip</string>
     <string name="delete_button">Delete</string>
     <string name="save_dialog_title">Confirmation</string>
     <string name="save_dialog_text">Save script %1$s?</string>

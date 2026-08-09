@@ -17,8 +17,6 @@ data class Script(
     val events: List<Event> = listOf(),
     @SerialName("timeout")
     val timeout: Int = 0,
-    @SerialName("can_skip")
-    val canSkip: Boolean = false,
 )
 
 @Serializable

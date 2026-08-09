@@ -28,7 +28,6 @@ class EditScriptUiStateMapper @Inject constructor() {
                 )
             }.toImmutableList(),
             eventsCount = script.events.size,
-            canSkip = script.canSkip,
             deleteMode = script.isEmpty() && state.loadingState == LoadingState.None,
             showDialog = state.showDialog,
         )
