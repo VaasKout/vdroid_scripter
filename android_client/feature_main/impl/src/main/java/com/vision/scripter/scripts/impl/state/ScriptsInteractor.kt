@@ -51,13 +51,13 @@ internal class ScriptsInteractor @Inject constructor(
                 )
             }
 
-            val node = currentState.selectedNode
-            val result = if (node.isEmpty()) scripterDataSource.getNodes()
-            else scripterDataSource.getNodeScripts(node)
+            val location = currentState.selectedLocation
+            val result = if (location.isEmpty()) scripterDataSource.getLocations()
+            else scripterDataSource.getLocationScripts(location)
 
             when (result) {
                 is ApiResponse.Success -> _stateFlow.update {
-                    if (node.isEmpty()) it.copy(nodes = result.data)
+                    if (location.isEmpty()) it.copy(locations = result.data)
                     else it.copy(scripts = result.data)
                 }
 
@@ -75,13 +75,13 @@ internal class ScriptsInteractor @Inject constructor(
         }
     }
 
-    override fun onNodeClick(node: String) {
-        _stateFlow.update { it.copy(selectedNode = node, scripts = listOf()) }
+    override fun onLocationClick(location: String) {
+        _stateFlow.update { it.copy(selectedLocation = location, scripts = listOf()) }
         onLoadData(onStart = true)
     }
 
     override fun onBack() {
-        _stateFlow.update { it.copy(selectedNode = "", scripts = listOf()) }
+        _stateFlow.update { it.copy(selectedLocation = "", scripts = listOf()) }
         onLoadData(onStart = true)
     }
 
@@ -127,9 +127,9 @@ internal class ScriptsInteractor @Inject constructor(
     }
 
     override fun onEditScript(name: String) {
-        val node = currentState.selectedNode
-        if (node.isEmpty() || name.isEmpty()) return
-        uiCommandsFlow.tryEmit(ScriptsUiCommand.OpenEditScript(node = node, name = name))
+        val location = currentState.selectedLocation
+        if (location.isEmpty() || name.isEmpty()) return
+        uiCommandsFlow.tryEmit(ScriptsUiCommand.OpenEditScript(location = location, name = name))
     }
 
     override fun onSelectDevice(serial: String) {
@@ -144,11 +144,11 @@ internal class ScriptsInteractor @Inject constructor(
         val bottomSheetState = currentState.bottomSheetData ?: return
         val serial = bottomSheetState.selectedDevice
         val name = bottomSheetState.selectedScript
-        val node = currentState.selectedNode
-        if (serial.isEmpty() || name.isEmpty() || node.isEmpty()) return
+        val location = currentState.selectedLocation
+        if (serial.isEmpty() || name.isEmpty() || location.isEmpty()) return
 
         coroutineScope.launch {
-            val started = scripterDataSource.runScript(serial = serial, node = node, name = name)
+            val started = scripterDataSource.runScript(serial = serial, location = location, name = name)
             if (!started) uiCommandsFlow.tryEmit(ScriptsUiCommand.ShowNetworkError)
         }
         onDismiss()
@@ -170,13 +170,13 @@ internal class ScriptsInteractor @Inject constructor(
     }
 
     override fun onConfirmDelete() {
-        val selectedNode = currentState.selectedNode
+        val selectedLocation = currentState.selectedLocation
         val targetName = currentState.itemToDelete.ifEmpty { return }
         coroutineScope.launch {
-            val deleted = if (selectedNode.isNotEmpty()) {
-                scripterDataSource.deleteScript(node = selectedNode, name = targetName)
+            val deleted = if (selectedLocation.isNotEmpty()) {
+                scripterDataSource.deleteScript(location = selectedLocation, name = targetName)
             } else {
-                scripterDataSource.deleteNode(node = targetName)
+                scripterDataSource.deleteLocation(location = targetName)
             }
 
             if (!deleted) uiCommandsFlow.tryEmit(ScriptsUiCommand.ShowNetworkError)

@@ -9,10 +9,10 @@ interface EditScriptUiStateHolder {
     val uiStateFlow: SharedFlow<EditScriptUiState>
     val uiCommandsFlow: CommandFlow<EditScriptUiCommand>
 
-    fun init(node: String, name: String)
+    fun init(location: String, name: String)
 
-    fun onNodeChanged(value: String)
-    fun onNextNodeChanged(value: String)
+    fun onLocationChanged(value: String)
+    fun onNextLocationChanged(value: String)
     fun onTimeoutChanged(value: String)
 
     fun onDeleteParam(id: Int)

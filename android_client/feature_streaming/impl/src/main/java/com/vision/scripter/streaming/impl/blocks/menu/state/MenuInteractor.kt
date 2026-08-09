@@ -375,7 +375,7 @@ class MenuInteractor @Inject constructor(
             val templateName = "${record.params.size + 1}"
             cvRepository.saveSelectedRectangle(
                 serial = serial,
-                node = record.node,
+                location = record.location,
                 name = record.name,
                 value = templateName,
                 screenSizes = screenSizes,

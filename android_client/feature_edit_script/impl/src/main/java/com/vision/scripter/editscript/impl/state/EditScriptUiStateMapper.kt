@@ -17,8 +17,8 @@ class EditScriptUiStateMapper @Inject constructor() {
         return EditScriptUiState(
             isLoading = state.loadingState == LoadingState.LoadingOnStart,
             name = script.name,
-            node = script.node,
-            nextNode = script.nextNode,
+            location = script.location,
+            nextLocation = script.nextLocation.firstOrNull().orEmpty(),
             timeout = script.timeout.toString(),
             params = script.params.mapIndexed { index, param ->
                 ParamUiData(

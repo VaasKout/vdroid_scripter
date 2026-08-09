@@ -38,7 +38,7 @@ internal fun ScriptsScreen(
         uiStateHolder.onLoadData(onStart = true)
     }
 
-    BackHandler(enabled = state.selectedNode.isNotEmpty()) {
+    BackHandler(enabled = state.selectedLocation.isNotEmpty()) {
         uiStateHolder.onBack()
     }
 
@@ -66,7 +66,7 @@ internal fun ScriptsScreen(
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            if (state.selectedNode.isNotEmpty()) {
+            if (state.selectedLocation.isNotEmpty()) {
                 items(
                     items = state.scripts,
                     key = @Stable { item -> item },
@@ -83,13 +83,13 @@ internal fun ScriptsScreen(
             }
 
             items(
-                items = state.nodes,
+                items = state.locations,
                 key = { item -> item },
             ) {
-                NodeItem(
+                LocationItem(
                     modifier = Modifier.fillMaxWidth(),
                     name = it,
-                    onClick = uiStateHolder::onNodeClick,
+                    onClick = uiStateHolder::onLocationClick,
                     onDeleteClick = uiStateHolder::onDeleteItem,
                 )
             }
@@ -97,10 +97,10 @@ internal fun ScriptsScreen(
     }
 
     if (state.itemToDelete.isNotEmpty()) {
-        val text = if (state.selectedNode.isNotEmpty()) {
+        val text = if (state.selectedLocation.isNotEmpty()) {
             stringResource(R.string.script_delete_dialog_text, state.itemToDelete)
         } else {
-            stringResource(R.string.node_delete_dialog_text, state.itemToDelete)
+            stringResource(R.string.location_delete_dialog_text, state.itemToDelete)
         }
         DeleteDialog(
             title = stringResource(R.string.script_delete_dialog_title),
@@ -124,7 +124,7 @@ internal fun ScriptsScreen(
 
 @Preview
 @Composable
-private fun ScriptsNodesScreenPreview() {
+private fun ScriptsLocationsScreenPreview() {
     ScriptsScreen(
         uiStateHolder = ScriptsScreenUiStateHolderPreview(scriptsUiStatePreview),
         paddingValues = PaddingValues(0.dp)

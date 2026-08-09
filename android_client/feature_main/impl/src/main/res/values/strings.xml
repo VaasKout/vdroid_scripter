@@ -7,7 +7,7 @@
 
     <string name="script_delete_dialog_title">Confirmation</string>
     <string name="script_delete_dialog_text">Delete script %1s?</string>
-    <string name="node_delete_dialog_text">Delete node %1s and all its scripts?</string>
+    <string name="location_delete_dialog_text">Delete location %1s and all its scripts?</string>
 
     <string name="select_device_title">Select a device</string>
     <string name="run">Run</string>

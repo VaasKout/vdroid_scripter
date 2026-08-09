@@ -7,10 +7,10 @@ import kotlinx.serialization.Serializable
 data class Script(
     @SerialName("name")
     val name: String = "",
-    @SerialName("node")
-    val node: String = "",
-    @SerialName("next_node")
-    val nextNode: String = "",
+    @SerialName("location")
+    val location: String = "",
+    @SerialName("next_location")
+    val nextLocation: List<String> = listOf(),
     @SerialName("params")
     val params: List<Parameter> = listOf(),
     @SerialName("events")

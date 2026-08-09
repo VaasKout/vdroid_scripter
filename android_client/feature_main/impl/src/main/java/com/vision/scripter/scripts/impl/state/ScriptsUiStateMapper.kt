@@ -13,8 +13,8 @@ class ScriptsUiStateMapper @Inject constructor() {
         return ScriptsUiState(
             isLoading = state.loadingState == LoadingState.LoadingOnStart,
             isRefreshing = state.loadingState == LoadingState.RefreshLoading,
-            selectedNode = state.selectedNode,
-            nodes = state.nodes.toImmutableList(),
+            selectedLocation = state.selectedLocation,
+            locations = state.locations.toImmutableList(),
             scripts = state.scripts.toImmutableList(),
             itemToDelete = state.itemToDelete,
             bottomSheetUiData = state.bottomSheetData?.toDevicePickerData(),

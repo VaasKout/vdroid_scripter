@@ -11,7 +11,7 @@ interface ScriptsUiStateHolder {
 
     fun onLoadData(onStart: Boolean)
 
-    fun onNodeClick(node: String)
+    fun onLocationClick(location: String)
     fun onBack()
 
     fun onPlayScript(name: String)

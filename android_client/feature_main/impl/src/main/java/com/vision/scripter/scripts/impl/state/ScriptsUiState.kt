@@ -8,8 +8,8 @@ import kotlinx.collections.immutable.persistentListOf
 data class ScriptsUiState(
     val isLoading: Boolean = true,
     val isRefreshing: Boolean = false,
-    val selectedNode: String = "",
-    val nodes: ImmutableList<String> = persistentListOf(),
+    val selectedLocation: String = "",
+    val locations: ImmutableList<String> = persistentListOf(),
     val scripts: ImmutableList<String> = persistentListOf(),
     val itemToDelete: String = "",
     val bottomSheetUiData: BottomSheetUiData? = null,

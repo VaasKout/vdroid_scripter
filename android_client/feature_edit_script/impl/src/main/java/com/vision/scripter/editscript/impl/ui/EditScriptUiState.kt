@@ -8,8 +8,8 @@ import kotlinx.collections.immutable.persistentListOf
 data class EditScriptUiState(
     val isLoading: Boolean = true,
     val name: String = "",
-    val node: String = "",
-    val nextNode: String = "",
+    val location: String = "",
+    val nextLocation: String = "",
     val timeout: String = "",
     val params: ImmutableList<ParamUiData> = persistentListOf(),
     val eventsCount: Int = 0,

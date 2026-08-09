@@ -73,21 +73,21 @@ internal fun EditScriptScreen(
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            item(key = "node_field") {
+            item(key = "location_field") {
                 ScriptEditField(
                     modifier = Modifier.fillMaxWidth(),
-                    value = state.node,
-                    label = stringResource(R.string.node_hint),
-                    onValueChange = uiStateHolder::onNodeChanged,
+                    value = state.location,
+                    label = stringResource(R.string.location_hint),
+                    onValueChange = uiStateHolder::onLocationChanged,
                 )
             }
 
-            item(key = "next_node_field") {
+            item(key = "next_location_field") {
                 ScriptEditField(
                     modifier = Modifier.fillMaxWidth(),
-                    value = state.nextNode,
-                    label = stringResource(R.string.next_node_hint),
-                    onValueChange = uiStateHolder::onNextNodeChanged,
+                    value = state.nextLocation,
+                    label = stringResource(R.string.next_location_hint),
+                    onValueChange = uiStateHolder::onNextLocationChanged,
                 )
             }
 

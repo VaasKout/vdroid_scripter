@@ -20,7 +20,7 @@ import com.vision.scripter.ui.customClickable
 
 @Composable
 internal fun ScriptsTopBar(
-    node: String,
+    location: String,
     onBack: () -> Unit,
 ) {
     TopBar(
@@ -35,7 +35,7 @@ internal fun ScriptsTopBar(
             )
             Spacer(modifier = Modifier.width(8.dp))
             Text(
-                text = node,
+                text = location,
                 style = TextStyle(
                     fontSize = 22.sp,
                     fontWeight = FontWeight.Bold,
@@ -49,7 +49,7 @@ internal fun ScriptsTopBar(
 @Composable
 private fun ScriptsTopBarPreview() {
     ScriptsTopBar(
-        node = "Node",
+        location = "Location",
         onBack = {},
     )
 }

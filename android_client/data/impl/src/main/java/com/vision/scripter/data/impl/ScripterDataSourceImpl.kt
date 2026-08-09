@@ -69,7 +69,7 @@ class ScripterDataSourceImpl @Inject constructor(
     }
 
     override suspend fun saveScript(script: Script): Boolean {
-        if (script.node.isEmpty() || script.name.isEmpty() || script.isEmpty()) return false
+        if (script.location.isEmpty() || script.name.isEmpty() || script.isEmpty()) return false
         val body = Json.encodeToString(script)
         val result = networkClient.post("save_script", body)
         return result is ApiResponse.Success
@@ -77,7 +77,7 @@ class ScripterDataSourceImpl @Inject constructor(
 
     override suspend fun saveRect(
         serial: String,
-        node: String,
+        location: String,
         name: String,
         value: String,
         rectangle: CvRectangle?,
@@ -85,7 +85,7 @@ class ScripterDataSourceImpl @Inject constructor(
         if (rectangle.isEmpty()) return false
         val saveRectRequest = SaveRectRequest(
             serial = serial,
-            node = node,
+            location = location,
             name = name,
             value = value,
             rectangle = rectangle,
@@ -114,21 +114,21 @@ class ScripterDataSourceImpl @Inject constructor(
         }
     }
 
-    override suspend fun getNodes(): ApiResponse<List<String>> {
-        return when (val result = networkClient.get("nodes")) {
+    override suspend fun getLocations(): ApiResponse<List<String>> {
+        return when (val result = networkClient.get("locations")) {
             is ApiResponse.Success -> {
                 val json = result.data
-                val nodes = if (json.isEmpty()) listOf()
+                val locations = if (json.isEmpty()) listOf()
                 else Json.decodeFromString<List<String>>(result.data)
-                ApiResponse.Success(nodes)
+                ApiResponse.Success(locations)
             }
 
             is ApiResponse.Error -> result
         }
     }
 
-    override suspend fun getNodeScripts(node: String): ApiResponse<List<String>> {
-        return when (val result = networkClient.get("nodes/$node")) {
+    override suspend fun getLocationScripts(location: String): ApiResponse<List<String>> {
+        return when (val result = networkClient.get("locations/$location")) {
             is ApiResponse.Success -> {
                 val json = result.data
                 val scripts = if (json.isEmpty()) listOf()
@@ -140,8 +140,8 @@ class ScripterDataSourceImpl @Inject constructor(
         }
     }
 
-    override suspend fun getScriptInfo(node: String, name: String): ApiResponse<Script> {
-        return when (val result = networkClient.get("nodes/$node/$name")) {
+    override suspend fun getScriptInfo(location: String, name: String): ApiResponse<Script> {
+        return when (val result = networkClient.get("locations/$location/$name")) {
             is ApiResponse.Success -> {
                 val json = result.data
                 val script = if (json.isEmpty()) Script()
@@ -153,22 +153,22 @@ class ScripterDataSourceImpl @Inject constructor(
         }
     }
 
-    override suspend fun deleteNode(node: String): Boolean {
-        return when (val result = networkClient.delete("nodes/$node")) {
+    override suspend fun deleteLocation(location: String): Boolean {
+        return when (val result = networkClient.delete("locations/$location")) {
             is ApiResponse.Success -> result.data.isNotEmpty()
             is ApiResponse.Error -> false
         }
     }
 
-    override suspend fun deleteScript(node: String, name: String): Boolean {
-        return when (val result = networkClient.delete("nodes/$node/$name")) {
+    override suspend fun deleteScript(location: String, name: String): Boolean {
+        return when (val result = networkClient.delete("locations/$location/$name")) {
             is ApiResponse.Success -> result.data.isNotEmpty()
             is ApiResponse.Error -> false
         }
     }
 
-    override suspend fun runScript(serial: String, node: String, name: String): Boolean {
-        return when (val result = networkClient.get("nodes/$node/$name/run?serial=$serial")) {
+    override suspend fun runScript(serial: String, location: String, name: String): Boolean {
+        return when (val result = networkClient.get("locations/$location/$name/run?serial=$serial")) {
             is ApiResponse.Success -> result.data.isNotEmpty()
             is ApiResponse.Error -> false
         }

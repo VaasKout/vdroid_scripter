@@ -87,7 +87,7 @@ fun ScriptItem(
 }
 
 @Composable
-fun NodeItem(
+fun LocationItem(
     modifier: Modifier = Modifier,
     name: String,
     onClick: (String) -> Unit,
@@ -137,8 +137,8 @@ private fun ScriptItemPreview() {
 
 @Preview
 @Composable
-private fun NodeItemPreview() {
-    NodeItem(
+private fun LocationItemPreview() {
+    LocationItem(
         modifier = Modifier.fillMaxWidth(),
         name = "main_screen",
         onClick = {},

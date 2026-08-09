@@ -19,7 +19,7 @@ import (
 const (
 	SerialKey = "serial"
 	NameKey   = "name"
-	NodeKey   = "node"
+	LocationKey = "location"
 )
 
 // Multipart consts

@@ -7,8 +7,8 @@ import kotlinx.serialization.Serializable
 data class SaveRectRequest(
     @SerialName("serial")
     val serial: String,
-    @SerialName("node")
-    val node: String,
+    @SerialName("location")
+    val location: String,
     @SerialName("name")
     val name: String,
     @SerialName("value")

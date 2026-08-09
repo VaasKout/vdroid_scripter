@@ -22,7 +22,7 @@ const (
 
 type SaveZoneDto struct {
 	Serial    string           `json:"serial"`
-	Node      string           `json:"node"`
+	Location  string           `json:"location"`
 	Name      string           `json:"name"`
 	Value     string           `json:"value"`
 	Rectangle models.Rectangle `json:"rectangle"`
@@ -30,17 +30,17 @@ type SaveZoneDto struct {
 
 func (s *SaveZoneDto) Valid() bool {
 	return s != nil && strings.TrimSpace(s.Serial) != "" &&
-		strings.TrimSpace(s.Node) != "" && strings.TrimSpace(s.Name) != "" &&
+		strings.TrimSpace(s.Location) != "" && strings.TrimSpace(s.Name) != "" &&
 		strings.TrimSpace(s.Value) != "" && s.Rectangle.IsNotEmpty()
 }
 
 // ScriptsUseCase ...
 type ScriptsUseCase interface {
-	GetNodes() ([]string, error)
-	GetScriptNames(node string) ([]string, error)
-	GetScript(node string, scriptName string) (*models.Script, error)
-	DeleteScript(node string, scriptName string) error
-	RunScript(serial string, node string, scriptName string, basePort int) error
+	GetLocations() ([]string, error)
+	GetScriptNames(location string) ([]string, error)
+	GetScript(location string, scriptName string) (*models.Script, error)
+	DeleteScript(location string, scriptName string) error
+	RunScript(serial string, location string, scriptName string, basePort int) error
 
 	SaveZone(saveZone *SaveZoneDto) bool
 	SaveScript(data *models.Script) bool
@@ -51,7 +51,7 @@ func (i *interactorImpl) SaveZone(saveZone *SaveZoneDto) bool {
 	if !saveZone.Valid() {
 		return false
 	}
-	var scriptDir = i.filesDB.CreateScriptDir(saveZone.Node, saveZone.Name)
+	var scriptDir = i.filesDB.CreateScriptDir(saveZone.Location, saveZone.Name)
 	var tmpImg = filepath.Join(scriptDir, saveZone.Value+".png")
 	created := file.CreateFileIfNotExist(tmpImg)
 	if !created {
@@ -73,12 +73,12 @@ func (i *interactorImpl) SaveScript(data *models.Script) bool {
 	}
 
 	data.Name = strings.TrimSpace(data.Name)
-	data.Node = strings.TrimSpace(data.Node)
-	if data.Name == "" || data.Node == "" {
+	data.Location = strings.TrimSpace(data.Location)
+	if data.Name == "" || data.Location == "" {
 		return false
 	}
 
-	runnerPath := i.getScriptRunner(data.Node, data.Name)
+	runnerPath := i.getScriptRunner(data.Location, data.Name)
 	if runnerPath == "" {
 		return false
 	}
@@ -127,23 +127,23 @@ func (i *interactorImpl) FindText(
 	return result
 }
 
-func (i *interactorImpl) GetNodes() ([]string, error) {
+func (i *interactorImpl) GetLocations() ([]string, error) {
 	return i.getFromScriptDirs(), nil
 }
 
-func (i *interactorImpl) GetScriptNames(node string) ([]string, error) {
-	node = strings.TrimSpace(node)
-	if node == "" {
-		nodes := i.getFromScriptDirs()
+func (i *interactorImpl) GetScriptNames(location string) ([]string, error) {
+	location = strings.TrimSpace(location)
+	if location == "" {
+		locations := i.getFromScriptDirs()
 		var allScripts = []string{}
-		for _, node := range nodes {
-			names := i.getFromScriptDirs(node)
+		for _, location := range locations {
+			names := i.getFromScriptDirs(location)
 			allScripts = append(allScripts, names...)
 		}
 		return allScripts, nil
 	}
 
-	return i.getFromScriptDirs(node), nil
+	return i.getFromScriptDirs(location), nil
 }
 
 func (i *interactorImpl) getFromScriptDirs(args ...string) []string {
@@ -157,13 +157,13 @@ func (i *interactorImpl) getFromScriptDirs(args ...string) []string {
 	return names
 }
 
-func (i *interactorImpl) GetScript(node string, scriptName string) (*models.Script, error) {
+func (i *interactorImpl) GetScript(location string, scriptName string) (*models.Script, error) {
 	scriptName = strings.TrimSpace(scriptName)
 	if scriptName == "" {
 		return &models.Script{}, errors.New(ScriptNameIsEmpty)
 	}
 
-	runnerPath := i.getScriptRunner(node, scriptName)
+	runnerPath := i.getScriptRunner(location, scriptName)
 	if runnerPath == "" {
 		var errStr = fmt.Sprintf("unable to create json runner for %s", scriptName)
 		return &models.Script{}, errors.New(errStr)
@@ -178,21 +178,21 @@ func (i *interactorImpl) GetScript(node string, scriptName string) (*models.Scri
 	return script, nil
 }
 
-func (i *interactorImpl) DeleteScript(node string, scriptName string) error {
+func (i *interactorImpl) DeleteScript(location string, scriptName string) error {
 	scriptName = strings.TrimSpace(scriptName)
-	nodeDir := i.filesDB.CreateScriptDir(node)
+	locationDir := i.filesDB.CreateScriptDir(location)
 	if scriptName == "" {
-		return os.RemoveAll(nodeDir)
+		return os.RemoveAll(locationDir)
 	}
-	i.filesDB.DeleteDirByName(nodeDir, scriptName)
+	i.filesDB.DeleteDirByName(locationDir, scriptName)
 	return nil
 }
 
 func (i *interactorImpl) getScriptRunner(
-	node string,
+	location string,
 	name string,
 ) string {
-	scriptDir := i.filesDB.CreateScriptDir(node, name)
+	scriptDir := i.filesDB.CreateScriptDir(location, name)
 	if scriptDir == "" {
 		return ""
 	}

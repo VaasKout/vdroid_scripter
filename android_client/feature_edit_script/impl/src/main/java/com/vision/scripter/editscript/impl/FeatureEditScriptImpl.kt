@@ -10,7 +10,7 @@ import androidx.navigation.NavType
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
 import com.vision.scripter.editscript.api.EditScriptNameArg
-import com.vision.scripter.editscript.api.EditScriptNodeArg
+import com.vision.scripter.editscript.api.EditScriptLocationArg
 import com.vision.scripter.editscript.api.EditScriptRouteWithArgs
 import com.vision.scripter.editscript.api.FeatureEditScript
 import com.vision.scripter.editscript.impl.commandobservers.EditScriptCommandObserver
@@ -29,17 +29,17 @@ class FeatureEditScriptImpl @Inject constructor() : FeatureEditScript {
         navGraphBuilder.composable(
             route = EditScriptRouteWithArgs,
             arguments = listOf(
-                navArgument(EditScriptNodeArg) { type = NavType.StringType },
+                navArgument(EditScriptLocationArg) { type = NavType.StringType },
                 navArgument(EditScriptNameArg) { type = NavType.StringType },
             ),
         ) { backStackEntry ->
-            val node = backStackEntry.arguments?.getString(EditScriptNodeArg).orEmpty()
+            val location = backStackEntry.arguments?.getString(EditScriptLocationArg).orEmpty()
             val name = backStackEntry.arguments?.getString(EditScriptNameArg).orEmpty()
             val snackbarHostState = remember { SnackbarHostState() }
             val editScriptViewModel = hiltViewModel<EditScriptViewModel>()
 
             LaunchedEffect(Unit) {
-                editScriptViewModel.init(node = node, name = name)
+                editScriptViewModel.init(location = location, name = name)
             }
 
             EditScriptCommandObserver(

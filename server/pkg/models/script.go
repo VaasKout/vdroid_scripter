@@ -36,12 +36,12 @@ const (
 
 // Script ...
 type Script struct {
-	Name     string      `json:"name"`
-	Node     string      `json:"node"`
-	NextNode string      `json:"next_node,omitempty"`
-	Params   []Parameter `json:"params,omitempty"`
-	Events   []Event     `json:"events,omitempty"`
-	Timeout  int         `json:"timeout"`
+	Name         string      `json:"name"`
+	Location     string      `json:"location"`
+	NextLocation []string    `json:"next_location,omitempty"`
+	Params       []Parameter `json:"params,omitempty"`
+	Events       []Event     `json:"events,omitempty"`
+	Timeout      int         `json:"timeout"`
 }
 
 // ToJSON ...

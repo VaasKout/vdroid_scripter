@@ -8,8 +8,8 @@ import kotlinx.coroutines.flow.SharedFlow
 internal val editScriptUiStatePreview = EditScriptUiState(
     isLoading = false,
     name = "login_tap",
-    node = "main_screen",
-    nextNode = "profile",
+    location = "main_screen",
+    nextLocation = "profile",
     timeout = "15",
     params = persistentListOf(
         ParamUiData(id = 0, title = "template: login_button", locale = ""),
@@ -24,9 +24,9 @@ internal class EditScriptUiStateHolderPreview(state: EditScriptUiState) : EditSc
     override val uiCommandsFlow: CommandFlow<EditScriptUiCommand>
         get() = throw UnsupportedOperationException()
 
-    override fun init(node: String, name: String) {}
-    override fun onNodeChanged(value: String) {}
-    override fun onNextNodeChanged(value: String) {}
+    override fun init(location: String, name: String) {}
+    override fun onLocationChanged(value: String) {}
+    override fun onNextLocationChanged(value: String) {}
     override fun onTimeoutChanged(value: String) {}
     override fun onDeleteParam(id: Int) {}
     override fun onDeleteEvents() {}

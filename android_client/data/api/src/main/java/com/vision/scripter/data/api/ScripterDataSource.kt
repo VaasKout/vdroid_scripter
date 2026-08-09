@@ -16,7 +16,7 @@ interface ScripterDataSource {
 
     suspend fun saveRect(
         serial: String,
-        node: String,
+        location: String,
         name: String,
         value: String,
         rectangle: CvRectangle?,
@@ -28,13 +28,13 @@ interface ScripterDataSource {
         locale: String,
     ): ApiResponse<List<RectangleWithText>>
 
-    suspend fun getNodes(): ApiResponse<List<String>>
-    suspend fun getNodeScripts(node: String): ApiResponse<List<String>>
-    suspend fun getScriptInfo(node: String, name: String): ApiResponse<Script>
-    suspend fun deleteNode(node: String): Boolean
+    suspend fun getLocations(): ApiResponse<List<String>>
+    suspend fun getLocationScripts(location: String): ApiResponse<List<String>>
+    suspend fun getScriptInfo(location: String, name: String): ApiResponse<Script>
+    suspend fun deleteLocation(location: String): Boolean
     suspend fun saveScript(script: Script): Boolean
-    suspend fun deleteScript(node: String, name: String): Boolean
-    suspend fun runScript(serial: String, node: String, name: String): Boolean
+    suspend fun deleteScript(location: String, name: String): Boolean
+    suspend fun runScript(serial: String, location: String, name: String): Boolean
     suspend fun resetKeyboard(serial: String, locale: String): ApiResponse<List<RectangleWithText>>
     suspend fun getKeyboard(serial: String, locale: String): ApiResponse<List<RectangleWithText>>
 

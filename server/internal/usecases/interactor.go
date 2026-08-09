@@ -25,7 +25,6 @@ type Interactor interface {
 	ScriptsUseCase
 	ScrcpyUseCase
 	KeyboardUseCase
-	FlowUseCase
 }
 
 type interactorImpl struct {

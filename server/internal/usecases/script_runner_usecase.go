@@ -22,7 +22,7 @@ import (
 
 func (i *interactorImpl) RunScript(
 	serial string,
-	node string,
+	location string,
 	scriptName string,
 	basePort int,
 ) error {
@@ -33,7 +33,7 @@ func (i *interactorImpl) RunScript(
 		return errors.New(ScriptNameIsEmpty)
 	}
 
-	path := i.getScriptRunner(node, scriptName)
+	path := i.getScriptRunner(location, scriptName)
 	if path == "" {
 		return errors.New("script not found")
 	}
@@ -95,7 +95,7 @@ func (i *interactorImpl) executeScript(
 		return false
 	}
 
-	scriptDir := i.filesDB.CreateScriptDir(script.Node, script.Name)
+	scriptDir := i.filesDB.CreateScriptDir(script.Location, script.Name)
 	if scriptDir == "" {
 		i.logger.Error(fmt.Sprintf("scriptDir not found %s", script.Name))
 		return false

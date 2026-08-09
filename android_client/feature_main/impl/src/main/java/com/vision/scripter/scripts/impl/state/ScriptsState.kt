@@ -5,8 +5,8 @@ import com.vision.scripter.ui.states.LoadingState
 
 data class ScriptsState(
     val loadingState: LoadingState = LoadingState.LoadingOnStart,
-    val nodes: List<String> = listOf(),
-    val selectedNode: String = "",
+    val locations: List<String> = listOf(),
+    val selectedLocation: String = "",
     val scripts: List<String> = listOf(),
     val itemToDelete: String = "",
     val bottomSheetData: BottomSheetData? = null,

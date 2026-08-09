@@ -5,7 +5,7 @@ import com.vision.scripter.ui.states.LoadingState
 
 data class EditScriptState(
     val loadingState: LoadingState = LoadingState.LoadingOnStart,
-    val initialNode: String = "",
+    val initialLocation: String = "",
     val script: Script? = null,
     val showDialog: Boolean = false,
 )

@@ -1,6 +1,6 @@
 <resources>
-    <string name="node_hint">Node</string>
-    <string name="next_node_hint">Next node</string>
+    <string name="location_hint">Location</string>
+    <string name="next_location_hint">Next location</string>
     <string name="timeout_hint">Timeout</string>
     <string name="save_button">Save</string>
     <string name="params_title">Parameters</string>

@@ -24,7 +24,7 @@ internal fun ScriptsCommandObserver(
             }
 
             is ScriptsUiCommand.OpenEditScript -> {
-                navController.navigate(EditScriptRoute + "/${it.node}/${it.name}")
+                navController.navigate(EditScriptRoute + "/${it.location}/${it.name}")
             }
         }
     }

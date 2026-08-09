@@ -8,7 +8,7 @@ const val SPACE_KEY = "space"
 
 const val DEFAULT_TIMEOUT = 15
 
-const val NEW_SCRIPTS_NODE = "new_scripts"
+const val NEW_SCRIPTS_LOCATION = "new_scripts"
 
 const val TEMPLATE = "template"
 const val YOLO_CLASS = "yolo_class"

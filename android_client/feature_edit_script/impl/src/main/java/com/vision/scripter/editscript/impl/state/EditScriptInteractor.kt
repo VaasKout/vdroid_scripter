@@ -46,17 +46,17 @@ class EditScriptInteractor @Inject constructor(
 
     override val uiCommandsFlow: CommandFlow<EditScriptUiCommand> = CommandFlow(coroutineScope)
 
-    override fun init(node: String, name: String) {
+    override fun init(location: String, name: String) {
         if (name.isEmpty()) return
         _stateFlow.update {
             it.copy(
-                initialNode = node,
+                initialLocation = location,
                 script = Script(name = name),
             )
         }
 
         coroutineScope.launch {
-            when (val result = scripterDataSource.getScriptInfo(node = node, name = name)) {
+            when (val result = scripterDataSource.getScriptInfo(location = location, name = name)) {
                 is ApiResponse.Success -> _stateFlow.update {
                     it.copy(
                         loadingState = LoadingState.None,
@@ -72,14 +72,17 @@ class EditScriptInteractor @Inject constructor(
         }
     }
 
-    override fun onNodeChanged(value: String) {
-        val updatedScript = currentState.script?.copy(node = value.trim()) ?: return
+    override fun onLocationChanged(value: String) {
+        val updatedScript = currentState.script?.copy(location = value.trim()) ?: return
         _stateFlow.update { it.copy(script = updatedScript) }
     }
 
-    override fun onNextNodeChanged(value: String) {
-        val updatedScript = currentState.script?.copy(nextNode = value.trim()) ?: return
-        _stateFlow.update { it.copy(script = updatedScript) }
+    override fun onNextLocationChanged(value: String) {
+        val script = currentState.script ?: return
+        val newLocation = value.trim()
+        val tail = script.nextLocation.drop(1)
+        val nextLocation = if (newLocation.isEmpty()) tail else listOf(newLocation) + tail
+        _stateFlow.update { it.copy(script = script.copy(nextLocation = nextLocation)) }
     }
 
     override fun onTimeoutChanged(value: String) {
@@ -107,7 +110,7 @@ class EditScriptInteractor @Inject constructor(
         val state = currentState
         if (state.loadingState != LoadingState.None) return
         val script = currentState.script ?: return
-        if (script.node.isEmpty()) return
+        if (script.location.isEmpty()) return
         _stateFlow.update { it.copy(showDialog = true) }
     }
 
@@ -124,9 +127,9 @@ class EditScriptInteractor @Inject constructor(
                 }
             }
 
-            if (script.isEmpty() || script.node != currentState.initialNode) {
+            if (script.isEmpty() || script.location != currentState.initialLocation) {
                 val deleted = scripterDataSource.deleteScript(
-                    node = state.initialNode,
+                    location = state.initialLocation,
                     name = script.name,
                 )
                 if (!deleted) {

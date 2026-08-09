@@ -123,7 +123,7 @@ class CvStreamerRepository @Inject constructor(
 
     suspend fun saveSelectedRectangle(
         serial: String,
-        node: String,
+        location: String,
         name: String,
         value: String,
         screenSizes: ScreenSizes,
@@ -132,7 +132,7 @@ class CvStreamerRepository @Inject constructor(
         if (!tmpZone.isEmpty()) {
             scripterDataSource.saveRect(
                 serial = serial,
-                node = node,
+                location = location,
                 name = name,
                 value = value,
                 rectangle = tmpZone?.adjustToServer(screenSizes),

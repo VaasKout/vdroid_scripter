@@ -9,8 +9,8 @@ import (
 
 // Script patterns...
 const (
-	Nodes         = "/nodes"
-	Scripts       = Nodes + "/{" + NodeKey + "}"
+	Locations     = "/locations"
+	Scripts       = Locations + "/{" + LocationKey + "}"
 	ScriptsByName = Scripts + "/{" + NameKey + "}"
 	RunScript     = ScriptsByName + "/run"
 
@@ -25,10 +25,10 @@ const (
 )
 
 func (s *serverImpl) handleScriptsFunctions() {
-	http.HandleFunc(Nodes, func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc(Locations, func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet {
 			s.logURL(r)
-			s.handleGetNodes(w, r)
+			s.handleGetLocations(w, r)
 			return
 		}
 		http.Error(w, "use GET method", http.StatusMethodNotAllowed)
@@ -100,8 +100,8 @@ func (s *serverImpl) handleScriptsFunctions() {
 	})
 }
 
-func (s *serverImpl) handleGetNodes(w http.ResponseWriter, r *http.Request) {
-	names, err := s.interactor.GetNodes()
+func (s *serverImpl) handleGetLocations(w http.ResponseWriter, r *http.Request) {
+	names, err := s.interactor.GetLocations()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -112,8 +112,8 @@ func (s *serverImpl) handleGetNodes(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *serverImpl) handleGetScripts(w http.ResponseWriter, r *http.Request) {
-	var node = r.PathValue(NodeKey)
-	names, err := s.interactor.GetScriptNames(node)
+	var location = r.PathValue(LocationKey)
+	names, err := s.interactor.GetScriptNames(location)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -124,14 +124,14 @@ func (s *serverImpl) handleGetScripts(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *serverImpl) handleGetScript(w http.ResponseWriter, r *http.Request) {
-	var node = r.PathValue(NodeKey)
+	var location = r.PathValue(LocationKey)
 	var name = r.PathValue(NameKey)
-	if node == "" {
-		http.Error(w, `"node" query needed`, http.StatusBadRequest)
+	if location == "" {
+		http.Error(w, `"location" query needed`, http.StatusBadRequest)
 		return
 	}
 
-	script, err := s.interactor.GetScript(node, name)
+	script, err := s.interactor.GetScript(location, name)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -142,28 +142,28 @@ func (s *serverImpl) handleGetScript(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *serverImpl) handleDeleteScript(w http.ResponseWriter, r *http.Request) {
-	var node = r.PathValue(NodeKey)
+	var location = r.PathValue(LocationKey)
 	var name = r.PathValue(NameKey)
-	if node == "" {
-		http.Error(w, `"node" query needed`, http.StatusBadRequest)
+	if location == "" {
+		http.Error(w, `"location" query needed`, http.StatusBadRequest)
 		return
 	}
 
-	s.interactor.DeleteScript(node, name)
+	s.interactor.DeleteScript(location, name)
 	s.sendStatusOk(w)
 }
 
 func (s *serverImpl) handleRunScript(w http.ResponseWriter, r *http.Request) {
 	var serial = r.URL.Query().Get(SerialKey)
-	var node = r.PathValue(NodeKey)
+	var location = r.PathValue(LocationKey)
 	var name = r.PathValue(NameKey)
 
-	if serial == "" || node == "" || name == "" {
+	if serial == "" || location == "" || name == "" {
 		http.Error(w, `check queries`, http.StatusBadRequest)
 		return
 	}
 
-	err := s.interactor.RunScript(serial, node, name, s.serverProps.SocketPort)
+	err := s.interactor.RunScript(serial, location, name, s.serverProps.SocketPort)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -195,7 +195,7 @@ func (s *serverImpl) handleSaveScript(w http.ResponseWriter, r *http.Request) {
 
 	var data = &models.Script{}
 	err := json.NewDecoder(r.Body).Decode(&data)
-	if err != nil || data.Node == "" || data.Name == "" {
+	if err != nil || data.Location == "" || data.Name == "" {
 		http.Error(w, "Invalid JSON", http.StatusBadRequest)
 		return
 	}
