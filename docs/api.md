@@ -8,7 +8,7 @@ This document describes every HTTP endpoint exposed by the server, defined in
 - **Base URL:** `http://<host>:8080`
   The port comes from the `SERVER_PORT` env var and defaults to `:8080`
   (`server/config/config.go`).
-- **Path parameters** use Go 1.22+ `net/http` patterns, e.g. `{serial}`, `{node}`,
+- **Path parameters** use Go 1.22+ `net/http` patterns, e.g. `{serial}`, `{location}`,
   `{name}`.
 - **Routing is path-exact.** Each route only accepts the method(s) listed below;
   any other method returns `405 Method Not Allowed`.
@@ -32,12 +32,12 @@ This document describes every HTTP endpoint exposed by the server, defined in
 | ------ | ---- | ----------- |
 | GET | `/ping` | Health check |
 | GET | `/devices` | List connected ADB devices |
-| GET | `/nodes` | List node (screen) names |
-| GET | `/nodes/{node}` | List script names saved under a node |
-| DELETE | `/nodes/{node}` | Delete a node and all its scripts |
-| GET | `/nodes/{node}/{name}` | Get a single script |
-| DELETE | `/nodes/{node}/{name}` | Delete a script |
-| GET | `/nodes/{node}/{name}/run?serial=` | Run a script on a device |
+| GET | `/locations` | List location (screen) names |
+| GET | `/locations/{location}` | List script names saved under a location |
+| DELETE | `/locations/{location}` | Delete a location and all its scripts |
+| GET | `/locations/{location}/{name}` | Get a single script |
+| DELETE | `/locations/{location}/{name}` | Delete a script |
+| GET | `/locations/{location}/{name}/run?serial=` | Run a script on a device |
 | POST | `/save_rectangle` | Crop and save a template image from the device screen |
 | POST | `/save_script` | Create or replace a script |
 | GET | `/devices/{serial}/find_text` | OCR: locate text on the current screen |
@@ -79,19 +79,19 @@ Returns all ADB devices currently visible to the server.
   ```
   `devices` is `[]` when none are connected.
 
-## Nodes & Scripts
+## Locations & Scripts
 
-Scripts are organised into **nodes** — a node is a screen, and the scripts under
+Scripts are organised into **locations** — a location is a screen, and the scripts under
 it are the interactions recorded on that screen. A script is identified by its
-`node` + `name` pair. On disk it lives at `scripts/<node>/<name>/run.json`, with
+`location` + `name` pair. On disk it lives at `locations/<location>/<name>/run.json`, with
 template images stored next to it as `<param.value>.png`.
 
-Nodes and scripts are stored server-wide: listing, fetching, and deleting are
+Locations and scripts are stored server-wide: listing, fetching, and deleting are
 device-independent. Only running a script targets a specific device.
 
-### `GET /nodes`
+### `GET /locations`
 
-Lists the saved node (screen) names.
+Lists the saved location (screen) names.
 
 - **Response `200`:** array of strings.
   ```json
@@ -99,42 +99,42 @@ Lists the saved node (screen) names.
   ```
 - **Errors:** `500` on read failure.
 
-### `GET /nodes/{node}`
+### `GET /locations/{location}`
 
-Lists the names of the scripts saved under a node.
+Lists the names of the scripts saved under a location.
 
-- **Path params:** `node` (required).
+- **Path params:** `location` (required).
 - **Response `200`:** array of strings.
   ```json
   ["open_profile", "open_settings"]
   ```
 - **Errors:** `500` on read failure.
 
-### `DELETE /nodes/{node}`
+### `DELETE /locations/{location}`
 
-Deletes a whole node — its directory and every script inside it.
+Deletes a whole location — its directory and every script inside it.
 
-- **Path params:** `node` (required).
+- **Path params:** `location` (required).
 - **Response `200`:** `{ "status": "ok" }`
-- **Errors:** `400` if `node` is empty.
+- **Errors:** `400` if `location` is empty.
 
-### `GET /nodes/{node}/{name}`
+### `GET /locations/{location}/{name}`
 
 Returns a single script.
 
-- **Path params:** `node`, `name` (both required).
+- **Path params:** `location`, `name` (both required).
 - **Response `200`:** a [`Script`](#script) object.
-- **Errors:** `400` if `node` is empty, `500` on read failure.
+- **Errors:** `400` if `location` is empty, `500` on read failure.
 
-### `DELETE /nodes/{node}/{name}`
+### `DELETE /locations/{location}/{name}`
 
 Deletes a single script (its directory, including template images).
 
-- **Path params:** `node`, `name` (both required).
+- **Path params:** `location`, `name` (both required).
 - **Response `200`:** `{ "status": "ok" }`
-- **Errors:** `400` if `node` is empty.
+- **Errors:** `400` if `location` is empty.
 
-### `GET /nodes/{node}/{name}/run`
+### `GET /locations/{location}/{name}/run`
 
 Executes the named script on a device.
 
@@ -145,24 +145,24 @@ offset to the **last** parameter's matched region. A `type_text` parameter
 instead types its `value` on the on-screen keyboard. If `params` is empty and
 `events` is not, the events are replayed exactly as recorded.
 
-- **Path params:** `node`, `name` (both required).
+- **Path params:** `location`, `name` (both required).
 - **Query params:** `serial` — target device serial (required).
 - **Response `200`:** `{ "status": "ok" }`
-- **Errors:** `400` if `serial`, `node` or `name` is empty; `500` if the script is
+- **Errors:** `400` if `serial`, `location` or `name` is empty; `500` if the script is
   empty or execution fails.
 
 ### `POST /save_rectangle`
 
 Takes a screenshot of the device, crops the given rectangle out of it, and
 saves it as `<value>.png` in the script's directory
-(`scripts/<node>/<name>/`, created if missing). This is the template image
+(`locations/<location>/<name>/`, created if missing). This is the template image
 that a `template` parameter with the same `value` is matched against.
 
 - **Request body:**
   ```json
   {
     "serial": "ABCD1234",
-    "node": "main_screen",
+    "location": "main_screen",
     "name": "open_profile",
     "value": "login_button",
     "rectangle": { "left_x": 100, "right_x": 300, "top_y": 200, "bottom_y": 260 }
@@ -175,15 +175,15 @@ that a `template` parameter with the same `value` is matched against.
 
 ### `POST /save_script`
 
-Creates a new script or replaces an existing one with the same `node` + `name`.
+Creates a new script or replaces an existing one with the same `location` + `name`.
 The body is a whole [`Script`](#script) object.
 
 - **Request body:**
   ```json
   {
     "name": "open_profile",
-    "node": "main_screen",
-    "next_node": "profile",
+    "location": "main_screen",
+    "next_location": "profile",
     "params": [
       { "type": "text", "value": "Profile" },
       { "type": "template", "value": "" }
@@ -192,14 +192,14 @@ The body is a whole [`Script`](#script) object.
     "timeout": 15
   }
   ```
-  `name` and `node` are required (both are trimmed). The body is stored as-is
-  to `scripts/<node>/<name>/run.json`. `timeout` is optional (seconds to keep
+  `name` and `location` are required (both are trimmed). The body is stored as-is
+  to `locations/<location>/<name>/run.json`. `timeout` is optional (seconds to keep
   locating a parameter's target before failing; values omitted or `<= 0` fall
   back to `15` at run time). Template images referenced by `template`
   parameters are saved separately via
   [`POST /save_rectangle`](#post-save_rectangle).
 - **Response `200`:** `{ "status": "ok" }`
-- **Errors:** `400` on invalid JSON or empty `node`/`name`, `500` if not saved.
+- **Errors:** `400` on invalid JSON or empty `location`/`name`, `500` if not saved.
 
 ### `GET /devices/{serial}/find_text`
 
@@ -337,8 +337,8 @@ ports.
 ```json
 {
   "name": "open_profile",
-  "node": "main_screen",
-  "next_node": "profile",
+  "location": "main_screen",
+  "next_location": "profile",
   "params": [ /* Parameter */ ],
   "events": [ /* Event */ ],
   "timeout": 15
@@ -347,9 +347,9 @@ ports.
 
 | Field | JSON | Type | Notes |
 | ----- | ---- | ---- | ----- |
-| Name | `name` | string | Script name; with `node` it forms the script's identity |
-| Node | `node` | string | The screen this script is recorded on |
-| NextNode | `next_node` | string | omitempty; the screen this script leads to |
+| Name | `name` | string | Script name; with `location` it forms the script's identity |
+| Location | `location` | string | The screen this script is recorded on |
+| NextLocation | `next_location` | string | omitempty; the screen this script leads to |
 | Params | `params` | [Parameter](#parameter) array | Locators matched **in order** to narrow the interactive zone |
 | Events | `events` | [Event](#event) array | omitempty; replayed against the **last** matched param, or verbatim when `params` is empty |
 | Timeout | `timeout` | int | Seconds to locate a param's target before failing (default `15` when omitted or `<= 0`) |

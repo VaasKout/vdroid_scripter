@@ -53,8 +53,8 @@ var testTapEvent = []models.Event{
 
 func TestSaveDefaultKeyboardScript(t *testing.T) {
 	var body = models.Script{
-		Name: TestScript,
-		Node: "main_screen",
+		Name:     TestScript,
+		Location: "main_screen",
 		Params: []models.Parameter{
 			{
 				Type:  models.Text,

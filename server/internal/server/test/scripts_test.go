@@ -12,7 +12,7 @@ import (
 
 // Script Path constants...
 const (
-	NodesPath         = LocalURL + server.Nodes
+	LocationsPath     = LocalURL + server.Locations
 	ScriptsPath       = LocalURL + server.Scripts
 	ScriptsByNamePath = LocalURL + server.ScriptsByName
 	SaveScriptPath    = LocalURL + server.SaveScript
@@ -23,14 +23,14 @@ const (
 
 // Script params constants
 const (
-	TestScript = "test_script"
-	TestNode   = "main_screen"
+	TestScript   = "test_script"
+	TestLocation = "main_screen"
 )
 
 var testScript1 = models.Script{
-	Name:     TestScript + "1",
-	Node:     TestNode,
-	NextNode: "profile",
+	Name:         TestScript + "1",
+	Location:     TestLocation,
+	NextLocation: []string{"profile"},
 	Params: []models.Parameter{
 		{
 			Type:  models.Text,
@@ -40,9 +40,9 @@ var testScript1 = models.Script{
 }
 
 var testScript2 = models.Script{
-	Name:     TestScript + "2",
-	Node:     TestNode,
-	NextNode: "settings",
+	Name:         TestScript + "2",
+	Location:     TestLocation,
+	NextLocation: []string{"settings"},
 	Params: []models.Parameter{
 		{
 			Type:  models.Text,
@@ -52,9 +52,9 @@ var testScript2 = models.Script{
 }
 
 var testScript3 = models.Script{
-	Name:     TestScript + "3",
-	Node:     "login",
-	NextNode: TestNode,
+	Name:         TestScript + "3",
+	Location:     "login",
+	NextLocation: []string{TestLocation},
 	Params: []models.Parameter{
 		{
 			Type:  models.Text,
@@ -63,10 +63,10 @@ var testScript3 = models.Script{
 	},
 }
 
-func TestGetNodes(t *testing.T) {
+func TestGetLocations(t *testing.T) {
 	var data = ""
 	makeHTTPRequest(
-		NodesPath,
+		LocationsPath,
 		http.MethodGet,
 		[]byte{},
 		&data,
@@ -75,8 +75,8 @@ func TestGetNodes(t *testing.T) {
 }
 
 func TestGetScripts(t *testing.T) {
-	var nodePath = fmt.Sprintf("{%s}", server.NodeKey)
-	var url = strings.ReplaceAll(ScriptsPath, nodePath, TestNode)
+	var locationPath = fmt.Sprintf("{%s}", server.LocationKey)
+	var url = strings.ReplaceAll(ScriptsPath, locationPath, TestLocation)
 
 	var data = ""
 	makeHTTPRequest(
@@ -89,9 +89,9 @@ func TestGetScripts(t *testing.T) {
 }
 
 func TestGetScriptByName(t *testing.T) {
-	var nodePath = fmt.Sprintf("{%s}", server.NodeKey)
+	var locationPath = fmt.Sprintf("{%s}", server.LocationKey)
 	var namePath = fmt.Sprintf("{%s}", server.NameKey)
-	var url = strings.ReplaceAll(ScriptsByNamePath, nodePath, TestNode)
+	var url = strings.ReplaceAll(ScriptsByNamePath, locationPath, TestLocation)
 	url = strings.ReplaceAll(url, namePath, TestScript+"1")
 
 	var data = ""
@@ -104,9 +104,9 @@ func TestGetScriptByName(t *testing.T) {
 	t.Log(data)
 }
 
-func TestDeleteNode(t *testing.T) {
-	var nodePath = fmt.Sprintf("{%s}", server.NodeKey)
-	var url = strings.ReplaceAll(ScriptsPath, nodePath, TestNode)
+func TestDeleteLocation(t *testing.T) {
+	var locationPath = fmt.Sprintf("{%s}", server.LocationKey)
+	var url = strings.ReplaceAll(ScriptsPath, locationPath, TestLocation)
 
 	var data = ""
 	makeHTTPRequest(
@@ -119,9 +119,9 @@ func TestDeleteNode(t *testing.T) {
 }
 
 func TestDeleteScript(t *testing.T) {
-	var nodePath = fmt.Sprintf("{%s}", server.NodeKey)
+	var locationPath = fmt.Sprintf("{%s}", server.LocationKey)
 	var namePath = fmt.Sprintf("{%s}", server.NameKey)
-	var url = strings.ReplaceAll(ScriptsByNamePath, nodePath, TestNode)
+	var url = strings.ReplaceAll(ScriptsByNamePath, locationPath, TestLocation)
 	url = strings.ReplaceAll(url, namePath, TestScript+"1")
 
 	var data = ""
