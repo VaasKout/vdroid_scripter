@@ -7,23 +7,50 @@ import (
 	"net/http"
 )
 
-// Scrcpy paths
+// Session paths
 const (
-	StartSession = "/start_session/{" + SerialKey + "}"
+	DeviceSession = Devices + "/{" + SerialKey + "}/session"
 )
 
-func (s *serverImpl) handleSocketFunctions() {
-	http.HandleFunc(StartSession, func(w http.ResponseWriter, r *http.Request) {
+func (s *serverImpl) handleSessionFunctions() {
+	http.HandleFunc(DeviceSession, func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet {
 			s.logURL(r)
-			s.handleStartSession(w, r)
+			s.handleGetSession(w, r)
 			return
 		}
-		http.Error(w, "use GET method", http.StatusMethodNotAllowed)
+		if r.Method == http.MethodPost {
+			s.logURL(r)
+			s.handleOpenSession(w, r)
+			return
+		}
+		if r.Method == http.MethodDelete {
+			s.logURL(r)
+			s.handleCloseSession(w, r)
+			return
+		}
+		http.Error(w, "use another method", http.StatusMethodNotAllowed)
 	})
 }
 
-func (s *serverImpl) handleStartSession(w http.ResponseWriter, r *http.Request) {
+func (s *serverImpl) handleGetSession(w http.ResponseWriter, r *http.Request) {
+	var serial = r.PathValue(SerialKey)
+	if serial == "" {
+		http.Error(w, `"serial" param required`, http.StatusBadRequest)
+		return
+	}
+
+	var ports = s.interactor.GetPortsJSON(serial)
+	if len(ports) == 0 {
+		http.Error(w, "no session", http.StatusNotFound)
+		return
+	}
+
+	s.setHeaders(w)
+	json.NewEncoder(w).Encode(ports)
+}
+
+func (s *serverImpl) handleOpenSession(w http.ResponseWriter, r *http.Request) {
 	var serial = r.PathValue(SerialKey)
 	if serial == "" {
 		http.Error(w, `"serial" param required`, http.StatusBadRequest)
@@ -44,6 +71,17 @@ func (s *serverImpl) handleStartSession(w http.ResponseWriter, r *http.Request) 
 	json.NewEncoder(w).Encode(data)
 
 	go s.acceptSocketConnections(serial)
+}
+
+func (s *serverImpl) handleCloseSession(w http.ResponseWriter, r *http.Request) {
+	var serial = r.PathValue(SerialKey)
+	if serial == "" {
+		http.Error(w, `"serial" param required`, http.StatusBadRequest)
+		return
+	}
+
+	s.interactor.CloseSession(serial)
+	s.sendStatusOk(w)
 }
 
 func (s *serverImpl) acceptSocketConnections(serial string) {

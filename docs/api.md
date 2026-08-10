@@ -45,7 +45,9 @@ This document describes every HTTP endpoint exposed by the server, defined in
 | POST | `/devices/{serial}/edit_keyboard` | Override a keyboard key's rectangle |
 | GET | `/devices/{serial}/reset_keyboard` | Reset keyboard keys to defaults |
 | GET | `/devices/{serial}/delete_button` | Delete a keyboard key override |
-| GET | `/start_session/{serial}` | Start scrcpy and open streaming sockets |
+| POST | `/devices/{serial}/session` | Open a session: start scrcpy and the streaming sockets |
+| GET | `/devices/{serial}/session` | Get the active session's ports |
+| DELETE | `/devices/{serial}/session` | Close the session |
 
 ## Devices
 
@@ -272,14 +274,14 @@ Deletes a saved keyboard key override.
 - **Response `200`:** `{ "status": "ok" }`
 - **Errors:** `400` if `serial` is empty, `500` if the deletion fails.
 
-## Sockets / streaming
+## Session / streaming
 
-### `GET /start_session/{serial}`
+### `POST /devices/{serial}/session`
 
-Starts the scrcpy server on the device and opens the streaming/control sockets.
-On success the server returns the TCP ports the client should connect to, then
-asynchronously begins accepting the video, CV, and control connections on those
-ports.
+Opens a session: starts the scrcpy server on the device and opens the
+streaming/control sockets. On success the server returns the TCP ports the
+client should connect to, then asynchronously begins accepting the video, CV,
+and control connections on those ports.
 
 - **Path params:** `serial` (required).
 - **Response `200`:**
@@ -294,8 +296,20 @@ ports.
   default `3001`). The three ports are **raw TCP sockets**, not HTTP — the
   client connects to them directly to receive the H.264 video stream, CV
   results, and to send control commands.
-- **Errors:** `500` if scrcpy could not be started (the connection is then
+- **Errors:** `500` if scrcpy could not be started (the session is then
   closed server-side).
+
+### `GET /devices/{serial}/session`
+
+Returns the active session's ports (same JSON as `POST`).
+
+- **Errors:** `404` if the device has no active session.
+
+### `DELETE /devices/{serial}/session`
+
+Closes the session: stops the scrcpy server and tears down the sockets.
+
+- **Response `200`:** `{ "status": "ok" }`
 
 ## Data models
 

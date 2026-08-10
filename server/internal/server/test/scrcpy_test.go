@@ -14,15 +14,29 @@ import (
 
 // Scrcpy paths
 const (
-	StartSessionPath = LocalURL + server.StartSession
+	SessionPath = LocalURL + server.DeviceSession
 )
 
-func TestStartSession(t *testing.T) {
+func sessionURL() string {
 	var serialPath = fmt.Sprintf("{%s}", server.SerialKey)
-	var requestURL = strings.ReplaceAll(StartSessionPath, serialPath, TestSerial)
+	return strings.ReplaceAll(SessionPath, serialPath, TestSerial)
+}
+
+func TestOpenSession(t *testing.T) {
 	var data = ""
 	makeHTTPRequest(
-		requestURL,
+		sessionURL(),
+		http.MethodPost,
+		[]byte{},
+		&data,
+	)
+	t.Log(data)
+}
+
+func TestGetSession(t *testing.T) {
+	var data = ""
+	makeHTTPRequest(
+		sessionURL(),
 		http.MethodGet,
 		[]byte{},
 		&data,
@@ -30,12 +44,22 @@ func TestStartSession(t *testing.T) {
 	t.Log(data)
 }
 
+func TestCloseSession(t *testing.T) {
+	var data = ""
+	makeHTTPRequest(
+		sessionURL(),
+		http.MethodDelete,
+		[]byte{},
+		&data,
+	)
+	t.Log(data)
+}
+
 func TestConnectToScrcpy(t *testing.T) {
-	var requestURL = fmt.Sprintf("%s?serial=%s", StartSessionPath, TestSerial)
 	var data = map[string]any{}
 	makeHTTPRequest(
-		requestURL,
-		http.MethodGet,
+		sessionURL(),
+		http.MethodPost,
 		[]byte{},
 		&data,
 	)
@@ -91,11 +115,10 @@ func TestConnectToScrcpy(t *testing.T) {
 }
 
 func TestReadRawVideoData(t *testing.T) {
-	var requestURL = fmt.Sprintf("%s?serial=%s", StartSessionPath, TestSerial)
 	var data = map[string]any{}
 	makeHTTPRequest(
-		requestURL,
-		http.MethodGet,
+		sessionURL(),
+		http.MethodPost,
 		[]byte{},
 		&data,
 	)

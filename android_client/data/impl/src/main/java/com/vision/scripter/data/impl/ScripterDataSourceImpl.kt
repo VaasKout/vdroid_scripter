@@ -56,7 +56,7 @@ class ScripterDataSourceImpl @Inject constructor(
     }
 
     override suspend fun startSession(serial: String): ApiResponse<StreamingData> {
-        return when (val result = networkClient.get("start_session/$serial")) {
+        return when (val result = networkClient.post("devices/$serial/session", "")) {
             is ApiResponse.Success -> {
                 val json = result.data
                 val streamingData = if (json.isEmpty()) StreamingData()
