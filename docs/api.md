@@ -138,20 +138,27 @@ Deletes a single script (its directory, including template images).
 
 ### `GET /locations/{location}/{name}/run`
 
-Executes the named script on a device.
+Queues the named script for execution on a device. If the device has no active
+session, one is opened first. The script is appended to the session's queue as
+`location/name`; a per-session worker pops entries one by one and executes them.
+Progress is observable via `GET /devices/{serial}/session`: `Running <name> on
+<location>` while executing, `Idle` when the queue drains, or an error text
+(e.g. `unable to find parameter <type> with value <value> in script
+<location>/<name>`) — a failure also clears the remaining queue.
 
-The script's `params` are located on screen **in order** — each must be found
-before the script's `timeout` expires — progressively identifying the element to
-act on. The script's `events` are then replayed over the scrcpy control socket,
-offset to the **last** parameter's matched region. A `type_text` parameter
-instead types its `value` on the on-screen keyboard. If `params` is empty and
-`events` is not, the events are replayed exactly as recorded.
+During execution the script's `params` are located on screen **in order** —
+each must be found before the script's `timeout` expires — progressively
+identifying the element to act on. The script's `events` are then replayed over
+the scrcpy control socket, offset to the **last** parameter's matched region. A
+`type_text` parameter instead types its `value` on the on-screen keyboard. If
+`params` is empty and `events` is not, the events are replayed exactly as
+recorded.
 
 - **Path params:** `location`, `name` (both required).
 - **Query params:** `serial` — target device serial (required).
-- **Response `200`:** `{ "status": "ok" }`
-- **Errors:** `400` if `serial`, `location` or `name` is empty; `500` if the script is
-  empty or execution fails.
+- **Response `200`:** `{ "status": "ok" }` — the script was queued, not yet run.
+- **Errors:** `400` if `serial`, `location` or `name` is empty; `500` if the
+  script is empty/missing or the session could not be started.
 
 ### `POST /save_rectangle`
 
@@ -301,9 +308,15 @@ and control connections on those ports.
 
 ### `GET /devices/{serial}/session`
 
-Returns the active session's ports (same JSON as `POST`).
+Returns the session's status.
 
-- **Errors:** `404` if the device has no active session.
+- **Response `200`:** `{ "status": "<status>" }` where `<status>` is one of:
+  - `closed` — no active session for this serial;
+  - `Idle` — session is open, script queue is empty;
+  - `Running <script> on <location>` — a queued script is executing;
+  - an error text (e.g. `unable to find parameter <type> with value <value> in
+    script <location>/<name>`) — the last queued script failed; the queue was
+    cleared. The error stays until the next script is queued.
 
 ### `DELETE /devices/{serial}/session`
 

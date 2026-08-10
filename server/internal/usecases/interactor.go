@@ -25,6 +25,7 @@ type Interactor interface {
 	ScriptsUseCase
 	ScrcpyUseCase
 	KeyboardUseCase
+	SessionUseCase
 }
 
 type interactorImpl struct {
@@ -36,8 +37,8 @@ type interactorImpl struct {
 	network network.Client
 	logger  *logger.Logger
 
-	devicesCache cache.Cache[models.AdbDevice]
-	sessionsCache cache.Cache[Session]
+	devicesCache  cache.Cache[models.AdbDevice]
+	sessionsCache cache.Cache[models.Session]
 }
 
 // New instance of interactor
@@ -51,7 +52,7 @@ func New(
 	logger *logger.Logger,
 ) Interactor {
 	var devicesCache = cache.NewSafeCache[models.AdbDevice]()
-	var sessionsCache = cache.NewSafeCache[Session]()
+	var sessionsCache = cache.NewSafeCache[models.Session]()
 
 	var interactor = &interactorImpl{
 		cv:      cv,
@@ -62,7 +63,7 @@ func New(
 		yolo:    yolo,
 		network: network,
 
-		devicesCache: devicesCache,
+		devicesCache:  devicesCache,
 		sessionsCache: sessionsCache,
 	}
 

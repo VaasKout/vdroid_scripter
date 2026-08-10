@@ -40,14 +40,12 @@ func (s *serverImpl) handleGetSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var ports = s.interactor.GetPortsJSON(serial)
-	if len(ports) == 0 {
-		http.Error(w, "no session", http.StatusNotFound)
-		return
+	var response = map[string]string{
+		"status": s.interactor.GetSessionStatus(serial),
 	}
 
 	s.setHeaders(w)
-	json.NewEncoder(w).Encode(ports)
+	json.NewEncoder(w).Encode(response)
 }
 
 func (s *serverImpl) handleOpenSession(w http.ResponseWriter, r *http.Request) {
@@ -57,7 +55,7 @@ func (s *serverImpl) handleOpenSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var started = s.interactor.StartScrcpyServer(serial, s.serverProps.SocketPort)
+	var started = s.interactor.StartSession(serial, s.serverProps.SocketPort)
 	if !started {
 		var errMsg = fmt.Sprintf("couldn't start scrcpy server for %s", serial)
 		http.Error(w, errMsg, http.StatusInternalServerError)

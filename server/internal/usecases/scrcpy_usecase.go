@@ -14,20 +14,9 @@ import (
 	"gocv.io/x/gocv"
 )
 
-// Session ...
-type Session struct {
-	ServerPort  int
-	VideoPort   int
-	CVPort      int
-	ControlPort int
-	DoneCh      chan struct{}
-}
-
 // ScrcpyUseCase ...
 type ScrcpyUseCase interface {
 	StartScrcpyServer(serial string, serverPort int) bool
-	CloseSession(serial string)
-	GetPortsJSON(serial string) map[string]string
 	AcceptVideoConnections(
 		ctx context.Context,
 		serial string,
@@ -42,96 +31,16 @@ type ScrcpyUseCase interface {
 	)
 }
 
-func (i *interactorImpl) StartScrcpyServer(
-	serial string,
-	basePort int,
-) bool {
-	i.logger.Info(fmt.Sprintf("closing old connections for %s... ⏳", serial))
-	i.CloseSession(serial)
-
-	session := i.initPorts(basePort)
-	if session == nil {
-		return false
-	}
-	i.sessionsCache.Add(serial, *session)
-
-	streamURL := i.scrcpy.StartScrcpyServer(serial, session.ServerPort)
-	if streamURL == "" {
-		return false
-	}
-
-	i.setScrcpyState(serial, true)
-	return true
-}
-
-func (i *interactorImpl) CloseSession(serial string) {
-	i.logger.Info(
-		fmt.Sprintf(
-			"closing scrcpy connection for %s... 🛑",
-			serial,
-		),
-	)
-	i.scrcpy.CloseScrcpyServer(serial)
-	if connection, ok := i.sessionsCache.Get(serial); ok {
-		close(connection.DoneCh)
-		i.sessionsCache.Delete(serial)
-	}
-	i.setScrcpyState(serial, false)
-}
-
-func (i *interactorImpl) GetPortsJSON(serial string) map[string]string {
-	if result, ok := i.sessionsCache.Get(serial); ok {
-		return map[string]string{
-			"video_port":   fmt.Sprintf("%d", result.VideoPort),
-			"cv_port":      fmt.Sprintf("%d", result.CVPort),
-			"control_port": fmt.Sprintf("%d", result.ControlPort),
-		}
-	}
-	return map[string]string{}
-}
-
-func (i *interactorImpl) initPorts(basePort int) *Session {
-	var videoPort = basePort + 1
-	var cvPort = videoPort + 1
-	var controlPort = cvPort + 1
-
-	var cacheMap = i.sessionsCache.GetMap()
-	if len(cacheMap) == 0 {
-		return &Session{
-			ServerPort:  basePort,
-			VideoPort:   videoPort,
-			CVPort:      cvPort,
-			ControlPort: controlPort,
-			DoneCh:      make(chan struct{}),
-		}
-	}
-
-	var biggestPort = controlPort
-	for _, conn := range cacheMap {
-		if conn.ControlPort > biggestPort {
-			biggestPort = conn.ControlPort
-		}
-	}
-
-	serverPort := biggestPort + 1
-	videoPort = serverPort + 1
-	cvPort = videoPort + 1
-	controlPort = cvPort + 1
-
-	return &Session{
-		ServerPort:  serverPort,
-		VideoPort:   videoPort,
-		CVPort:      cvPort,
-		ControlPort: controlPort,
-		DoneCh:      make(chan struct{}),
-	}
+func (i *interactorImpl) StartScrcpyServer(serial string, serverPort int) bool {
+	streamURL := i.scrcpy.StartScrcpyServer(serial, serverPort)
+	return streamURL != ""
 }
 
 func (i *interactorImpl) AcceptVideoConnections(
 	ctx context.Context,
 	serial string,
 ) {
-	var session *Session
+	var session *models.Session
 	if result, ok := i.sessionsCache.Get(serial); ok {
 		session = &result
 	}
@@ -212,7 +121,7 @@ func (i *interactorImpl) AcceptCvConnection(
 	ctx context.Context,
 	serial string,
 ) {
-	var session *Session
+	var session *models.Session
 	if result, ok := i.sessionsCache.Get(serial); ok {
 		session = &result
 	}
@@ -422,7 +331,7 @@ func (i *interactorImpl) AcceptControlConnection(
 	ctx context.Context,
 	serial string,
 ) {
-	var session *Session
+	var session *models.Session
 	if result, ok := i.sessionsCache.Get(serial); ok {
 		session = &result
 	}

@@ -43,62 +43,37 @@ func (i *interactorImpl) RunScript(
 		return errors.New("script is empty")
 	}
 
-	var newConnection = false
 	if _, ok := i.sessionsCache.Get(serial); !ok {
-		started := i.StartScrcpyServer(serial, basePort)
+		started := i.StartSession(serial, basePort)
 		if !started {
 			var errMsg = fmt.Sprintf("couldn't start scrcpy server for %s", serial)
 			return errors.New(errMsg)
 		}
-		newConnection = started
+		go i.scrcpy.ReadVideoStream(serial, nil)
 	}
 
-	go i.startVideoListener(serial, script, newConnection)
+	i.addScriptToQueue(serial, location, scriptName)
 	return nil
-}
-
-func (i *interactorImpl) startVideoListener(
-	serial string,
-	script *models.Script,
-	newConnection bool,
-) {
-	var doneCh = make(chan struct{})
-
-	go func() {
-		defer close(doneCh)
-		if newConnection {
-			go i.scrcpy.ReadVideoStream(serial, nil)
-		}
-		i.executeScript(serial, script)
-	}()
-
-	<-doneCh
-	if newConnection {
-		i.CloseSession(serial)
-	}
 }
 
 func (i *interactorImpl) executeScript(
 	serial string,
 	script *models.Script,
-) bool {
-	var session *Session
+) error {
+	var session *models.Session
 	if result, ok := i.sessionsCache.Get(serial); ok {
 		session = &result
 	}
 	if session == nil || session.VideoPort == 0 {
-		i.logger.Error(fmt.Sprintf("no connection to %s", serial))
-		return false
+		return fmt.Errorf("no connection to %s", serial)
 	}
 	if script == nil || script.Name == "" {
-		i.logger.Error("script is empty")
-		return false
+		return errors.New("script is empty")
 	}
 
 	scriptDir := i.filesDB.CreateScriptDir(script.Location, script.Name)
 	if scriptDir == "" {
-		i.logger.Error(fmt.Sprintf("scriptDir not found %s", script.Name))
-		return false
+		return fmt.Errorf("scriptDir not found %s", script.Name)
 	}
 
 	i.logger.Info(fmt.Sprintf("running script %s... ⏳", script.Name))
@@ -113,35 +88,34 @@ func (i *interactorImpl) executeScript(
 		if param.Type == models.TypeText {
 			err := i.typeText(serial, timeout, &param, script.Events)
 			if err != nil {
-				i.logger.Error(err.Error())
-				return false
+				return paramNotFoundError(&param, script)
 			}
 			continue
 		}
 
 		if index < len(script.Params)-1 || len(script.Events) == 0 {
 			foundRect, err := i.findRectangle(serial, &param, timeout, scriptDir)
-			if err != nil {
-				i.logger.Error(err.Error())
-				return false
-			}
-			if foundRect == nil {
-				return false
+			if err != nil || foundRect == nil {
+				return paramNotFoundError(&param, script)
 			}
 		}
 
 		if len(script.Events) > 0 && index == len(script.Params)-1 {
 			foundRect, err := i.findRectangle(serial, &param, timeout, scriptDir)
 			if err != nil {
-				i.logger.Error(err.Error())
-				return false
+				return paramNotFoundError(&param, script)
 			}
 			i.playEvent(serial, foundRect, script.Events)
 		}
 	}
 
 	i.logger.Info(fmt.Sprintf("script %s is COMPLETE ✅", script.Name))
-	return true
+	return nil
+}
+
+func paramNotFoundError(param *models.Parameter, script *models.Script) error {
+	var scriptPath = script.Location + "/" + script.Name
+	return fmt.Errorf(models.StatusError, param.Type, param.Value, scriptPath)
 }
 
 func (i *interactorImpl) findRectangle(
