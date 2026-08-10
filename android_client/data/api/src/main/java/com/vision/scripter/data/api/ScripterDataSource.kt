@@ -12,7 +12,7 @@ interface ScripterDataSource {
     suspend fun getDevicePreview(serial: String): ApiResponse<ByteArray>
     suspend fun pingServer(): Boolean
 
-    suspend fun startSockets(serial: String): ApiResponse<StreamingData>
+    suspend fun startSession(serial: String): ApiResponse<StreamingData>
 
     suspend fun saveRect(
         serial: String,

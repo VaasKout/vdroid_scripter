@@ -45,7 +45,7 @@ This document describes every HTTP endpoint exposed by the server, defined in
 | POST | `/devices/{serial}/edit_keyboard` | Override a keyboard key's rectangle |
 | GET | `/devices/{serial}/reset_keyboard` | Reset keyboard keys to defaults |
 | GET | `/devices/{serial}/delete_button` | Delete a keyboard key override |
-| GET | `/start_sockets/{serial}` | Start scrcpy and open streaming sockets |
+| GET | `/start_session/{serial}` | Start scrcpy and open streaming sockets |
 
 ## Devices
 
@@ -274,7 +274,7 @@ Deletes a saved keyboard key override.
 
 ## Sockets / streaming
 
-### `GET /start_sockets/{serial}`
+### `GET /start_session/{serial}`
 
 Starts the scrcpy server on the device and opens the streaming/control sockets.
 On success the server returns the TCP ports the client should connect to, then

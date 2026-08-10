@@ -14,12 +14,12 @@ import (
 
 // Scrcpy paths
 const (
-	SocketPath = LocalURL + server.Sockets
+	StartSessionPath = LocalURL + server.StartSession
 )
 
-func TestStartSockets(t *testing.T) {
+func TestStartSession(t *testing.T) {
 	var serialPath = fmt.Sprintf("{%s}", server.SerialKey)
-	var requestURL = strings.ReplaceAll(SocketPath, serialPath, TestSerial)
+	var requestURL = strings.ReplaceAll(StartSessionPath, serialPath, TestSerial)
 	var data = ""
 	makeHTTPRequest(
 		requestURL,
@@ -31,7 +31,7 @@ func TestStartSockets(t *testing.T) {
 }
 
 func TestConnectToScrcpy(t *testing.T) {
-	var requestURL = fmt.Sprintf("%s?serial=%s", SocketPath, TestSerial)
+	var requestURL = fmt.Sprintf("%s?serial=%s", StartSessionPath, TestSerial)
 	var data = map[string]any{}
 	makeHTTPRequest(
 		requestURL,
@@ -91,7 +91,7 @@ func TestConnectToScrcpy(t *testing.T) {
 }
 
 func TestReadRawVideoData(t *testing.T) {
-	var requestURL = fmt.Sprintf("%s?serial=%s", SocketPath, TestSerial)
+	var requestURL = fmt.Sprintf("%s?serial=%s", StartSessionPath, TestSerial)
 	var data = map[string]any{}
 	makeHTTPRequest(
 		requestURL,

@@ -14,8 +14,8 @@ import (
 	"gocv.io/x/gocv"
 )
 
-// ClientConnection ...
-type ClientConnection struct {
+// Session ...
+type Session struct {
 	ServerPort  int
 	VideoPort   int
 	CVPort      int
@@ -26,7 +26,7 @@ type ClientConnection struct {
 // ScrcpyUseCase ...
 type ScrcpyUseCase interface {
 	StartScrcpyServer(serial string, serverPort int) bool
-	CloseConnection(serial string)
+	CloseSession(serial string)
 	GetPortsJSON(serial string) map[string]string
 	AcceptVideoConnections(
 		ctx context.Context,
@@ -47,15 +47,15 @@ func (i *interactorImpl) StartScrcpyServer(
 	basePort int,
 ) bool {
 	i.logger.Info(fmt.Sprintf("closing old connections for %s... ⏳", serial))
-	i.CloseConnection(serial)
+	i.CloseSession(serial)
 
-	clientConnection := i.initPorts(basePort)
-	if clientConnection == nil {
+	session := i.initPorts(basePort)
+	if session == nil {
 		return false
 	}
-	i.clientsCache.Add(serial, *clientConnection)
+	i.sessionsCache.Add(serial, *session)
 
-	streamURL := i.scrcpy.StartScrcpyServer(serial, clientConnection.ServerPort)
+	streamURL := i.scrcpy.StartScrcpyServer(serial, session.ServerPort)
 	if streamURL == "" {
 		return false
 	}
@@ -64,7 +64,7 @@ func (i *interactorImpl) StartScrcpyServer(
 	return true
 }
 
-func (i *interactorImpl) CloseConnection(serial string) {
+func (i *interactorImpl) CloseSession(serial string) {
 	i.logger.Info(
 		fmt.Sprintf(
 			"closing scrcpy connection for %s... 🛑",
@@ -72,15 +72,15 @@ func (i *interactorImpl) CloseConnection(serial string) {
 		),
 	)
 	i.scrcpy.CloseScrcpyServer(serial)
-	if connection, ok := i.clientsCache.Get(serial); ok {
+	if connection, ok := i.sessionsCache.Get(serial); ok {
 		close(connection.DoneCh)
-		i.clientsCache.Delete(serial)
+		i.sessionsCache.Delete(serial)
 	}
 	i.setScrcpyState(serial, false)
 }
 
 func (i *interactorImpl) GetPortsJSON(serial string) map[string]string {
-	if result, ok := i.clientsCache.Get(serial); ok {
+	if result, ok := i.sessionsCache.Get(serial); ok {
 		return map[string]string{
 			"video_port":   fmt.Sprintf("%d", result.VideoPort),
 			"cv_port":      fmt.Sprintf("%d", result.CVPort),
@@ -90,14 +90,14 @@ func (i *interactorImpl) GetPortsJSON(serial string) map[string]string {
 	return map[string]string{}
 }
 
-func (i *interactorImpl) initPorts(basePort int) *ClientConnection {
+func (i *interactorImpl) initPorts(basePort int) *Session {
 	var videoPort = basePort + 1
 	var cvPort = videoPort + 1
 	var controlPort = cvPort + 1
 
-	var cacheMap = i.clientsCache.GetMap()
+	var cacheMap = i.sessionsCache.GetMap()
 	if len(cacheMap) == 0 {
-		return &ClientConnection{
+		return &Session{
 			ServerPort:  basePort,
 			VideoPort:   videoPort,
 			CVPort:      cvPort,
@@ -118,7 +118,7 @@ func (i *interactorImpl) initPorts(basePort int) *ClientConnection {
 	cvPort = videoPort + 1
 	controlPort = cvPort + 1
 
-	return &ClientConnection{
+	return &Session{
 		ServerPort:  serverPort,
 		VideoPort:   videoPort,
 		CVPort:      cvPort,
@@ -131,19 +131,19 @@ func (i *interactorImpl) AcceptVideoConnections(
 	ctx context.Context,
 	serial string,
 ) {
-	var clientConnection *ClientConnection
-	if result, ok := i.clientsCache.Get(serial); ok {
-		clientConnection = &result
+	var session *Session
+	if result, ok := i.sessionsCache.Get(serial); ok {
+		session = &result
 	}
-	if clientConnection == nil || clientConnection.VideoPort == 0 {
+	if session == nil || session.VideoPort == 0 {
 		return
 	}
 
-	videoListener, err := i.startSocketListener(clientConnection.VideoPort)
+	videoListener, err := i.startSocketListener(session.VideoPort)
 	if err != nil {
 		var errMsg = fmt.Sprintf(
 			"couldn't start video listener on port %d for %s",
-			clientConnection.VideoPort,
+			session.VideoPort,
 			serial,
 		)
 		i.logger.Error(errMsg)
@@ -163,7 +163,7 @@ func (i *interactorImpl) AcceptVideoConnections(
 	i.logger.Info(
 		fmt.Sprintf(
 			"start listening video socket on port %d for %s... ⏳",
-			clientConnection.VideoPort,
+			session.VideoPort,
 			serial,
 		),
 	)
@@ -212,21 +212,21 @@ func (i *interactorImpl) AcceptCvConnection(
 	ctx context.Context,
 	serial string,
 ) {
-	var clientConnection *ClientConnection
-	if result, ok := i.clientsCache.Get(serial); ok {
-		clientConnection = &result
+	var session *Session
+	if result, ok := i.sessionsCache.Get(serial); ok {
+		session = &result
 	}
-	if clientConnection == nil ||
-		clientConnection.VideoPort == 0 ||
-		clientConnection.CVPort == 0 {
+	if session == nil ||
+		session.VideoPort == 0 ||
+		session.CVPort == 0 {
 		return
 	}
 
-	cvListener, err := i.startSocketListener(clientConnection.CVPort)
+	cvListener, err := i.startSocketListener(session.CVPort)
 	if err != nil {
 		var errMsg = fmt.Sprintf(
 			"couldn't start cv listener on port %d for %s",
-			clientConnection.CVPort,
+			session.CVPort,
 			serial,
 		)
 		i.logger.Error(errMsg)
@@ -246,7 +246,7 @@ func (i *interactorImpl) AcceptCvConnection(
 	i.logger.Info(
 		fmt.Sprintf(
 			"start listening cv socket on port %d for %s... ⏳",
-			clientConnection.CVPort,
+			session.CVPort,
 			serial,
 		),
 	)
@@ -422,18 +422,18 @@ func (i *interactorImpl) AcceptControlConnection(
 	ctx context.Context,
 	serial string,
 ) {
-	var clientConnection *ClientConnection
-	if result, ok := i.clientsCache.Get(serial); ok {
-		clientConnection = &result
+	var session *Session
+	if result, ok := i.sessionsCache.Get(serial); ok {
+		session = &result
 	}
-	if clientConnection == nil || clientConnection.ControlPort == 0 {
+	if session == nil || session.ControlPort == 0 {
 		return
 	}
-	controlListener, err := i.startSocketListener(clientConnection.ControlPort)
+	controlListener, err := i.startSocketListener(session.ControlPort)
 	if err != nil {
 		var errMsg = fmt.Sprintf(
 			"couldn't start control listener on port %d for %s",
-			clientConnection.ControlPort,
+			session.ControlPort,
 			serial,
 		)
 		i.logger.Error(errMsg)
@@ -453,7 +453,7 @@ func (i *interactorImpl) AcceptControlConnection(
 	i.logger.Info(
 		fmt.Sprintf(
 			"start listening control socket on port %d for %s... ⏳",
-			clientConnection.ControlPort,
+			session.ControlPort,
 			serial,
 		),
 	)

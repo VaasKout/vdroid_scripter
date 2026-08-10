@@ -102,7 +102,7 @@ class VideoInteractor @Inject constructor(
 
     override fun onRefresh() {
         coroutineScope.launch {
-            when (val result = scripterDataSource.startSockets(currentState.serial)) {
+            when (val result = scripterDataSource.startSession(currentState.serial)) {
                 is ApiResponse.Success -> {
                     val fullServerUri = dataStoreRepository.getServerUrl().toUri()
                     _stateFlow.update {

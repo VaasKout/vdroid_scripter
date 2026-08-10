@@ -9,21 +9,21 @@ import (
 
 // Scrcpy paths
 const (
-	Sockets = "/start_sockets/{" + SerialKey + "}"
+	StartSession = "/start_session/{" + SerialKey + "}"
 )
 
 func (s *serverImpl) handleSocketFunctions() {
-	http.HandleFunc(Sockets, func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc(StartSession, func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet {
 			s.logURL(r)
-			s.handleStartSockets(w, r)
+			s.handleStartSession(w, r)
 			return
 		}
 		http.Error(w, "use GET method", http.StatusMethodNotAllowed)
 	})
 }
 
-func (s *serverImpl) handleStartSockets(w http.ResponseWriter, r *http.Request) {
+func (s *serverImpl) handleStartSession(w http.ResponseWriter, r *http.Request) {
 	var serial = r.PathValue(SerialKey)
 	if serial == "" {
 		http.Error(w, `"serial" param required`, http.StatusBadRequest)
@@ -34,7 +34,7 @@ func (s *serverImpl) handleStartSockets(w http.ResponseWriter, r *http.Request) 
 	if !started {
 		var errMsg = fmt.Sprintf("couldn't start scrcpy server for %s", serial)
 		http.Error(w, errMsg, http.StatusInternalServerError)
-		s.interactor.CloseConnection(serial)
+		s.interactor.CloseSession(serial)
 		return
 	}
 
@@ -66,5 +66,5 @@ func (s *serverImpl) acceptSocketConnections(serial string) {
 
 	<-doneCtx.Done()
 
-	s.interactor.CloseConnection(serial)
+	s.interactor.CloseSession(serial)
 }

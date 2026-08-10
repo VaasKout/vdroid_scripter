@@ -37,7 +37,7 @@ type interactorImpl struct {
 	logger  *logger.Logger
 
 	devicesCache cache.Cache[models.AdbDevice]
-	clientsCache cache.Cache[ClientConnection]
+	sessionsCache cache.Cache[Session]
 }
 
 // New instance of interactor
@@ -51,7 +51,7 @@ func New(
 	logger *logger.Logger,
 ) Interactor {
 	var devicesCache = cache.NewSafeCache[models.AdbDevice]()
-	var clientCache = cache.NewSafeCache[ClientConnection]()
+	var sessionsCache = cache.NewSafeCache[Session]()
 
 	var interactor = &interactorImpl{
 		cv:      cv,
@@ -63,7 +63,7 @@ func New(
 		network: network,
 
 		devicesCache: devicesCache,
-		clientsCache: clientCache,
+		sessionsCache: sessionsCache,
 	}
 
 	go interactor.FillUpDevicesCache()

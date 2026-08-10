@@ -44,7 +44,7 @@ func (i *interactorImpl) RunScript(
 	}
 
 	var newConnection = false
-	if _, ok := i.clientsCache.Get(serial); !ok {
+	if _, ok := i.sessionsCache.Get(serial); !ok {
 		started := i.StartScrcpyServer(serial, basePort)
 		if !started {
 			var errMsg = fmt.Sprintf("couldn't start scrcpy server for %s", serial)
@@ -74,7 +74,7 @@ func (i *interactorImpl) startVideoListener(
 
 	<-doneCh
 	if newConnection {
-		i.CloseConnection(serial)
+		i.CloseSession(serial)
 	}
 }
 
@@ -82,11 +82,11 @@ func (i *interactorImpl) executeScript(
 	serial string,
 	script *models.Script,
 ) bool {
-	var clientConnection *ClientConnection
-	if result, ok := i.clientsCache.Get(serial); ok {
-		clientConnection = &result
+	var session *Session
+	if result, ok := i.sessionsCache.Get(serial); ok {
+		session = &result
 	}
-	if clientConnection == nil || clientConnection.VideoPort == 0 {
+	if session == nil || session.VideoPort == 0 {
 		i.logger.Error(fmt.Sprintf("no connection to %s", serial))
 		return false
 	}
