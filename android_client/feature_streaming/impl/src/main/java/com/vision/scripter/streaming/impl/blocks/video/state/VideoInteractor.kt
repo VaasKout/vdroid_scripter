@@ -14,9 +14,9 @@ import com.vision.scripter.streaming.impl.blocks.video.ui.VideoUiStateHolder
 import com.vision.scripter.streaming.impl.data.CvStreamerRepository
 import com.vision.scripter.streaming.impl.data.KeyboardRepository
 import com.vision.scripter.streaming.impl.data.RecordRepository
+import com.vision.scripter.streaming.impl.data.VideoStreamerRepository
 import com.vision.scripter.streaming.impl.screen.StreamingEvent
 import com.vision.scripter.streaming.impl.screen.StreamingEventsHolder
-import com.vision.scripter.streaming.impl.data.VideoStreamerRepository
 import com.vision.scripter.streaming.impl.screen.state.TEMPLATE
 import com.vision.scripter.streaming.impl.screen.state.YOLO_CLASS
 import dagger.hilt.android.scopes.ViewModelScoped
