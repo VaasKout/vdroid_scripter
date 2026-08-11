@@ -34,6 +34,17 @@ func (s *SaveZoneDto) Valid() bool {
 		strings.TrimSpace(s.Value) != "" && s.Rectangle.IsNotEmpty()
 }
 
+type EditScriptDto struct {
+	PrevLocation string         `json:"prev_location"`
+	Script       *models.Script `json:"script"`
+}
+
+func (e *EditScriptDto) Valid() bool {
+	return e != nil && e.Script != nil &&
+		strings.TrimSpace(e.Script.Name) != "" &&
+		strings.TrimSpace(e.Script.Location) != ""
+}
+
 // ScriptsUseCase ...
 type ScriptsUseCase interface {
 	GetLocations() ([]string, error)
@@ -44,6 +55,7 @@ type ScriptsUseCase interface {
 
 	SaveZone(saveZone *SaveZoneDto) bool
 	SaveScript(data *models.Script) bool
+	EditScript(data *EditScriptDto) bool
 	FindText(serial string, text string, locale string) []cv.OCRResult
 }
 
@@ -84,6 +96,49 @@ func (i *interactorImpl) SaveScript(data *models.Script) bool {
 	}
 
 	return i.saveScriptInFile(data, runnerPath)
+}
+
+func (i *interactorImpl) EditScript(data *EditScriptDto) bool {
+	if !data.Valid() {
+		return false
+	}
+
+	script := data.Script
+	name := strings.TrimSpace(script.Name)
+	newLocation := strings.TrimSpace(script.Location)
+	prevLocation := strings.TrimSpace(data.PrevLocation)
+
+	if prevLocation != "" && prevLocation != newLocation {
+		moved := i.moveScriptFiles(prevLocation, newLocation, name)
+		if !moved {
+			return false
+		}
+	}
+
+	return i.SaveScript(script)
+}
+
+func (i *interactorImpl) moveScriptFiles(
+	prevLocation string,
+	location string,
+	name string,
+) bool {
+	prevScriptDir := filepath.Join(i.filesDB.CreateScriptDir(), prevLocation, name)
+	if _, err := os.Stat(prevScriptDir); err != nil {
+		return true
+	}
+
+	newLocationDir := i.filesDB.CreateScriptDir(location)
+	if newLocationDir == "" {
+		return false
+	}
+
+	newScriptDir := filepath.Join(newLocationDir, name)
+	err := os.Rename(prevScriptDir, newScriptDir)
+	if err != nil {
+		i.logger.Error(err.Error())
+	}
+	return err == nil
 }
 
 func (i *interactorImpl) FindText(

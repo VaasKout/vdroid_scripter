@@ -5,6 +5,7 @@ import com.vision.scripter.data.api.models.AdbDevice
 import com.vision.scripter.data.api.models.AdbDevicesResponse
 import com.vision.scripter.data.api.models.CvRectangle
 import com.vision.scripter.data.api.models.EditKeyboardRequest
+import com.vision.scripter.data.api.models.EditScriptRequest
 import com.vision.scripter.data.api.models.KeyboardButtons
 import com.vision.scripter.data.api.models.RectangleWithText
 import com.vision.scripter.data.api.models.SaveRectRequest
@@ -72,6 +73,14 @@ class ScripterDataSourceImpl @Inject constructor(
         if (script.location.isEmpty() || script.name.isEmpty() || script.isEmpty()) return false
         val body = Json.encodeToString(script)
         val result = networkClient.post("save_script", body)
+        return result is ApiResponse.Success
+    }
+
+    override suspend fun editScript(script: Script, prevLocation: String): Boolean {
+        if (script.isEmpty()) return false
+        val request = EditScriptRequest(prevLocation = prevLocation, script = script)
+        val body = Json.encodeToString(request)
+        val result = networkClient.post("edit_script", body)
         return result is ApiResponse.Success
     }
 
@@ -168,7 +177,8 @@ class ScripterDataSourceImpl @Inject constructor(
     }
 
     override suspend fun runScript(serial: String, location: String, name: String): Boolean {
-        return when (val result = networkClient.get("locations/$location/$name/run?serial=$serial")) {
+        return when (val result =
+            networkClient.get("locations/$location/$name/run?serial=$serial")) {
             is ApiResponse.Success -> result.data.isNotEmpty()
             is ApiResponse.Error -> false
         }

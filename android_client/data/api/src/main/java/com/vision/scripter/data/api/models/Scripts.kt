@@ -30,8 +30,16 @@ data class Parameter(
 )
 
 fun Script.isEmpty(): Boolean {
-    return params.isEmpty() && events.isEmpty()
+    return name.isEmpty() || location.isEmpty() || (params.isEmpty() && events.isEmpty())
 }
+
+@Serializable
+data class EditScriptRequest(
+    @SerialName("prev_location")
+    val prevLocation: String = "",
+    @SerialName("script")
+    val script: Script = Script(),
+)
 
 @Serializable
 data class Event(

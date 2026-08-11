@@ -15,6 +15,7 @@ const (
 	RunScript     = ScriptsByName + "/run"
 
 	SaveScript    = "/save_script"
+	EditScript    = "/edit_script"
 	SaveRectangle = "/save_rectangle"
 	FindText      = "/devices/{" + SerialKey + "}/find_text"
 )
@@ -85,6 +86,15 @@ func (s *serverImpl) handleScriptsFunctions() {
 		if r.Method == http.MethodPost {
 			s.logURL(r)
 			s.handleSaveScript(w, r)
+			return
+		}
+		http.Error(w, "use POST method", http.StatusMethodNotAllowed)
+	})
+
+	http.HandleFunc(EditScript, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			s.logURL(r)
+			s.handleEditScript(w, r)
 			return
 		}
 		http.Error(w, "use POST method", http.StatusMethodNotAllowed)
@@ -195,13 +205,32 @@ func (s *serverImpl) handleSaveScript(w http.ResponseWriter, r *http.Request) {
 
 	var data = &models.Script{}
 	err := json.NewDecoder(r.Body).Decode(&data)
-	if err != nil || data.Location == "" || data.Name == "" {
+	if err != nil || data.IsEmpty() {
 		http.Error(w, "Invalid JSON", http.StatusBadRequest)
 		return
 	}
 
 	saved := s.interactor.SaveScript(data)
 	if saved {
+		s.sendStatusOk(w)
+		return
+	}
+
+	http.Error(w, "Something went wrong", http.StatusInternalServerError)
+}
+
+func (s *serverImpl) handleEditScript(w http.ResponseWriter, r *http.Request) {
+	defer r.Body.Close()
+
+	var data = &usecases.EditScriptDto{}
+	err := json.NewDecoder(r.Body).Decode(data)
+	if err != nil || !data.Valid() {
+		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		return
+	}
+
+	edited := s.interactor.EditScript(data)
+	if edited {
 		s.sendStatusOk(w)
 		return
 	}

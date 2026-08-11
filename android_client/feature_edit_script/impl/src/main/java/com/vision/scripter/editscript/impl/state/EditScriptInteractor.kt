@@ -120,14 +120,17 @@ class EditScriptInteractor @Inject constructor(
         val state = currentState
         coroutineScope.launch {
             if (!script.isEmpty()) {
-                val saved = scripterDataSource.saveScript(script)
+                val saved = scripterDataSource.editScript(
+                    script = script,
+                    prevLocation = state.initialLocation,
+                )
                 if (!saved) {
                     uiCommandsFlow.tryEmit(EditScriptUiCommand.ShowNetworkError)
                     return@launch
                 }
             }
 
-            if (script.isEmpty() || script.location != currentState.initialLocation) {
+            if (script.isEmpty()) {
                 val deleted = scripterDataSource.deleteScript(
                     location = state.initialLocation,
                     name = script.name,

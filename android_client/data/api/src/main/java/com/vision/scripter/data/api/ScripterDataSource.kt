@@ -33,6 +33,7 @@ interface ScripterDataSource {
     suspend fun getScriptInfo(location: String, name: String): ApiResponse<Script>
     suspend fun deleteLocation(location: String): Boolean
     suspend fun saveScript(script: Script): Boolean
+    suspend fun editScript(script: Script, prevLocation: String): Boolean
     suspend fun deleteScript(location: String, name: String): Boolean
     suspend fun runScript(serial: String, location: String, name: String): Boolean
     suspend fun resetKeyboard(serial: String, locale: String): ApiResponse<List<RectangleWithText>>
