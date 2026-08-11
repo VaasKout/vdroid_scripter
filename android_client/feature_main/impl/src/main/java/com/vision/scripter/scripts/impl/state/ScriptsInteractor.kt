@@ -2,6 +2,7 @@ package com.vision.scripter.scripts.impl.state
 
 import com.vision.scripter.coroutines.api.CoroutineScopeFactory
 import com.vision.scripter.data.api.ScripterDataSource
+import com.vision.scripter.data.api.models.RunScriptsRequest
 import com.vision.scripter.network.api.ApiResponse
 import com.vision.scripter.ui.CommandFlow
 import com.vision.scripter.ui.states.LoadingState
@@ -148,7 +149,10 @@ internal class ScriptsInteractor @Inject constructor(
         if (serial.isEmpty() || name.isEmpty() || location.isEmpty()) return
 
         coroutineScope.launch {
-            val started = scripterDataSource.runScript(serial = serial, location = location, name = name)
+            val started = scripterDataSource.runScripts(
+                serial = serial,
+                scripts = listOf(RunScriptsRequest.ScriptRef(location = location, name = name)),
+            )
             if (!started) uiCommandsFlow.tryEmit(ScriptsUiCommand.ShowNetworkError)
         }
         onDismiss()

@@ -9,7 +9,7 @@ import (
 func main() {
 	baseURL := os.Getenv("VDROID_URL")
 	if baseURL == "" {
-		baseURL = "http://127.0.0.1:8081"
+		baseURL = "http://127.0.0.1:8080"
 	}
 
 	server := New(baseURL)

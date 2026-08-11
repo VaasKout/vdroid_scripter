@@ -34,6 +34,20 @@ func (s *SaveZoneDto) Valid() bool {
 		strings.TrimSpace(s.Value) != "" && s.Rectangle.IsNotEmpty()
 }
 
+type RunScriptsDto struct {
+	Serial  string      `json:"serial"`
+	Scripts []ScriptRef `json:"scripts"`
+}
+
+type ScriptRef struct {
+	Location string `json:"location"`
+	Name     string `json:"name"`
+}
+
+func (r *RunScriptsDto) Valid() bool {
+	return r != nil && strings.TrimSpace(r.Serial) != "" && len(r.Scripts) > 0
+}
+
 type EditScriptDto struct {
 	PrevLocation string         `json:"prev_location"`
 	Script       *models.Script `json:"script"`
@@ -51,7 +65,7 @@ type ScriptsUseCase interface {
 	GetScriptNames(location string) ([]string, error)
 	GetScript(location string, scriptName string) (*models.Script, error)
 	DeleteScript(location string, scriptName string) error
-	RunScript(serial string, location string, scriptName string, basePort int) error
+	RunScripts(serial string, scripts []ScriptRef, basePort int) error
 
 	SaveZone(saveZone *SaveZoneDto) bool
 	SaveScript(data *models.Script) bool

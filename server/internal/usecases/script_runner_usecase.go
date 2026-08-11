@@ -20,27 +20,34 @@ import (
 	"gocv.io/x/gocv"
 )
 
-func (i *interactorImpl) RunScript(
+func (i *interactorImpl) RunScripts(
 	serial string,
-	location string,
-	scriptName string,
+	scripts []ScriptRef,
 	basePort int,
 ) error {
 	if serial == "" {
 		return errors.New(SerialIsEmptyError)
 	}
-	if scriptName == "" {
+	if len(scripts) == 0 {
 		return errors.New(ScriptNameIsEmpty)
 	}
 
-	path := i.getScriptRunner(location, scriptName)
-	if path == "" {
-		return errors.New("script not found")
-	}
+	var entries = make([]string, 0, len(scripts))
+	for _, ref := range scripts {
+		if ref.Location == "" || ref.Name == "" {
+			return errors.New("script location and name are required")
+		}
 
-	script := i.getScriptFromFile(path)
-	if script == nil || script.Name == "" {
-		return errors.New("script is empty")
+		path := i.getScriptRunner(ref.Location, ref.Name)
+		if path == "" {
+			return fmt.Errorf("script not found: %s/%s", ref.Location, ref.Name)
+		}
+
+		script := i.getScriptFromFile(path)
+		if script == nil || script.Name == "" {
+			return fmt.Errorf("script is empty: %s/%s", ref.Location, ref.Name)
+		}
+		entries = append(entries, ref.Location+"/"+ref.Name)
 	}
 
 	if _, ok := i.sessionsCache.Get(serial); !ok {
@@ -52,7 +59,7 @@ func (i *interactorImpl) RunScript(
 		go i.scrcpy.ReadVideoStream(serial, nil)
 	}
 
-	i.addScriptToQueue(serial, location, scriptName)
+	i.addScriptsToQueue(serial, entries)
 	return nil
 }
 

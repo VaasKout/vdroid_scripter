@@ -8,6 +8,7 @@ import com.vision.scripter.data.api.models.EditKeyboardRequest
 import com.vision.scripter.data.api.models.EditScriptRequest
 import com.vision.scripter.data.api.models.KeyboardButtons
 import com.vision.scripter.data.api.models.RectangleWithText
+import com.vision.scripter.data.api.models.RunScriptsRequest
 import com.vision.scripter.data.api.models.SaveRectRequest
 import com.vision.scripter.data.api.models.Script
 import com.vision.scripter.data.api.models.StreamingData
@@ -176,12 +177,15 @@ class ScripterDataSourceImpl @Inject constructor(
         }
     }
 
-    override suspend fun runScript(serial: String, location: String, name: String): Boolean {
-        return when (val result =
-            networkClient.get("locations/$location/$name/run?serial=$serial")) {
-            is ApiResponse.Success -> result.data.isNotEmpty()
-            is ApiResponse.Error -> false
-        }
+    override suspend fun runScripts(
+        serial: String,
+        scripts: List<RunScriptsRequest.ScriptRef>,
+    ): Boolean {
+        if (serial.isEmpty() || scripts.isEmpty()) return false
+        val request = RunScriptsRequest(serial = serial, scripts = scripts)
+        val body = Json.encodeToString(request)
+        val result = networkClient.post("run_scripts", body)
+        return result is ApiResponse.Success
     }
 
     override suspend fun resetKeyboard(

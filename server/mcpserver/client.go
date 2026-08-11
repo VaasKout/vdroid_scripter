@@ -2,6 +2,7 @@ package main
 
 import (
 	"android_vision_scripter/pkg/models"
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -15,6 +16,11 @@ type apiClient struct {
 	client  *http.Client
 }
 
+type scriptRef struct {
+	Location string `json:"location"`
+	Name     string `json:"name"`
+}
+
 func newAPIClient(baseURL string) *apiClient {
 	return &apiClient{
 		baseURL: baseURL,
@@ -22,10 +28,13 @@ func newAPIClient(baseURL string) *apiClient {
 	}
 }
 
-func (c *apiClient) request(method string, path string) ([]byte, error) {
-	req, err := http.NewRequest(method, c.baseURL+path, nil)
+func (c *apiClient) request(method string, path string, reqBody io.Reader) ([]byte, error) {
+	req, err := http.NewRequest(method, c.baseURL+path, reqBody)
 	if err != nil {
 		return nil, err
+	}
+	if reqBody != nil {
+		req.Header.Set("Content-Type", "application/json")
 	}
 
 	resp, err := c.client.Do(req)
@@ -45,12 +54,12 @@ func (c *apiClient) request(method string, path string) ([]byte, error) {
 }
 
 func (c *apiClient) getDevices() (string, error) {
-	body, err := c.request(http.MethodGet, "/devices")
+	body, err := c.request(http.MethodGet, "/devices", nil)
 	return string(body), err
 }
 
 func (c *apiClient) getLocations() ([]string, error) {
-	body, err := c.request(http.MethodGet, "/locations")
+	body, err := c.request(http.MethodGet, "/locations", nil)
 	if err != nil {
 		return nil, err
 	}
@@ -60,7 +69,7 @@ func (c *apiClient) getLocations() ([]string, error) {
 }
 
 func (c *apiClient) getLocationScripts(location string) ([]string, error) {
-	body, err := c.request(http.MethodGet, "/locations/"+url.PathEscape(location))
+	body, err := c.request(http.MethodGet, "/locations/"+url.PathEscape(location), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -75,7 +84,7 @@ func (c *apiClient) getScript(location string, name string) (*models.Script, err
 		url.PathEscape(location),
 		url.PathEscape(name),
 	)
-	body, err := c.request(http.MethodGet, path)
+	body, err := c.request(http.MethodGet, path, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -85,28 +94,33 @@ func (c *apiClient) getScript(location string, name string) (*models.Script, err
 }
 
 func (c *apiClient) queueScript(serial string, location string, name string) error {
-	var path = fmt.Sprintf(
-		"/locations/%s/%s/run?serial=%s",
-		url.PathEscape(location),
-		url.PathEscape(name),
-		url.QueryEscape(serial),
-	)
-	_, err := c.request(http.MethodGet, path)
+	var payload = struct {
+		Serial  string      `json:"serial"`
+		Scripts []scriptRef `json:"scripts"`
+	}{
+		Serial:  serial,
+		Scripts: []scriptRef{{Location: location, Name: name}},
+	}
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return err
+	}
+	_, err = c.request(http.MethodPost, "/run_scripts", bytes.NewReader(body))
 	return err
 }
 
 func (c *apiClient) openSession(serial string) (string, error) {
-	body, err := c.request(http.MethodPost, "/devices/"+url.PathEscape(serial)+"/session")
+	body, err := c.request(http.MethodPost, "/devices/"+url.PathEscape(serial)+"/session", nil)
 	return string(body), err
 }
 
 func (c *apiClient) closeSession(serial string) error {
-	_, err := c.request(http.MethodDelete, "/devices/"+url.PathEscape(serial)+"/session")
+	_, err := c.request(http.MethodDelete, "/devices/"+url.PathEscape(serial)+"/session", nil)
 	return err
 }
 
 func (c *apiClient) getSessionStatus(serial string) (string, error) {
-	body, err := c.request(http.MethodGet, "/devices/"+url.PathEscape(serial)+"/session")
+	body, err := c.request(http.MethodGet, "/devices/"+url.PathEscape(serial)+"/session", nil)
 	if err != nil {
 		return "", err
 	}

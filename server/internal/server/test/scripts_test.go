@@ -2,6 +2,7 @@ package test
 
 import (
 	"android_vision_scripter/internal/server"
+	"android_vision_scripter/internal/usecases"
 	"android_vision_scripter/pkg/models"
 	"encoding/json"
 	"fmt"
@@ -17,7 +18,7 @@ const (
 	ScriptsByNamePath = LocalURL + server.ScriptsByName
 	SaveScriptPath    = LocalURL + server.SaveScript
 	SaveRectangle     = LocalURL + server.SaveRectangle
-	RunScriptPath     = LocalURL + server.RunScript
+	RunScriptsPath    = LocalURL + server.RunScripts
 	FindTextPath      = LocalURL + server.FindText
 )
 
@@ -187,17 +188,22 @@ func TestSaveScript(t *testing.T) {
 }
 
 func TestRunScript(t *testing.T) {
-	var data = ""
-	var serialPath = fmt.Sprintf("{%s}", server.SerialKey)
-	var namePath = fmt.Sprintf("{%s}", server.NameKey)
-	var url = strings.ReplaceAll(RunScriptPath, serialPath, TestSerial)
-	url = strings.ReplaceAll(url, namePath, TestScript)
-	fmt.Println(url)
+	var body = usecases.RunScriptsDto{
+		Serial: TestSerial,
+		Scripts: []usecases.ScriptRef{
+			{Location: TestLocation, Name: TestScript + "1"},
+		},
+	}
+	bytes, err := json.Marshal(body)
+	if err != nil {
+		t.Fatal(err)
+	}
 
+	var data = ""
 	makeHTTPRequest(
-		url,
-		http.MethodGet,
-		nil,
+		RunScriptsPath,
+		http.MethodPost,
+		bytes,
 		&data,
 	)
 	t.Log(data)

@@ -12,7 +12,7 @@ const (
 	Locations     = "/locations"
 	Scripts       = Locations + "/{" + LocationKey + "}"
 	ScriptsByName = Scripts + "/{" + NameKey + "}"
-	RunScript     = ScriptsByName + "/run"
+	RunScripts    = "/run_scripts"
 
 	SaveScript    = "/save_script"
 	EditScript    = "/edit_script"
@@ -64,13 +64,13 @@ func (s *serverImpl) handleScriptsFunctions() {
 		http.Error(w, "use another method", http.StatusMethodNotAllowed)
 	})
 
-	http.HandleFunc(RunScript, func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodGet {
+	http.HandleFunc(RunScripts, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
 			s.logURL(r)
-			s.handleRunScript(w, r)
+			s.handleRunScripts(w, r)
 			return
 		}
-		http.Error(w, "use GET method", http.StatusMethodNotAllowed)
+		http.Error(w, "use POST method", http.StatusMethodNotAllowed)
 	})
 
 	http.HandleFunc(SaveRectangle, func(w http.ResponseWriter, r *http.Request) {
@@ -163,17 +163,17 @@ func (s *serverImpl) handleDeleteScript(w http.ResponseWriter, r *http.Request) 
 	s.sendStatusOk(w)
 }
 
-func (s *serverImpl) handleRunScript(w http.ResponseWriter, r *http.Request) {
-	var serial = r.URL.Query().Get(SerialKey)
-	var location = r.PathValue(LocationKey)
-	var name = r.PathValue(NameKey)
+func (s *serverImpl) handleRunScripts(w http.ResponseWriter, r *http.Request) {
+	defer r.Body.Close()
 
-	if serial == "" || location == "" || name == "" {
-		http.Error(w, `check queries`, http.StatusBadRequest)
+	var data = &usecases.RunScriptsDto{}
+	err := json.NewDecoder(r.Body).Decode(data)
+	if err != nil || !data.Valid() {
+		http.Error(w, "Invalid JSON", http.StatusBadRequest)
 		return
 	}
 
-	err := s.interactor.RunScript(serial, location, name, s.serverProps.SocketPort)
+	err = s.interactor.RunScripts(data.Serial, data.Scripts, s.serverProps.SocketPort)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

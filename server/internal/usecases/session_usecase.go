@@ -108,12 +108,12 @@ func (i *interactorImpl) GetSessionStatus(serial string) string {
 	return session.Status
 }
 
-func (i *interactorImpl) addScriptToQueue(serial string, location string, name string) {
+func (i *interactorImpl) addScriptsToQueue(serial string, entries []string) {
 	session, ok := i.sessionsCache.Get(serial)
 	if !ok {
 		return
 	}
-	session.Query = append(session.Query, location+"/"+name)
+	session.Query = append(session.Query, entries...)
 	i.sessionsCache.Add(serial, session)
 }
 

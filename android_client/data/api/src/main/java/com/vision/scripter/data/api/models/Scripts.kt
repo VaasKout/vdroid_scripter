@@ -34,6 +34,22 @@ fun Script.isEmpty(): Boolean {
 }
 
 @Serializable
+data class RunScriptsRequest(
+    @SerialName("serial")
+    val serial: String = "",
+    @SerialName("scripts")
+    val scripts: List<ScriptRef> = listOf(),
+) {
+    @Serializable
+    data class ScriptRef(
+        @SerialName("location")
+        val location: String = "",
+        @SerialName("name")
+        val name: String = "",
+    )
+}
+
+@Serializable
 data class EditScriptRequest(
     @SerialName("prev_location")
     val prevLocation: String = "",
