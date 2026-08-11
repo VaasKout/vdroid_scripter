@@ -11,7 +11,7 @@ import (
 const (
 	BasePath       = "android_vision_scripter"
 	LogsDir        = "logs"
-	ScriptsDir     = "locations"
+	ScriptsDir     = "scripts"
 	KeyboardDir    = "keyboards"
 	ScrcpyDir      = "scrcpy"
 	YoloDir        = "yolo"
