@@ -21,7 +21,7 @@ const (
 
 const serverInstructions = `vdroid-scripter drives Android devices by replaying recorded CV automation scripts.
 
-Building a flow: call list_devices, then get_location_graph, then plan a chain of scripts where each script's next_location contains the location of the next step. Queue the scripts in order with queue_script and wait for the result with wait_for_session.
+Building a flow: call list_devices, then get_location_graph, then plan a chain of scripts where each script's next_location contains the location of the next step. Queue the whole flow with one queue_scripts call (scripts run in the given order) and wait for the result with wait_for_session.
 
 Failure recovery: an error status means the failed script could not find its CV params on screen, so the device is probably not on the location you assumed. To find out the actual location, queue the previous successful script (the last one that completed before the failure) and wait for the result. If it succeeds, the device was still on that script's location and has now moved to its next_location — re-queue the failed script and continue the flow from there. If it fails too, the device is on an unknown screen: re-plan the flow from get_location_graph, or close_session and start over.`
 
@@ -52,10 +52,14 @@ type serialInput struct {
 	Serial string `json:"serial" jsonschema:"device serial number, get it from list_devices"`
 }
 
-type queueScriptInput struct {
-	Serial   string `json:"serial" jsonschema:"device serial number, get it from list_devices"`
+type queuedScript struct {
 	Location string `json:"location" jsonschema:"location (screen) name the script belongs to"`
 	Script   string `json:"script" jsonschema:"script name inside the location"`
+}
+
+type queueScriptsInput struct {
+	Serial  string         `json:"serial" jsonschema:"device serial number, get it from list_devices"`
+	Scripts []queuedScript `json:"scripts" jsonschema:"scripts to queue, executed in the given order"`
 }
 
 type waitInput struct {
@@ -96,7 +100,7 @@ func (s *Server) registerTools() {
 	mcp.AddTool(s.mcp, &mcp.Tool{
 		Name: "open_session",
 		Description: "Open a device session (starts screen capture). A session is required " +
-			"before scripts can execute. queue_script opens one automatically, so call this " +
+			"before scripts can execute. queue_scripts opens one automatically, so call this " +
 			"only when you want the session up before queueing.",
 	}, s.handleOpenSession)
 
@@ -118,20 +122,20 @@ func (s *Server) registerTools() {
 	}, s.handleGetSessionStatus)
 
 	mcp.AddTool(s.mcp, &mcp.Tool{
-		Name: "queue_script",
-		Description: "Queue a script for execution on the device. Scripts run sequentially " +
-			"in queue order on a single session; if no session exists one is opened " +
-			"automatically. Queue the whole planned flow (one call per script, in order), " +
-			"then poll get_session_status or call wait_for_session. A script failure clears " +
-			"the remaining queue and puts the error into the session status.",
-	}, s.handleQueueScript)
+		Name: "queue_scripts",
+		Description: "Queue one or more scripts for execution on the device. Scripts run " +
+			"sequentially in the given order on a single session; if no session exists one " +
+			"is opened automatically. Queue the whole planned flow in one call, then poll " +
+			"get_session_status or call wait_for_session. A script failure clears the " +
+			"remaining queue and puts the error into the session status.",
+	}, s.handleQueueScripts)
 
 	mcp.AddTool(s.mcp, &mcp.Tool{
 		Name: "wait_for_session",
 		Description: "Block until the device session stops running queued scripts, then " +
 			"return the final status: 'idle' means the flow completed successfully, an error " +
 			"text means a script failed (remaining queue was cleared), 'closed' means the " +
-			"session ended. Call this after queue_script instead of polling manually. " +
+			"session ended. Call this after queue_scripts instead of polling manually. " +
 			"On an error status, recover by queueing the previous successful script: success " +
 			"means the device was still on that script's location (re-queue the failed script " +
 			"and continue), another failure means the screen is unknown — re-plan the flow.",
@@ -242,19 +246,33 @@ func (s *Server) handleGetSessionStatus(
 	return textResult(status), nil, nil
 }
 
-func (s *Server) handleQueueScript(
+func (s *Server) handleQueueScripts(
 	ctx context.Context,
 	req *mcp.CallToolRequest,
-	in queueScriptInput,
+	in queueScriptsInput,
 ) (*mcp.CallToolResult, any, error) {
-	if in.Serial == "" || in.Location == "" || in.Script == "" {
-		return nil, nil, fmt.Errorf("serial, location and script are required")
+	if in.Serial == "" || len(in.Scripts) == 0 {
+		return nil, nil, fmt.Errorf("serial and scripts are required")
 	}
-	err := s.api.queueScript(in.Serial, in.Location, in.Script)
+
+	var refs = make([]scriptRef, 0, len(in.Scripts))
+	for _, script := range in.Scripts {
+		if script.Location == "" || script.Script == "" {
+			return nil, nil, fmt.Errorf("location and script are required in every entry")
+		}
+		refs = append(refs, scriptRef{Location: script.Location, Name: script.Script})
+	}
+
+	err := s.api.queueScripts(in.Serial, refs)
 	if err != nil {
 		return nil, nil, err
 	}
-	var text = fmt.Sprintf("queued %s/%s", in.Location, in.Script)
+
+	var names = make([]string, 0, len(refs))
+	for _, ref := range refs {
+		names = append(names, ref.Location+"/"+ref.Name)
+	}
+	var text = "queued " + strings.Join(names, ", ")
 	return textResult(text), nil, nil
 }
 

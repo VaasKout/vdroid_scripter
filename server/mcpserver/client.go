@@ -93,13 +93,13 @@ func (c *apiClient) getScript(location string, name string) (*models.Script, err
 	return script, err
 }
 
-func (c *apiClient) queueScript(serial string, location string, name string) error {
+func (c *apiClient) queueScripts(serial string, scripts []scriptRef) error {
 	var payload = struct {
 		Serial  string      `json:"serial"`
 		Scripts []scriptRef `json:"scripts"`
 	}{
 		Serial:  serial,
-		Scripts: []scriptRef{{Location: location, Name: name}},
+		Scripts: scripts,
 	}
 	body, err := json.Marshal(payload)
 	if err != nil {

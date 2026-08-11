@@ -54,6 +54,27 @@ For development, you can run from source instead:
 cd server && go run cmd/main.go
 ```
 
+### Building the MCP Server
+
+`server/mcpserver` contains an MCP (Model Context Protocol) server that exposes
+the HTTP API as tools for AI-driven flow building. It needs only Go — none of
+the CV native libraries:
+
+```bash
+cd server && go build -o vdroid-mcp ./mcpserver
+```
+
+The `-o` flag is required: without it the default output name collides with the
+`mcpserver` directory. Register the binary with your MCP client, e.g. for
+Claude Code:
+
+```bash
+claude mcp add vdroid -- <path>/vdroid-mcp
+```
+
+The MCP server talks to a running vdroid server at the URL from the
+`VDROID_URL` env var (default `http://127.0.0.1:8081`).
+
 ### API Reference
 
 The server exposes an HTTP API for managing devices, scripts, the on-screen

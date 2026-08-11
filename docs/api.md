@@ -37,9 +37,10 @@ This document describes every HTTP endpoint exposed by the server, defined in
 | DELETE | `/locations/{location}` | Delete a location and all its scripts |
 | GET | `/locations/{location}/{name}` | Get a single script |
 | DELETE | `/locations/{location}/{name}` | Delete a script |
-| GET | `/locations/{location}/{name}/run?serial=` | Run a script on a device |
+| POST | `/run_scripts` | Queue one or more scripts to run in order on a device |
 | POST | `/save_rectangle` | Crop and save a template image from the device screen |
 | POST | `/save_script` | Create or replace a script |
+| POST | `/edit_script` | Update a script, moving its files if the location changed |
 | GET | `/devices/{serial}/find_text` | OCR: locate text on the current screen |
 | GET | `/devices/{serial}/keyboard` | Detect on-screen keyboard keys |
 | POST | `/devices/{serial}/edit_keyboard` | Override a keyboard key's rectangle |
@@ -136,15 +137,17 @@ Deletes a single script (its directory, including template images).
 - **Response `200`:** `{ "status": "ok" }`
 - **Errors:** `400` if `location` is empty.
 
-### `GET /locations/{location}/{name}/run`
+### `POST /run_scripts`
 
-Queues the named script for execution on a device. If the device has no active
-session, one is opened first. The script is appended to the session's queue as
-`location/name`; a per-session worker pops entries one by one and executes them.
-Progress is observable via `GET /devices/{serial}/session`: `Running <name> on
-<location>` while executing, `Idle` when the queue drains, or an error text
-(e.g. `unable to find parameter <type> with value <value> in script
-<location>/<name>`) — a failure also clears the remaining queue.
+Queues one or more scripts for execution on a device, in the given order. If
+the device has no active session, one is opened first. Every entry is validated
+up front (the script must exist and be non-empty) — one bad entry rejects the
+whole batch and nothing is queued. Entries are then appended to the session's
+queue as `location/name`; a per-session worker pops them one by one and
+executes them. Progress is observable via `GET /devices/{serial}/session`:
+`running <name> on <location>` while executing, `idle` when the queue drains,
+or an error text (e.g. `unable to find parameter <type> with value <value> in
+script <location>/<name>`) — a failure also clears the remaining queue.
 
 During execution the script's `params` are located on screen **in order** —
 each must be found before the script's `timeout` expires — progressively
@@ -154,11 +157,22 @@ the scrcpy control socket, offset to the **last** parameter's matched region. A
 `params` is empty and `events` is not, the events are replayed exactly as
 recorded.
 
-- **Path params:** `location`, `name` (both required).
-- **Query params:** `serial` — target device serial (required).
-- **Response `200`:** `{ "status": "ok" }` — the script was queued, not yet run.
-- **Errors:** `400` if `serial`, `location` or `name` is empty; `500` if the
-  script is empty/missing or the session could not be started.
+- **Request body:**
+  ```json
+  {
+    "serial": "ABCD1234",
+    "scripts": [
+      { "location": "main_screen", "name": "open_profile" },
+      { "location": "profile", "name": "logout" }
+    ]
+  }
+  ```
+  `serial` and a non-empty `scripts` array are required; every entry needs both
+  `location` and `name`.
+- **Response `200`:** `{ "status": "ok" }` — the scripts were queued, not yet run.
+- **Errors:** `400` on invalid JSON, empty `serial`, or an empty `scripts`
+  array; `500` if an entry is invalid, its script is empty/missing, or the
+  session could not be started.
 
 ### `POST /save_rectangle`
 
@@ -192,7 +206,7 @@ The body is a whole [`Script`](#script) object.
   {
     "name": "open_profile",
     "location": "main_screen",
-    "next_location": "profile",
+    "next_location": ["profile"],
     "params": [
       { "type": "text", "value": "Profile" },
       { "type": "template", "value": "" }
@@ -209,6 +223,28 @@ The body is a whole [`Script`](#script) object.
   [`POST /save_rectangle`](#post-save_rectangle).
 - **Response `200`:** `{ "status": "ok" }`
 - **Errors:** `400` on invalid JSON or empty `location`/`name`, `500` if not saved.
+
+### `POST /edit_script`
+
+Updates an existing script. Unlike [`POST /save_script`](#post-save_script),
+it also handles a location change: when `prev_location` differs from the
+script's `location`, the whole script directory — `run.json` plus its template
+PNGs — is moved from `locations/<prev_location>/<name>/` to
+`locations/<location>/<name>/` before the updated script is written.
+
+- **Request body:**
+  ```json
+  {
+    "prev_location": "main_screen",
+    "script": { /* Script, see models */ }
+  }
+  ```
+  `script.name` and `script.location` are required. `prev_location` is the
+  location the script is currently stored under; when it is empty or equal to
+  `script.location`, the endpoint behaves like `save_script`.
+- **Response `200`:** `{ "status": "ok" }`
+- **Errors:** `400` on invalid JSON or empty `script.location`/`script.name`,
+  `500` if the move or the save fails.
 
 ### `GET /devices/{serial}/find_text`
 
@@ -312,8 +348,8 @@ Returns the session's status.
 
 - **Response `200`:** `{ "status": "<status>" }` where `<status>` is one of:
   - `closed` — no active session for this serial;
-  - `Idle` — session is open, script queue is empty;
-  - `Running <script> on <location>` — a queued script is executing;
+  - `idle` — session is open, script queue is empty;
+  - `running <script> on <location>` — a queued script is executing;
   - an error text (e.g. `unable to find parameter <type> with value <value> in
     script <location>/<name>`) — the last queued script failed; the queue was
     cleared. The error stays until the next script is queued.
@@ -365,7 +401,7 @@ Closes the session: stops the scrcpy server and tears down the sockets.
 {
   "name": "open_profile",
   "location": "main_screen",
-  "next_location": "profile",
+  "next_location": ["profile"],
   "params": [ /* Parameter */ ],
   "events": [ /* Event */ ],
   "timeout": 15
@@ -376,7 +412,7 @@ Closes the session: stops the scrcpy server and tears down the sockets.
 | ----- | ---- | ---- | ----- |
 | Name | `name` | string | Script name; with `location` it forms the script's identity |
 | Location | `location` | string | The screen this script is recorded on |
-| NextLocation | `next_location` | string | omitempty; the screen this script leads to |
+| NextLocation | `next_location` | string array | omitempty; the screens this script can lead to |
 | Params | `params` | [Parameter](#parameter) array | Locators matched **in order** to narrow the interactive zone |
 | Events | `events` | [Event](#event) array | omitempty; replayed against the **last** matched param, or verbatim when `params` is empty |
 | Timeout | `timeout` | int | Seconds to locate a param's target before failing (default `15` when omitted or `<= 0`) |
