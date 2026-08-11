@@ -2,11 +2,12 @@ package com.vision.scripter.scripts.impl.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
@@ -33,25 +34,29 @@ fun ScriptItem(
     onEditClick: (String) -> Unit,
     onDeleteClick: (String) -> Unit,
 ) {
-    Box(
+    Row(
         modifier = modifier
             .fillMaxWidth()
-            .background(color = Color.White, shape = RoundedCornerShape(16.dp))
+            .background(
+                color = Color.White,
+                shape = RoundedCornerShape(16.dp)
+            )
             .padding(16.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
-            modifier = Modifier.align(Alignment.Center),
+            modifier = Modifier.weight(1f),
             text = name,
             color = Color.Black,
             style = TextStyle(
                 color = Color.Black,
                 fontSize = 24.sp,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.Bold,
             )
         )
-
+        Spacer(modifier = Modifier.width(4.dp))
         Row(
-            modifier = Modifier.align(Alignment.CenterEnd),
             horizontalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             Icon(
@@ -60,7 +65,7 @@ fun ScriptItem(
                     .customClickable(onClick = { onEditClick(name) }),
                 imageVector = Icons.Filled.Edit,
                 tint = Color.Gray,
-                contentDescription = ""
+                contentDescription = "",
             )
             Icon(
                 modifier = Modifier
@@ -68,7 +73,7 @@ fun ScriptItem(
                     .customClickable(onClick = { onDeleteClick(name) }),
                 imageVector = Icons.Filled.Delete,
                 tint = Color.Red,
-                contentDescription = ""
+                contentDescription = "",
             )
             Icon(
                 modifier = Modifier
@@ -80,7 +85,7 @@ fun ScriptItem(
                     ),
                 imageVector = Icons.Filled.PlayArrow,
                 tint = Color.Green,
-                contentDescription = ""
+                contentDescription = "",
             )
         }
     }
@@ -93,32 +98,33 @@ fun LocationItem(
     onClick: (String) -> Unit,
     onDeleteClick: (String) -> Unit,
 ) {
-    Box(
+    Row(
         modifier = modifier
             .fillMaxWidth()
             .background(color = Color.White, shape = RoundedCornerShape(16.dp))
             .customClickable(onClick = { onClick(name) })
             .padding(16.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
-            modifier = Modifier.align(Alignment.CenterStart),
+            modifier = Modifier.weight(1f),
             text = name,
             color = Color.Black,
             style = TextStyle(
                 color = Color.Black,
                 fontSize = 24.sp,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.Bold,
             )
         )
-
+        Spacer(modifier = Modifier.width(4.dp))
         Icon(
             modifier = Modifier
-                .align(Alignment.CenterEnd)
                 .size(32.dp)
                 .customClickable(onClick = { onDeleteClick(name) }),
             imageVector = Icons.Filled.Delete,
             tint = Color.Red,
-            contentDescription = ""
+            contentDescription = "",
         )
     }
 }
@@ -137,10 +143,33 @@ private fun ScriptItemPreview() {
 
 @Preview
 @Composable
+private fun ScriptItemLongNamePreview() {
+    ScriptItem(
+        modifier = Modifier.fillMaxWidth(),
+        name = "very_long_script_name_that_wraps_to_multiple_lines",
+        onPlayClick = {},
+        onEditClick = {},
+        onDeleteClick = {},
+    )
+}
+
+@Preview
+@Composable
 private fun LocationItemPreview() {
     LocationItem(
         modifier = Modifier.fillMaxWidth(),
         name = "main_screen",
+        onClick = {},
+        onDeleteClick = {},
+    )
+}
+
+@Preview
+@Composable
+private fun LocationLongItemPreview() {
+    LocationItem(
+        modifier = Modifier.fillMaxWidth(),
+        name = "screen_with_a_very_long_name",
         onClick = {},
         onDeleteClick = {},
     )
