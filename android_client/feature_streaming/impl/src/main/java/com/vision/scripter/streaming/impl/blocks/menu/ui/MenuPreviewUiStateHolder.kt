@@ -12,7 +12,8 @@ internal class MenuPreviewUiStateHolder(state: MenuUiState) : MenuUiStateHolder 
     override val uiStateFlow: StateFlow<MenuUiState> = MutableStateFlow(state)
 
     override fun init(serial: String) {}
-    override fun onScriptModeClicked() {}
+    override fun onAddClicked() {}
+    override fun onAddItemConfirmed(name: String, isImage: Boolean) {}
     override fun onCvModeClicked() {}
     override fun onTextModeClicked() {}
     override fun onTryToFindText(text: String, locale: String) {}
@@ -24,9 +25,6 @@ internal class MenuPreviewUiStateHolder(state: MenuUiState) : MenuUiStateHolder 
     override fun onExpandClicked() {}
     override fun onCancelClicked() {}
     override fun onExitClicked() {}
-    override fun onTimeoutClicked() {}
-    override fun onTimeoutSaved(timeout: Int) {}
-    override fun onSavedRecordName(name: String) {}
     override fun onSaveLocale(locale: String) {}
     override fun onDialogDismissed() {}
 }

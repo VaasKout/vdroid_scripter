@@ -6,16 +6,6 @@ const val NUMBERS = "numbers"
 const val PHONE = "phone"
 const val SPACE_KEY = "space"
 
-const val DEFAULT_TIMEOUT = 15
-
-const val NEW_SCRIPTS_LOCATION = "new_scripts"
-
-const val TEMPLATE = "template"
-const val YOLO_CLASS = "yolo_class"
-const val TEXT = "text"
-const val TYPE_TEXT = "type_text"
-const val COMMAND = "command"
-
 val locales = listOf(
     ENG,
     RUS,
@@ -45,22 +35,14 @@ fun CVMode.toggleDetection(): CVMode = when (this) {
     else -> CVMode.CV_RECTS
 }
 
-fun CVMode.toType(): String = when (this) {
-    CVMode.CV_RECTS -> TEMPLATE
-    CVMode.YOLO -> YOLO_CLASS
-    else -> ""
-}
-
 enum class KeyboardMode {
-    TYPING,
     EDIT,
     ADD_NEW,
 }
 
 fun KeyboardMode.increment(): KeyboardMode = when (this) {
-    KeyboardMode.TYPING -> KeyboardMode.EDIT
     KeyboardMode.EDIT -> KeyboardMode.ADD_NEW
-    else -> KeyboardMode.TYPING
+    else -> KeyboardMode.EDIT
 }
 
 data class StreamingState(

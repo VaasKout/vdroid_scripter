@@ -12,7 +12,9 @@ interface MenuUiStateHolder {
 
     fun init(serial: String)
 
-    fun onScriptModeClicked()
+    fun onAddClicked()
+    fun onAddItemConfirmed(name: String, isImage: Boolean)
+
     fun onCvModeClicked()
 
     fun onTextModeClicked()
@@ -28,10 +30,6 @@ interface MenuUiStateHolder {
     fun onCancelClicked()
     fun onExitClicked()
 
-    fun onTimeoutClicked()
-    fun onTimeoutSaved(timeout: Int)
-
-    fun onSavedRecordName(name: String)
     fun onSaveLocale(locale: String)
     fun onDialogDismissed()
 }

@@ -1,23 +1,19 @@
 package com.vision.scripter.streaming.impl.data
 
 import com.vision.scripter.data.api.ScripterDataSource
+import com.vision.scripter.data.api.models.CvRectangle
 import com.vision.scripter.data.api.models.Event
-import com.vision.scripter.data.api.models.Parameter
-import com.vision.scripter.data.api.models.Script
+import com.vision.scripter.data.api.models.ScreenSizes
 import com.vision.scripter.streaming.impl.di.StreamingScope
-import com.vision.scripter.streaming.impl.screen.state.DEFAULT_TIMEOUT
-import com.vision.scripter.streaming.impl.screen.state.NEW_SCRIPTS_LOCATION
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.update
 import javax.inject.Inject
 
 @StreamingScope
 class RecordRepository @Inject constructor(
     private val scripterDataSource: ScripterDataSource,
-    private val keyboardRepository: KeyboardRepository,
 ) {
 
     private val _stateFlow = MutableStateFlow(Record())
@@ -28,43 +24,30 @@ class RecordRepository @Inject constructor(
 
     private var startRecordingTime = 0L
 
-    fun switchControlRecording() {
+    fun startImage(name: String) {
+        startRecordingTime = 0L
         _stateFlow.update {
-            it.copy(controlRecording = !it.controlRecording)
+            Record(name = name, pending = PendingItem.IMAGE)
         }
     }
 
-    fun updateName(name: String) {
+    fun startAction(name: String) {
+        startRecordingTime = 0L
         _stateFlow.update {
-            it.copy(name = name)
+            Record(name = name, pending = PendingItem.ACTION)
         }
     }
 
-    fun updateTimeout(timeout: Int) {
+    fun switchRecording() {
         _stateFlow.update {
-            it.copy(timeout = timeout)
-        }
-    }
-
-    fun addParam(param: Parameter) {
-        _stateFlow.update {
-            it.copy(params = it.params + param, tmpParam = null)
-        }
-    }
-
-    fun updateTmpParam(param: Parameter?) {
-        _stateFlow.update {
-            it.copy(tmpParam = param)
+            it.copy(recording = !it.recording)
         }
     }
 
     @OptIn(ExperimentalUnsignedTypes::class)
-    suspend fun recordBytes(bytesArray: UByteArray?) {
+    fun recordBytes(bytesArray: UByteArray?) {
         if (bytesArray == null) return
-        val keyboardButtons = keyboardRepository.observeKeyboardButtons().firstOrNull().orEmpty()
-        val record = currentState
-        val keyboardRecording = keyboardButtons.isNotEmpty() && record.name.isNotEmpty()
-        if (!record.controlRecording && !keyboardRecording) return
+        if (!currentState.recording) return
 
         val elapsedMs = if (startRecordingTime == 0L) {
             startRecordingTime = System.nanoTime()
@@ -83,31 +66,42 @@ class RecordRepository @Inject constructor(
         }
     }
 
-    suspend fun saveScript(): Boolean {
+    suspend fun saveImage(serial: String, rectangle: CvRectangle?): Boolean {
         val record = currentState
-        return scripterDataSource.saveScript(
-            Script(
-                name = record.name,
-                location = record.location,
-                params = record.params,
-                events = record.events,
-                timeout = record.timeout,
-            ),
+        if (record.name.isEmpty()) return false
+        return scripterDataSource.saveImage(
+            serial = serial,
+            name = record.name,
+            rectangle = rectangle,
         )
     }
 
-    fun clear(saveName: Boolean = false) {
+    suspend fun saveAction(screenSizes: ScreenSizes): Boolean {
+        val record = currentState
+        if (record.name.isEmpty() || record.events.isEmpty()) return false
+        return scripterDataSource.saveAction(
+            name = record.name,
+            screenWidth = screenSizes.remoteWidth,
+            screenHeight = screenSizes.remoteHeight,
+            events = record.events,
+        )
+    }
+
+    fun clear() {
         startRecordingTime = 0L
-        _stateFlow.update { Record(name = if (saveName) it.name else "") }
+        _stateFlow.update { Record() }
     }
 }
 
+enum class PendingItem {
+    NONE,
+    IMAGE,
+    ACTION,
+}
+
 data class Record(
-    val controlRecording: Boolean = false,
     val name: String = "",
-    val location: String = NEW_SCRIPTS_LOCATION,
-    val params: List<Parameter> = listOf(),
+    val pending: PendingItem = PendingItem.NONE,
+    val recording: Boolean = false,
     val events: List<Event> = listOf(),
-    val timeout: Int = DEFAULT_TIMEOUT,
-    val tmpParam: Parameter? = null,
 )

@@ -18,17 +18,17 @@ internal fun StreamingCommandObserver(
 ) {
     val ctx = LocalContext.current
     val commonNetworkError = stringResource(CommonR.string.common_network_error)
-    val scriptSavedMessage = stringResource(R.string.script_saved)
+    val itemSavedMessage = stringResource(R.string.item_saved)
     uiStateHolder.uiCommandsFlow.observe {
         when (it) {
             is StreamingUiCommand.ShowNetworkError -> {
                 snackbarHostState.showSnackbar(commonNetworkError)
             }
 
-            is StreamingUiCommand.ShowScriptSavedSnackbar -> {
+            is StreamingUiCommand.ShowItemSavedSnackbar -> {
                 Toast.makeText(
                     ctx,
-                    scriptSavedMessage,
+                    itemSavedMessage,
                     Toast.LENGTH_SHORT
                 ).show()
             }

@@ -5,8 +5,6 @@ import com.vision.scripter.data.api.ScripterDataSource
 import com.vision.scripter.data.api.models.CvRectangle
 import com.vision.scripter.data.api.models.ScreenSizes
 import com.vision.scripter.data.api.models.adjustToClient
-import com.vision.scripter.data.api.models.adjustToServer
-import com.vision.scripter.data.api.models.isEmpty
 import com.vision.scripter.data.api.models.smallestBy
 import com.vision.scripter.network.api.ApiResponse
 import com.vision.scripter.streaming.impl.di.StreamingScope
@@ -119,25 +117,6 @@ class CvStreamerRepository @Inject constructor(
         }
 
         return result is ApiResponse.Success && result.data.isNotEmpty()
-    }
-
-    suspend fun saveSelectedRectangle(
-        serial: String,
-        location: String,
-        name: String,
-        value: String,
-        screenSizes: ScreenSizes,
-    ) {
-        val tmpZone = _selectedRectangles.value.firstOrNull()
-        if (!tmpZone.isEmpty()) {
-            scripterDataSource.saveRect(
-                serial = serial,
-                location = location,
-                name = name,
-                value = value,
-                rectangle = tmpZone?.adjustToServer(screenSizes),
-            )
-        }
     }
 
     fun selectRectangle(x: Int, y: Int) {

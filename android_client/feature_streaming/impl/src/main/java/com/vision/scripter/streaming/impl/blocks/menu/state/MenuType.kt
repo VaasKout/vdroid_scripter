@@ -1,7 +1,6 @@
 package com.vision.scripter.streaming.impl.blocks.menu.state
 
 import com.vision.scripter.streaming.impl.screen.state.CVMode
-import com.vision.scripter.streaming.impl.screen.state.DEFAULT_TIMEOUT
 import com.vision.scripter.streaming.impl.screen.state.KeyboardMode
 
 data class MenuState(
@@ -17,21 +16,16 @@ sealed interface MenuType {
         val expanded: Boolean = false,
     ) : MenuType
 
-    data class Recording(
-        val controlRecording: Boolean = false,
-        val recordTimeout: Int = DEFAULT_TIMEOUT,
-    ) : MenuType
-
     data class SelectingCV(
         val localCvMode: CVMode = CVMode.CV_RECTS,
     ) : MenuType
 
-    data object SelectingText : MenuType
+    data class CustomAction(
+        val recording: Boolean = false,
+    ) : MenuType
 
     data class Keyboard(
         val isLoading: Boolean = true,
-        val mode: KeyboardMode = KeyboardMode.TYPING,
-        val fromUsual: Boolean = false,
+        val mode: KeyboardMode = KeyboardMode.EDIT,
     ) : MenuType
 }
-

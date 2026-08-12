@@ -53,7 +53,7 @@ fun UsualMenu(
                 modifier = Modifier
                     .size(32.dp)
                     .customClickable(
-                        onClick = uiStateHolder::onScriptModeClicked,
+                        onClick = uiStateHolder::onAddClicked,
                     ),
                 imageVector = Icons.Filled.Add,
                 tint = MaterialTheme.colorScheme.onSurface,

@@ -8,17 +8,14 @@ import androidx.navigation.NavController
 import com.vision.scripter.streaming.impl.blocks.menu.commandobservers.MenuCommandObserver
 import com.vision.scripter.streaming.impl.blocks.menu.state.DialogState
 import com.vision.scripter.streaming.impl.blocks.menu.state.MenuType
+import com.vision.scripter.streaming.impl.blocks.menu.ui.dialogs.AddItemDialog
 import com.vision.scripter.streaming.impl.blocks.menu.ui.dialogs.EditKeyboardDialog
 import com.vision.scripter.streaming.impl.blocks.menu.ui.dialogs.KeyboardDialog
-import com.vision.scripter.streaming.impl.blocks.menu.ui.dialogs.RecordDialog
 import com.vision.scripter.streaming.impl.blocks.menu.ui.dialogs.TextToFindDialog
-import com.vision.scripter.streaming.impl.blocks.menu.ui.dialogs.TimeoutDialog
+import com.vision.scripter.streaming.impl.blocks.menu.ui.menu.CustomActionMenu
 import com.vision.scripter.streaming.impl.blocks.menu.ui.menu.KeyboardMenu
-import com.vision.scripter.streaming.impl.blocks.menu.ui.menu.ScriptMenu
 import com.vision.scripter.streaming.impl.blocks.menu.ui.menu.SelectingTemplateMenu
-import com.vision.scripter.streaming.impl.blocks.menu.ui.menu.SelectingTextMenu
 import com.vision.scripter.streaming.impl.blocks.menu.ui.menu.UsualMenu
-import com.vision.scripter.streaming.impl.screen.state.DEFAULT_TIMEOUT
 
 @Composable
 fun MenuBlock(
@@ -62,15 +59,8 @@ private fun MenuContent(
             )
         }
 
-        is MenuType.SelectingText -> {
-            SelectingTextMenu(
-                modifier = modifier,
-                uiStateHolder = uiStateHolder,
-            )
-        }
-
-        is MenuType.Recording -> {
-            ScriptMenu(
+        is MenuType.CustomAction -> {
+            CustomActionMenu(
                 modifier = modifier,
                 menuType = state.menuType,
                 uiStateHolder = uiStateHolder,
@@ -89,9 +79,9 @@ private fun MenuContent(
     when (state.dialogState) {
         is DialogState.None -> {}
 
-        is DialogState.Record -> {
-            RecordDialog(
-                onSaveRecordName = uiStateHolder::onSavedRecordName,
+        is DialogState.AddItem -> {
+            AddItemDialog(
+                onConfirm = uiStateHolder::onAddItemConfirmed,
                 onDismiss = uiStateHolder::onDialogDismissed,
             )
         }
@@ -114,15 +104,6 @@ private fun MenuContent(
             EditKeyboardDialog(
                 oldKey = state.dialogState.oldKey,
                 onSave = uiStateHolder::onEditKeyboardButtonSaved,
-                onDismiss = uiStateHolder::onDialogDismissed,
-            )
-        }
-
-        is DialogState.Timeout -> {
-            TimeoutDialog(
-                initialTimeout = (state.menuType as? MenuType.Recording)?.recordTimeout
-                    ?: DEFAULT_TIMEOUT,
-                onSave = uiStateHolder::onTimeoutSaved,
                 onDismiss = uiStateHolder::onDialogDismissed,
             )
         }

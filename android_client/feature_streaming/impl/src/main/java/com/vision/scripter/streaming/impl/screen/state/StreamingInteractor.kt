@@ -46,7 +46,7 @@ class StreamingInteractor @Inject constructor(
             eventRepository.eventsFlow.collect { event ->
                 when (event) {
                     is StreamingEvent.ShowNetworkError -> showNetworkError()
-                    is StreamingEvent.ShowScriptSavedSnackbar -> showStepSavedSnackbar()
+                    is StreamingEvent.ShowItemSavedSnackbar -> showStepSavedSnackbar()
                     is StreamingEvent.SuccessLoading -> doneLoading()
                 }
             }
@@ -58,7 +58,7 @@ class StreamingInteractor @Inject constructor(
     }
 
     private fun showStepSavedSnackbar() {
-        uiCommandsFlow.tryEmit(StreamingUiCommand.ShowScriptSavedSnackbar)
+        uiCommandsFlow.tryEmit(StreamingUiCommand.ShowItemSavedSnackbar)
     }
 
     private fun showNetworkError() {

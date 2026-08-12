@@ -7,11 +7,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.RadioButtonChecked
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
@@ -24,13 +22,12 @@ import com.vision.scripter.streaming.impl.blocks.menu.state.MenuType
 import com.vision.scripter.streaming.impl.blocks.menu.ui.MenuPreviewUiStateHolder
 import com.vision.scripter.streaming.impl.blocks.menu.ui.MenuUiStateHolder
 import com.vision.scripter.streaming.impl.blocks.menu.ui.usualMenuPreviewUiState
-import com.vision.scripter.streaming.impl.screen.state.KeyboardMode
 import com.vision.scripter.ui.customClickable
 
 @Composable
-fun KeyboardMenu(
+fun CustomActionMenu(
     modifier: Modifier = Modifier,
-    menuType: MenuType.Keyboard,
+    menuType: MenuType.CustomAction,
     uiStateHolder: MenuUiStateHolder,
 ) {
     Column(
@@ -43,21 +40,17 @@ fun KeyboardMenu(
         horizontalAlignment = Alignment.End,
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        if (menuType.isLoading) {
-            CircularProgressIndicator(modifier = Modifier.size(32.dp))
-            return
-        }
-
         Icon(
             modifier = Modifier
                 .size(32.dp)
-                .customClickable(onClick = uiStateHolder::onKeyboardModeClicked),
-            imageVector = when (menuType.mode) {
-                KeyboardMode.EDIT -> Icons.Filled.Edit
-                KeyboardMode.ADD_NEW -> Icons.Filled.Add
-            },
-            tint = Color.Red,
-            contentDescription = "",
+                .customClickable(
+                    onClick = uiStateHolder::onRecordingClicked,
+                ),
+            imageVector = Icons.Filled.RadioButtonChecked,
+            tint =
+                if (menuType.recording) Color.Red
+                else MaterialTheme.colorScheme.onSurface,
+            contentDescription = ""
         )
 
         Icon(
@@ -66,40 +59,34 @@ fun KeyboardMenu(
                 .customClickable(onClick = uiStateHolder::onSaveClicked),
             imageVector = Icons.Filled.Check,
             tint = Color.Green,
-            contentDescription = "",
+            contentDescription = ""
         )
 
         Icon(
             modifier = Modifier
                 .size(32.dp)
                 .customClickable(onClick = uiStateHolder::onCancelClicked),
-            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+            imageVector = Icons.Filled.Close,
             tint = MaterialTheme.colorScheme.onSurface,
-            contentDescription = "",
+            contentDescription = ""
         )
     }
 }
 
 @Preview
 @Composable
-private fun KeyboardMenuEditPreview() {
-    KeyboardMenu(
-        menuType = MenuType.Keyboard(
-            isLoading = false,
-            mode = KeyboardMode.EDIT,
-        ),
+private fun CustomActionMenuPreview() {
+    CustomActionMenu(
+        menuType = MenuType.CustomAction(),
         uiStateHolder = MenuPreviewUiStateHolder(usualMenuPreviewUiState),
     )
 }
 
 @Preview
 @Composable
-private fun KeyboardMenuAddNewPreview() {
-    KeyboardMenu(
-        menuType = MenuType.Keyboard(
-            isLoading = false,
-            mode = KeyboardMode.ADD_NEW,
-        ),
+private fun CustomActionMenuRecordingPreview() {
+    CustomActionMenu(
+        menuType = MenuType.CustomAction(recording = true),
         uiStateHolder = MenuPreviewUiStateHolder(usualMenuPreviewUiState),
     )
 }

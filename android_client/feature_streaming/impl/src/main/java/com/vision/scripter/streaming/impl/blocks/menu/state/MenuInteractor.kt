@@ -1,7 +1,6 @@
 package com.vision.scripter.streaming.impl.blocks.menu.state
 
 import com.vision.scripter.coroutines.api.CoroutineScopeFactory
-import com.vision.scripter.data.api.models.Parameter
 import com.vision.scripter.data.api.models.adjustToServer
 import com.vision.scripter.streaming.impl.blocks.menu.ui.MenuUiCommand
 import com.vision.scripter.streaming.impl.blocks.menu.ui.MenuUiState
@@ -14,11 +13,7 @@ import com.vision.scripter.streaming.impl.screen.StreamingEvent
 import com.vision.scripter.streaming.impl.screen.StreamingEventsHolder
 import com.vision.scripter.streaming.impl.screen.state.CVMode
 import com.vision.scripter.streaming.impl.screen.state.KeyboardMode
-import com.vision.scripter.streaming.impl.screen.state.TEMPLATE
-import com.vision.scripter.streaming.impl.screen.state.TEXT
-import com.vision.scripter.streaming.impl.screen.state.YOLO_CLASS
 import com.vision.scripter.streaming.impl.screen.state.increment
-import com.vision.scripter.streaming.impl.screen.state.toType
 import com.vision.scripter.streaming.impl.screen.state.toggleDetection
 import com.vision.scripter.ui.CommandFlow
 import dagger.hilt.android.scopes.ViewModelScoped
@@ -85,8 +80,8 @@ class MenuInteractor @Inject constructor(
         recordRepository.observeRecord().onEach { record ->
             _menuState.update {
                 val type = it.type
-                if (type !is MenuType.Recording) return@update it
-                it.copy(type = type.copy(controlRecording = record.controlRecording))
+                if (type !is MenuType.CustomAction) return@update it
+                it.copy(type = type.copy(recording = record.recording))
             }
         }.launchIn(coroutineScope)
 
@@ -95,12 +90,24 @@ class MenuInteractor @Inject constructor(
         }.launchIn(coroutineScope)
     }
 
-    override fun onScriptModeClicked() {
-        _dialogState.update { DialogState.Record }
+    override fun onAddClicked() {
+        _dialogState.update { DialogState.AddItem }
     }
 
-    override fun onTimeoutClicked() {
-        _dialogState.update { DialogState.Timeout }
+    override fun onAddItemConfirmed(name: String, isImage: Boolean) {
+        hideDialog()
+        val trimmedName = name.trim()
+        if (trimmedName.isEmpty()) return
+
+        if (isImage) {
+            recordRepository.startImage(trimmedName)
+            updateMenuType(MenuType.SelectingCV(localCvMode = CVMode.CV_RECTS))
+            switchCvMode(CVMode.CV_RECTS)
+            return
+        }
+
+        recordRepository.startAction(trimmedName)
+        updateMenuType(MenuType.CustomAction())
     }
 
     override fun onKeyboardClicked() {
@@ -116,27 +123,22 @@ class MenuInteractor @Inject constructor(
 
     override fun onRecordingClicked() {
         val state = _menuState.value
-        if (state.type !is MenuType.Recording) return
-        recordRepository.switchControlRecording()
+        if (state.type !is MenuType.CustomAction) return
+        recordRepository.switchRecording()
     }
 
     override fun onCvModeClicked() {
         when (val type = _menuState.value.type) {
-            is MenuType.Recording -> {
-                updateMenuType(MenuType.SelectingCV(localCvMode = CVMode.CV_RECTS))
-                nextCvMode(cvMode = CVMode.CV_RECTS, recording = true)
-            }
-
             is MenuType.SelectingCV -> {
                 val cvMode = type.localCvMode.toggleDetection()
                 updateMenuType(type.copy(localCvMode = cvMode))
-                nextCvMode(cvMode = cvMode, recording = true)
+                switchCvMode(cvMode)
             }
 
             is MenuType.Usual -> {
                 val newCvMode = type.localCvMode.increment()
                 updateMenuType(type.copy(localCvMode = newCvMode))
-                nextCvMode(cvMode = newCvMode, recording = false)
+                switchCvMode(newCvMode)
             }
 
             else -> {}
@@ -145,9 +147,10 @@ class MenuInteractor @Inject constructor(
 
     override fun onTextModeClicked() {
         val type = _menuState.value.type
-        if (type is MenuType.Usual && type.textHighlighted) {
+        if (type !is MenuType.Usual) return
+        if (type.textHighlighted) {
             updateMenuType(type.copy(textHighlighted = false))
-            nextCvMode(cvMode = CVMode.NO_CV, recording = false)
+            switchCvMode(CVMode.NO_CV)
             return
         }
         _dialogState.update { DialogState.Text }
@@ -156,16 +159,9 @@ class MenuInteractor @Inject constructor(
     override fun onTryToFindText(text: String, locale: String) {
         hideDialog()
         findText(text = text.trim(), locale = locale)
-        when (val type = _menuState.value.type) {
-            is MenuType.Recording -> {
-                updateMenuType(MenuType.SelectingText)
-            }
-
-            is MenuType.Usual -> {
-                updateMenuType(type.copy(localCvMode = CVMode.NO_CV, textHighlighted = true))
-            }
-
-            else -> {}
+        val type = _menuState.value.type
+        if (type is MenuType.Usual) {
+            updateMenuType(type.copy(localCvMode = CVMode.NO_CV, textHighlighted = true))
         }
     }
 
@@ -186,47 +182,22 @@ class MenuInteractor @Inject constructor(
     }
 
     override fun onSaveClicked() {
-        val type = _menuState.value.type
-        when (type) {
-            is MenuType.Keyboard -> exitKeyboard(type)
-
-            is MenuType.SelectingText, is MenuType.SelectingCV -> {
-                updateMenuType(MenuType.Recording())
-            }
-
-            is MenuType.Recording -> {
-                updateMenuType(MenuType.Usual(expanded = true))
-            }
-
+        when (_menuState.value.type) {
+            is MenuType.Keyboard -> exitKeyboard()
+            is MenuType.SelectingCV -> saveImage()
+            is MenuType.CustomAction -> saveAction()
             else -> Unit
-        }
-
-        coroutineScope.launch {
-            when (type) {
-                is MenuType.Keyboard -> saveTypedText()
-                is MenuType.SelectingText, is MenuType.SelectingCV -> saveParameter()
-                is MenuType.Recording -> saveScript()
-                else -> Unit
-            }
         }
     }
 
     override fun onCancelClicked() {
-        when (val type = _menuState.value.type) {
-            is MenuType.Recording -> {
-                updateMenuType(MenuType.Usual(expanded = true))
-            }
-
-            is MenuType.Keyboard -> exitKeyboard(type)
-
-            else -> {
-                updateMenuType(MenuType.Recording())
-            }
+        when (_menuState.value.type) {
+            is MenuType.Keyboard -> exitKeyboard()
+            else -> updateMenuType(MenuType.Usual(expanded = true))
         }
 
         coroutineScope.launch {
-            val tmpParam = recordRepository.observeRecord().value.tmpParam
-            recordRepository.clear(saveName = tmpParam != null)
+            recordRepository.clear()
             dropState()
         }
     }
@@ -235,29 +206,10 @@ class MenuInteractor @Inject constructor(
         uiCommandsFlow.tryEmit(MenuUiCommand.ExitCommand)
     }
 
-    override fun onTimeoutSaved(timeout: Int) {
-        hideDialog()
-        val type = _menuState.value.type
-        if (type is MenuType.Recording) {
-            updateMenuType(type.copy(recordTimeout = timeout))
-        }
-        recordRepository.updateTimeout(timeout)
-    }
-
-    override fun onSavedRecordName(name: String) {
-        hideDialog()
-        updateMenuType(MenuType.Recording())
-        recordRepository.updateName(name)
-    }
-
     override fun onSaveLocale(locale: String) {
         hideDialog()
-        val updated = when (_menuState.value.type) {
-            is MenuType.Recording -> MenuType.Keyboard(mode = KeyboardMode.TYPING)
-            is MenuType.Usual -> MenuType.Keyboard(fromUsual = true, mode = KeyboardMode.TYPING)
-            else -> return
-        }
-        updateMenuType(updated)
+        if (_menuState.value.type !is MenuType.Usual) return
+        updateMenuType(MenuType.Keyboard(mode = KeyboardMode.EDIT))
         openKeyboard(locale)
     }
 
@@ -265,14 +217,55 @@ class MenuInteractor @Inject constructor(
         hideDialog()
     }
 
-    private fun nextCvMode(cvMode: CVMode, recording: Boolean) {
+    private fun saveImage() {
+        updateMenuType(MenuType.Usual(expanded = true))
         coroutineScope.launch {
-            if (recording) {
-                val type = cvMode.toType()
-                if (type.isNotEmpty()) {
-                    recordRepository.updateTmpParam(Parameter(type = type))
-                }
+            val screenSizes = videoRepository.observeScreenSizes().value
+            val selected = cvRepository.observeSelectedRectangles().value.firstOrNull()
+            if (screenSizes == null || selected == null) {
+                recordRepository.clear()
+                dropState()
+                return@launch
             }
+
+            val saved = recordRepository.saveImage(
+                serial = serial,
+                rectangle = selected.adjustToServer(screenSizes),
+            )
+            notifySaved(saved)
+            recordRepository.clear()
+            dropState()
+        }
+    }
+
+    private fun saveAction() {
+        updateMenuType(MenuType.Usual(expanded = true))
+        coroutineScope.launch {
+            val screenSizes = videoRepository.observeScreenSizes().value
+            val events = recordRepository.observeRecord().value.events
+            if (screenSizes == null || events.isEmpty()) {
+                recordRepository.clear()
+                dropState()
+                return@launch
+            }
+
+            val saved = recordRepository.saveAction(screenSizes)
+            notifySaved(saved)
+            recordRepository.clear()
+            dropState()
+        }
+    }
+
+    private fun notifySaved(saved: Boolean) {
+        if (saved) {
+            eventRepository.sendEvent(StreamingEvent.ShowItemSavedSnackbar)
+            return
+        }
+        eventRepository.sendEvent(StreamingEvent.ShowNetworkError)
+    }
+
+    private fun switchCvMode(cvMode: CVMode) {
+        coroutineScope.launch {
             if (cvMode == CVMode.NO_CV) {
                 cvRepository.restoreSelectedRectangles()
             } else {
@@ -293,11 +286,7 @@ class MenuInteractor @Inject constructor(
             )
             if (!found) {
                 eventRepository.sendEvent(StreamingEvent.ShowNetworkError)
-                return@launch
             }
-            recordRepository.updateTmpParam(
-                Parameter(type = TEXT, value = text, locale = locale),
-            )
         }
     }
 
@@ -351,66 +340,6 @@ class MenuInteractor @Inject constructor(
         if (!loaded) eventRepository.sendEvent(StreamingEvent.ShowNetworkError)
     }
 
-    private suspend fun saveTypedText() {
-        val param = keyboardRepository.extractParameter()
-        if (param == null) {
-            recordRepository.clear()
-            dropState()
-            return
-        }
-        addParam(param)
-    }
-
-    private suspend fun saveParameter() {
-        val record = recordRepository.observeRecord().value
-        val parameter = record.tmpParam
-        if (parameter == null) {
-            saveScript()
-            return
-        }
-
-        if (parameter.type == TEMPLATE) {
-            val screenSizes = videoRepository.observeScreenSizes().value ?: return
-            cvRepository.nextCvMode(CVMode.NO_CV)
-            val templateName = "${record.params.size + 1}"
-            cvRepository.saveSelectedRectangle(
-                serial = serial,
-                location = record.location,
-                name = record.name,
-                value = templateName,
-                screenSizes = screenSizes,
-            )
-            addParam(parameter.copy(value = templateName))
-            return
-        }
-
-        if (parameter.type == YOLO_CLASS) {
-            val label =
-                cvRepository.observeSelectedRectangles().value.firstOrNull()?.label.orEmpty()
-            cvRepository.nextCvMode(CVMode.NO_CV)
-            addParam(parameter.copy(value = label))
-            return
-        }
-
-        if (parameter.value.isNotEmpty()) {
-            addParam(parameter)
-        }
-    }
-
-    private suspend fun saveScript() {
-        val success = recordRepository.saveScript()
-        if (!success) return
-
-        eventRepository.sendEvent(StreamingEvent.ShowScriptSavedSnackbar)
-        recordRepository.clear()
-        dropState()
-    }
-
-    private suspend fun addParam(param: Parameter) {
-        recordRepository.addParam(param)
-        dropState()
-    }
-
     private suspend fun dropState() {
         cvRepository.clearSelectedRectangles()
         cvRepository.nextCvMode(CVMode.NO_CV)
@@ -424,17 +353,16 @@ class MenuInteractor @Inject constructor(
         }
     }
 
-    private fun exitKeyboard(type: MenuType.Keyboard) {
-        if (type.fromUsual) {
-            updateMenuType(MenuType.Usual(expanded = true))
-            return
+    private fun exitKeyboard() {
+        updateMenuType(MenuType.Usual(expanded = true))
+        coroutineScope.launch {
+            dropState()
         }
-        updateMenuType(MenuType.Recording())
     }
 
     private fun onEditKeyboardRectangleSelected(oldKey: String) {
         val type = _menuState.value.type
-        if (type is MenuType.Keyboard && type.mode != KeyboardMode.TYPING) {
+        if (type is MenuType.Keyboard) {
             _dialogState.update { DialogState.EditKeyboard(oldKey) }
         }
     }

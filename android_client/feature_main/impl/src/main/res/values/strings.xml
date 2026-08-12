@@ -2,15 +2,13 @@
     <string name="devices_not_found">Devices not found</string>
 
     <string name="home">Home</string>
-    <string name="scripts">Scripts</string>
+    <string name="images">Images</string>
+    <string name="custom_events">Custom events</string>
     <string name="streaming">Streaming</string>
 
-    <string name="script_delete_dialog_title">Confirmation</string>
-    <string name="script_delete_dialog_text">Delete script %1s?</string>
-    <string name="location_delete_dialog_text">Delete location %1s and all its scripts?</string>
-
-    <string name="select_device_title">Select a device</string>
-    <string name="run">Run</string>
+    <string name="delete_dialog_title">Confirmation</string>
+    <string name="image_delete_dialog_text">Delete image %1s?</string>
+    <string name="action_delete_dialog_text">Delete custom action %1s?</string>
 
     <string name="serial_key">Serial</string>
     <string name="brand_key">Brand</string>

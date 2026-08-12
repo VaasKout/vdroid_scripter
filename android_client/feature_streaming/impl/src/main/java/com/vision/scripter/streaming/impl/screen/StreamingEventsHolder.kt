@@ -16,6 +16,6 @@ class StreamingEventsHolder @Inject constructor() {
 
 sealed interface StreamingEvent {
     data object ShowNetworkError : StreamingEvent
-    data object ShowScriptSavedSnackbar : StreamingEvent
+    data object ShowItemSavedSnackbar : StreamingEvent
     data object SuccessLoading : StreamingEvent
 }

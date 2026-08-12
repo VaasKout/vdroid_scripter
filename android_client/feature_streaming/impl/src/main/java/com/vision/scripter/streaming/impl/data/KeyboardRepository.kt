@@ -2,10 +2,8 @@ package com.vision.scripter.streaming.impl.data
 
 import android.view.MotionEvent
 import android.view.MotionEvent.ACTION_DOWN
-import android.view.MotionEvent.ACTION_UP
 import com.vision.scripter.data.api.ScripterDataSource
 import com.vision.scripter.data.api.models.CvRectangle
-import com.vision.scripter.data.api.models.Parameter
 import com.vision.scripter.data.api.models.RectangleWithText
 import com.vision.scripter.data.api.models.ScreenSizes
 import com.vision.scripter.data.api.models.adjustToClient
@@ -13,8 +11,6 @@ import com.vision.scripter.data.api.models.contains
 import com.vision.scripter.network.api.ApiResponse
 import com.vision.scripter.streaming.impl.di.StreamingScope
 import com.vision.scripter.streaming.impl.screen.state.KeyboardMode
-import com.vision.scripter.streaming.impl.screen.state.SPACE_KEY
-import com.vision.scripter.streaming.impl.screen.state.TYPE_TEXT
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -65,32 +61,16 @@ class KeyboardRepository @Inject constructor(
         return false
     }
 
-    fun handleTouchEvent(
-        event: MotionEvent,
-        recordName: String,
-    ): String? {
+    fun handleTouchEvent(event: MotionEvent): String? {
         val state = currentState
-        if (state.buttons.isNotEmpty()) {
-            when (state.mode) {
-                KeyboardMode.TYPING -> {
-                    if (event.action != ACTION_UP || recordName.isEmpty()) return null
-                    recordLetters(event.x.toInt(), event.y.toInt())
-                }
+        if (state.buttons.isEmpty()) return null
 
-                KeyboardMode.EDIT -> {
-                    val newButton = selectKeyboardKey(event)
-                    if (newButton != null) _selectedButtonFlow.tryEmit(newButton)
-                    return newButton
-                }
-
-                KeyboardMode.ADD_NEW -> {
-                    val newButton = selectNewKeyboardRect(event)
-                    if (newButton != null) _selectedButtonFlow.tryEmit(newButton)
-                    return newButton
-                }
-            }
+        val newButton = when (state.mode) {
+            KeyboardMode.EDIT -> selectKeyboardKey(event)
+            KeyboardMode.ADD_NEW -> selectNewKeyboardRect(event)
         }
-        return null
+        if (newButton != null) _selectedButtonFlow.tryEmit(newButton)
+        return newButton
     }
 
     private fun setupKeyboardRects(
@@ -144,24 +124,6 @@ class KeyboardRepository @Inject constructor(
         )
     }
 
-    fun recordLetters(x: Int, y: Int) {
-        val state = currentState
-        if (state.locale.isEmpty()) return
-        val letter = state.buttons.firstOrNull {
-            it.contains(x = x, y = y)
-        }?.text ?: return
-        if (letter.isEmpty()) return
-
-        val updatedText = buildString {
-            append(state.typedText)
-            if (letter == SPACE_KEY) append(" ")
-            else append(letter)
-        }
-        _stateFlow.update {
-            it.copy(typedText = updatedText)
-        }
-    }
-
     fun selectKeyboardKey(event: MotionEvent): String? {
         if (event.action != ACTION_DOWN) return null
         val button = currentState.buttons.firstOrNull {
@@ -177,21 +139,12 @@ class KeyboardRepository @Inject constructor(
         return ""
     }
 
-    fun extractParameter(): Parameter? {
-        if (currentState.locale.isEmpty() || currentState.typedText.isEmpty()) return null
-        return Parameter(
-            type = TYPE_TEXT,
-            value = currentState.typedText,
-            locale = currentState.locale,
-        )
-    }
-
     fun clear() {
         _stateFlow.update {
             it.copy(
                 locale = "",
                 buttons = listOf(),
-                typedText = "",
+                mode = KeyboardMode.EDIT,
             )
         }
     }
@@ -202,6 +155,5 @@ data class Keyboard(
     val screenSizes: ScreenSizes? = null,
     val locale: String = "",
     val buttons: List<RectangleWithText> = listOf(),
-    val mode: KeyboardMode = KeyboardMode.TYPING,
-    val typedText: String = "",
+    val mode: KeyboardMode = KeyboardMode.EDIT,
 )

@@ -5,12 +5,12 @@ import com.vision.scripter.data.api.models.AdbDevice
 import com.vision.scripter.data.api.models.AdbDevicesResponse
 import com.vision.scripter.data.api.models.CvRectangle
 import com.vision.scripter.data.api.models.EditKeyboardRequest
-import com.vision.scripter.data.api.models.EditScriptRequest
+import com.vision.scripter.data.api.models.Event
 import com.vision.scripter.data.api.models.KeyboardButtons
+import com.vision.scripter.data.api.models.Library
 import com.vision.scripter.data.api.models.RectangleWithText
-import com.vision.scripter.data.api.models.RunScriptsRequest
-import com.vision.scripter.data.api.models.SaveRectRequest
-import com.vision.scripter.data.api.models.Script
+import com.vision.scripter.data.api.models.SaveActionRequest
+import com.vision.scripter.data.api.models.SaveImageRequest
 import com.vision.scripter.data.api.models.StreamingData
 import com.vision.scripter.data.api.models.isEmpty
 import com.vision.scripter.network.api.ApiResponse
@@ -70,38 +70,62 @@ class ScripterDataSourceImpl @Inject constructor(
         }
     }
 
-    override suspend fun saveScript(script: Script): Boolean {
-        if (script.location.isEmpty() || script.name.isEmpty() || script.isEmpty()) return false
-        val body = Json.encodeToString(script)
-        val result = networkClient.post("save_script", body)
-        return result is ApiResponse.Success
+    override suspend fun getLibrary(): ApiResponse<Library> {
+        return when (val result = networkClient.get("library")) {
+            is ApiResponse.Success -> {
+                val json = result.data
+                val library = if (json.isEmpty()) Library()
+                else Json.decodeFromString<Library>(result.data)
+                ApiResponse.Success(library)
+            }
+
+            is ApiResponse.Error -> result
+        }
     }
 
-    override suspend fun editScript(script: Script, prevLocation: String): Boolean {
-        if (script.isEmpty()) return false
-        val request = EditScriptRequest(prevLocation = prevLocation, script = script)
-        val body = Json.encodeToString(request)
-        val result = networkClient.post("edit_script", body)
-        return result is ApiResponse.Success
-    }
-
-    override suspend fun saveRect(
+    override suspend fun saveImage(
         serial: String,
-        location: String,
         name: String,
-        value: String,
         rectangle: CvRectangle?,
     ): Boolean {
-        if (rectangle.isEmpty()) return false
-        val saveRectRequest = SaveRectRequest(
+        if (serial.isEmpty() || name.isEmpty() || rectangle.isEmpty()) return false
+        val request = SaveImageRequest(
             serial = serial,
-            location = location,
             name = name,
-            value = value,
             rectangle = rectangle,
         )
-        val body = Json.encodeToString(saveRectRequest)
-        val result = networkClient.post("save_rectangle", body)
+        val body = Json.encodeToString(request)
+        val result = networkClient.post("save_image", body)
+        return result is ApiResponse.Success
+    }
+
+    override suspend fun saveAction(
+        name: String,
+        screenWidth: Int,
+        screenHeight: Int,
+        events: List<Event>,
+    ): Boolean {
+        if (name.isEmpty() || events.isEmpty()) return false
+        val request = SaveActionRequest(
+            name = name,
+            screenWidth = screenWidth,
+            screenHeight = screenHeight,
+            events = events,
+        )
+        val body = Json.encodeToString(request)
+        val result = networkClient.post("save_action", body)
+        return result is ApiResponse.Success
+    }
+
+    override suspend fun deleteImage(name: String): Boolean {
+        if (name.isEmpty()) return false
+        val result = networkClient.delete("images/$name")
+        return result is ApiResponse.Success
+    }
+
+    override suspend fun deleteAction(name: String): Boolean {
+        if (name.isEmpty()) return false
+        val result = networkClient.delete("actions/$name")
         return result is ApiResponse.Success
     }
 
@@ -122,70 +146,6 @@ class ScripterDataSourceImpl @Inject constructor(
 
             is ApiResponse.Error -> result
         }
-    }
-
-    override suspend fun getLocations(): ApiResponse<List<String>> {
-        return when (val result = networkClient.get("locations")) {
-            is ApiResponse.Success -> {
-                val json = result.data
-                val locations = if (json.isEmpty()) listOf()
-                else Json.decodeFromString<List<String>>(result.data)
-                ApiResponse.Success(locations)
-            }
-
-            is ApiResponse.Error -> result
-        }
-    }
-
-    override suspend fun getLocationScripts(location: String): ApiResponse<List<String>> {
-        return when (val result = networkClient.get("locations/$location")) {
-            is ApiResponse.Success -> {
-                val json = result.data
-                val scripts = if (json.isEmpty()) listOf()
-                else Json.decodeFromString<List<String>>(result.data)
-                ApiResponse.Success(scripts)
-            }
-
-            is ApiResponse.Error -> result
-        }
-    }
-
-    override suspend fun getScriptInfo(location: String, name: String): ApiResponse<Script> {
-        return when (val result = networkClient.get("locations/$location/$name")) {
-            is ApiResponse.Success -> {
-                val json = result.data
-                val script = if (json.isEmpty()) Script()
-                else Json.decodeFromString<Script>(result.data)
-                ApiResponse.Success(script)
-            }
-
-            is ApiResponse.Error -> result
-        }
-    }
-
-    override suspend fun deleteLocation(location: String): Boolean {
-        return when (val result = networkClient.delete("locations/$location")) {
-            is ApiResponse.Success -> result.data.isNotEmpty()
-            is ApiResponse.Error -> false
-        }
-    }
-
-    override suspend fun deleteScript(location: String, name: String): Boolean {
-        return when (val result = networkClient.delete("locations/$location/$name")) {
-            is ApiResponse.Success -> result.data.isNotEmpty()
-            is ApiResponse.Error -> false
-        }
-    }
-
-    override suspend fun runScripts(
-        serial: String,
-        scripts: List<RunScriptsRequest.ScriptRef>,
-    ): Boolean {
-        if (serial.isEmpty() || scripts.isEmpty()) return false
-        val request = RunScriptsRequest(serial = serial, scripts = scripts)
-        val body = Json.encodeToString(request)
-        val result = networkClient.post("run_scripts", body)
-        return result is ApiResponse.Success
     }
 
     override suspend fun resetKeyboard(

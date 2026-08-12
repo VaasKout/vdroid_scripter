@@ -13,12 +13,11 @@ import com.vision.scripter.streaming.impl.blocks.video.ui.VideoUiState
 import com.vision.scripter.streaming.impl.blocks.video.ui.VideoUiStateHolder
 import com.vision.scripter.streaming.impl.data.CvStreamerRepository
 import com.vision.scripter.streaming.impl.data.KeyboardRepository
+import com.vision.scripter.streaming.impl.data.PendingItem
 import com.vision.scripter.streaming.impl.data.RecordRepository
 import com.vision.scripter.streaming.impl.data.VideoStreamerRepository
 import com.vision.scripter.streaming.impl.screen.StreamingEvent
 import com.vision.scripter.streaming.impl.screen.StreamingEventsHolder
-import com.vision.scripter.streaming.impl.screen.state.TEMPLATE
-import com.vision.scripter.streaming.impl.screen.state.YOLO_CLASS
 import dagger.hilt.android.scopes.ViewModelScoped
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -183,23 +182,18 @@ class VideoInteractor @Inject constructor(
         if (event == null) return
         val screenSizes = currentState.screenSizes ?: return
         val record = currentState.record
-        val tmpParam = record.tmpParam
 
         coroutineScope.launch {
             touchMutex.withLock {
                 try {
-                    if (tmpParam?.type == TEMPLATE || tmpParam?.type == YOLO_CLASS) {
+                    if (record.pending == PendingItem.IMAGE) {
                         if (event.action == ACTION_DOWN) {
                             cvRepository.selectRectangle(x = event.x.toInt(), y = event.y.toInt())
                         }
                         return@launch
                     }
 
-                    val newButton = keyboardRepository.handleTouchEvent(
-                        event,
-                        record.name,
-                    )
-
+                    val newButton = keyboardRepository.handleTouchEvent(event)
                     if (newButton != null) return@launch
 
                     val bytesArray = controlStreamer.sendControlData(

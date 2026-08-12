@@ -79,5 +79,4 @@ dependencies {
     implementation(project(":data:api"))
     implementation(project(":feature_main:api"))
     implementation(project(":feature_streaming:api"))
-    implementation(project(":feature_edit_script:api"))
 }

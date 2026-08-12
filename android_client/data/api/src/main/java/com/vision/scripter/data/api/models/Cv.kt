@@ -4,20 +4,6 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 @Serializable
-data class SaveRectRequest(
-    @SerialName("serial")
-    val serial: String,
-    @SerialName("location")
-    val location: String,
-    @SerialName("name")
-    val name: String,
-    @SerialName("value")
-    val value: String,
-    @SerialName("rectangle")
-    val rectangle: CvRectangle?,
-)
-
-@Serializable
 data class EditKeyboardRequest(
     @SerialName("serial")
     val serial: String,
