@@ -19,7 +19,6 @@ import (
 const (
 	SerialKey = "serial"
 	NameKey   = "name"
-	LocationKey = "location"
 )
 
 // Multipart consts
@@ -53,7 +52,7 @@ func New(
 
 func (s *serverImpl) ListenAndServe() {
 	s.handleDeviceFunctions()
-	s.handleScriptsFunctions()
+	s.handleStepsFunctions()
 	s.handleKeyboardFunctions()
 	s.handleSessionFunctions()
 	s.handleLibraryFunctions()

@@ -11,11 +11,6 @@ const (
 	TesseractDir  = "tesseract"
 )
 
-// Script JSONs
-const (
-	RunJSON = "run.json"
-)
-
 // FilesDB ...
 type FilesDB interface {
 	Create

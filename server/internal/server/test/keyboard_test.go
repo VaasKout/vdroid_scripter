@@ -17,68 +17,6 @@ const (
 	DeleteButtonPath  = LocalURL + server.DeleteButton
 )
 
-// to get screen size use adb -s SERIAL shell wm size
-var testTapEvent = []models.Event{
-	models.Event{
-		Time: 0,
-		Data: models.ControlBytes{
-			2,                                      // TYPE_INJECT_TOUCH_EVENT
-			0,                                      // MotionEvent ACTION_DOWN
-			255, 255, 255, 255, 255, 255, 255, 254, // POINTER_ID
-			0, 0, 0, 0, // X - empty will be init later
-			0, 0, 0, 0, // Y - empty will be init later
-			4, 56, // remote width 1080
-			9, 104, // remote height 2408
-			0, 1, // pressure
-			0, 0, 0, 0,
-			0, 0, 0, 0,
-		},
-	},
-	models.Event{
-		Time: 51,
-		Data: models.ControlBytes{
-			2,                                      // TYPE_INJECT_TOUCH_EVENT
-			1,                                      // MotionEvent ACTION_UP
-			255, 255, 255, 255, 255, 255, 255, 254, // POINTER_ID
-			0, 0, 0, 0, // X - empty will be init later
-			0, 0, 0, 0, // Y - empty will be init later
-			4, 56, // remote width 1080
-			9, 104, // remote height 2408
-			0, 1, // pressure
-			0, 0, 0, 0,
-			0, 0, 0, 0,
-		},
-	},
-}
-
-func TestSaveDefaultKeyboardScript(t *testing.T) {
-	var body = models.Script{
-		Name:     TestScript,
-		Location: "main_screen",
-		Params: []models.Parameter{
-			{
-				Type:  models.Text,
-				Value: "hello",
-			},
-		},
-		Events: testTapEvent,
-	}
-
-	bytes, err := json.Marshal(body)
-	if err != nil {
-		t.Fatal(err)
-	}
-	var data = ""
-
-	makeHTTPRequest(
-		SaveScriptPath,
-		http.MethodPost,
-		bytes,
-		&data,
-	)
-	t.Log(data)
-}
-
 func TestGetKeyboard(t *testing.T) {
 	var data = ""
 	var serialPath = fmt.Sprintf("{%s}", server.SerialKey)

@@ -3,7 +3,6 @@ package usecases
 import (
 	"android_vision_scripter/pkg/models"
 	"fmt"
-	"strings"
 	"time"
 )
 
@@ -108,12 +107,12 @@ func (i *interactorImpl) GetSessionStatus(serial string) string {
 	return session.Status
 }
 
-func (i *interactorImpl) addScriptsToQueue(serial string, entries []string) {
+func (i *interactorImpl) addStepsToQueue(serial string, steps []models.Step) {
 	session, ok := i.sessionsCache.Get(serial)
 	if !ok {
 		return
 	}
-	session.Query = append(session.Query, entries...)
+	session.Query = append(session.Query, steps...)
 	i.sessionsCache.Add(serial, session)
 }
 
@@ -135,37 +134,17 @@ func (i *interactorImpl) runSessionQueue(serial string) {
 			continue
 		}
 
-		var entry = session.Query[0]
-		location, name, _ := strings.Cut(entry, "/")
-
+		var step = session.Query[0]
 		session.Query = session.Query[1:]
-		session.Status = fmt.Sprintf(models.StatusRunning, name, location)
+		session.Status = fmt.Sprintf(models.StatusRunningStep, step.Describe())
 		i.sessionsCache.Add(serial, session)
 
-		err := i.runQueuedScript(serial, location, name)
-		i.finishQueuedScript(serial, err)
+		err := i.executeStep(serial, &step)
+		i.finishQueuedStep(serial, err)
 	}
 }
 
-func (i *interactorImpl) runQueuedScript(
-	serial string,
-	location string,
-	name string,
-) error {
-	path := i.getScriptRunner(location, name)
-	if path == "" {
-		return fmt.Errorf("script not found %s/%s", location, name)
-	}
-
-	script := i.getScriptFromFile(path)
-	if script == nil || script.Name == "" {
-		return fmt.Errorf("script is empty %s/%s", location, name)
-	}
-
-	return i.executeScript(serial, script)
-}
-
-func (i *interactorImpl) finishQueuedScript(serial string, err error) {
+func (i *interactorImpl) finishQueuedStep(serial string, err error) {
 	session, ok := i.sessionsCache.Get(serial)
 	if !ok {
 		return
@@ -174,7 +153,7 @@ func (i *interactorImpl) finishQueuedScript(serial string, err error) {
 	if err != nil {
 		i.logger.Error(err.Error())
 		session.Status = err.Error()
-		session.Query = []string{}
+		session.Query = []models.Step{}
 		i.sessionsCache.Add(serial, session)
 		return
 	}

@@ -57,15 +57,6 @@ func (f *filesDBImpl) FindFileByName(dir string, name string) string {
 	return ""
 }
 
-func (f *filesDBImpl) FindFileInScriptDir(fileName string) string {
-	var filePath = filepath.Join(f.filesProps.Scripts, fileName)
-	if ok := file.Exists(filePath); !ok {
-		return ""
-	}
-
-	return filePath
-}
-
 func (f *filesDBImpl) FindDirByName(dir string, name string) string {
 	dirs := f.GetDirs(dir, true)
 	for _, path := range dirs {

@@ -11,7 +11,6 @@ import (
 const (
 	BasePath       = "android_vision_scripter"
 	LogsDir        = "logs"
-	ScriptsDir     = "scripts"
 	KeyboardDir    = "keyboards"
 	ScrcpyDir      = "scrcpy"
 	YoloDir        = "yolo"
@@ -38,7 +37,6 @@ type ServerProps struct {
 // FilesProps ...
 type FilesProps struct {
 	Logs      string
-	Scripts   string
 	Keyboards string
 	Scrcpy    string
 	Yolo      string
@@ -82,11 +80,6 @@ func New() *Config {
 		logsDir = LogsDir
 	}
 
-	scriptsDir := os.Getenv("SCRIPTS_DIR")
-	if scriptsDir == "" {
-		scriptsDir = ScriptsDir
-	}
-
 	keyboardsDir := os.Getenv("KEYBOARDS_DIR")
 	if keyboardsDir == "" {
 		keyboardsDir = KeyboardDir
@@ -124,7 +117,6 @@ func New() *Config {
 		},
 		FilesProps: &FilesProps{
 			Logs:      filepath.Join(cachePath, logsDir),
-			Scripts:   filepath.Join(cachePath, scriptsDir),
 			Keyboards: filepath.Join(cachePath, keyboardsDir),
 			Scrcpy:    filepath.Join(cachePath, scrcpyDir),
 			Yolo:      filepath.Join(cachePath, yoloDir),

@@ -22,11 +22,12 @@ const (
 // Interactor ...
 type Interactor interface {
 	CmdUseCase
-	ScriptsUseCase
 	ScrcpyUseCase
 	KeyboardUseCase
 	SessionUseCase
 	LibraryUseCase
+	StepsUseCase
+	OcrUseCase
 }
 
 type interactorImpl struct {

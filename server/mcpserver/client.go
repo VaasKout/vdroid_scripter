@@ -1,8 +1,6 @@
 package main
 
 import (
-	"android_vision_scripter/pkg/models"
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -14,11 +12,6 @@ import (
 type apiClient struct {
 	baseURL string
 	client  *http.Client
-}
-
-type scriptRef struct {
-	Location string `json:"location"`
-	Name     string `json:"name"`
 }
 
 func newAPIClient(baseURL string) *apiClient {
@@ -56,57 +49,6 @@ func (c *apiClient) request(method string, path string, reqBody io.Reader) ([]by
 func (c *apiClient) getDevices() (string, error) {
 	body, err := c.request(http.MethodGet, "/devices", nil)
 	return string(body), err
-}
-
-func (c *apiClient) getLocations() ([]string, error) {
-	body, err := c.request(http.MethodGet, "/locations", nil)
-	if err != nil {
-		return nil, err
-	}
-	var locations []string
-	err = json.Unmarshal(body, &locations)
-	return locations, err
-}
-
-func (c *apiClient) getLocationScripts(location string) ([]string, error) {
-	body, err := c.request(http.MethodGet, "/locations/"+url.PathEscape(location), nil)
-	if err != nil {
-		return nil, err
-	}
-	var names []string
-	err = json.Unmarshal(body, &names)
-	return names, err
-}
-
-func (c *apiClient) getScript(location string, name string) (*models.Script, error) {
-	var path = fmt.Sprintf(
-		"/locations/%s/%s",
-		url.PathEscape(location),
-		url.PathEscape(name),
-	)
-	body, err := c.request(http.MethodGet, path, nil)
-	if err != nil {
-		return nil, err
-	}
-	var script = &models.Script{}
-	err = json.Unmarshal(body, script)
-	return script, err
-}
-
-func (c *apiClient) queueScripts(serial string, scripts []scriptRef) error {
-	var payload = struct {
-		Serial  string      `json:"serial"`
-		Scripts []scriptRef `json:"scripts"`
-	}{
-		Serial:  serial,
-		Scripts: scripts,
-	}
-	body, err := json.Marshal(payload)
-	if err != nil {
-		return err
-	}
-	_, err = c.request(http.MethodPost, "/run_scripts", bytes.NewReader(body))
-	return err
 }
 
 func (c *apiClient) openSession(serial string) (string, error) {

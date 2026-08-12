@@ -3,6 +3,9 @@ package usecases
 import (
 	"android_vision_scripter/pkg/core/file"
 	"android_vision_scripter/pkg/models"
+	"encoding/json"
+	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
@@ -128,6 +131,29 @@ func (i *interactorImpl) SaveAction(action *models.Action) bool {
 		i.logger.Error(err.Error())
 	}
 	return err == nil
+}
+
+func (i *interactorImpl) getAction(name string) (*models.Action, error) {
+	actionsDir := i.filesDB.CreateActionsDir()
+	if actionsDir == "" {
+		return nil, errors.New("actions dir not found")
+	}
+
+	actionPath := filepath.Join(actionsDir, strings.TrimSpace(name)+ActionExt)
+	bytes, err := os.ReadFile(actionPath)
+	if err != nil {
+		return nil, fmt.Errorf("action not found in library: %s", name)
+	}
+
+	var action = &models.Action{}
+	err = json.Unmarshal(bytes, action)
+	if err != nil {
+		return nil, err
+	}
+	if action.IsEmpty() {
+		return nil, fmt.Errorf("action is empty: %s", name)
+	}
+	return action, nil
 }
 
 func (i *interactorImpl) DeleteAction(name string) bool {

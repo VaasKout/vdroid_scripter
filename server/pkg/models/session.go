@@ -2,10 +2,10 @@ package models
 
 // Session statuses
 const (
-	StatusIdle    = "idle"
-	StatusClosed  = "closed"
-	StatusRunning = "running %s on %s"
-	StatusError   = "unable to find parameter %s with value %s in script %s"
+	StatusIdle        = "idle"
+	StatusClosed      = "closed"
+	StatusRunningStep = "running %s"
+	StatusError       = "unable to find %s %s on screen"
 )
 
 // Session ...
@@ -14,7 +14,7 @@ type Session struct {
 	VideoPort   int
 	CVPort      int
 	ControlPort int
-	Query       []string
+	Query       []Step
 	Status      string
 	DoneCh      chan struct{}
 }

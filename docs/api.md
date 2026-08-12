@@ -32,15 +32,7 @@ This document describes every HTTP endpoint exposed by the server, defined in
 | ------ | ---- | ----------- |
 | GET | `/ping` | Health check |
 | GET | `/devices` | List connected ADB devices |
-| GET | `/locations` | List location (screen) names |
-| GET | `/locations/{location}` | List script names saved under a location |
-| DELETE | `/locations/{location}` | Delete a location and all its scripts |
-| GET | `/locations/{location}/{name}` | Get a single script |
-| DELETE | `/locations/{location}/{name}` | Delete a script |
-| POST | `/run_scripts` | Queue one or more scripts to run in order on a device |
-| POST | `/save_rectangle` | Crop and save a template image from the device screen |
-| POST | `/save_script` | Create or replace a script |
-| POST | `/edit_script` | Update a script, moving its files if the location changed |
+| POST | `/run_steps` | Queue one or more steps to run in order on a device |
 | GET | `/devices/{serial}/find_text` | OCR: locate text on the current screen |
 | GET | `/library` | List image and action names in the library |
 | POST | `/save_image` | Crop and save a named template image into the library |
@@ -87,169 +79,49 @@ Returns all ADB devices currently visible to the server.
   ```
   `devices` is `[]` when none are connected.
 
-## Locations & Scripts
+## Steps
 
-Scripts are organised into **locations** — a location is a screen, and the scripts under
-it are the interactions recorded on that screen. A script is identified by its
-`location` + `name` pair. On disk it lives at `locations/<location>/<name>/run.json`, with
-template images stored next to it as `<param.value>.png`.
+A **step** is the unit of execution: an action applied to an optional CV-located
+target. Steps compose the [library](#library) at runtime — targets locate a
+region on the live screen (a library image, OCR text, or a YOLO class) and
+actions act on it (generated taps, CV keyboard typing, or a recorded gesture
+from the library).
 
-Locations and scripts are stored server-wide: listing, fetching, and deleting are
-device-independent. Only running a script targets a specific device.
+| `action` | with `target` | without `target` |
+| -------- | ------------- | ---------------- |
+| `check` | visibility assertion only, no touch | invalid |
+| `tap` / `long_tap` | generated tap pair placed at a random point inside the found region | invalid |
+| `type_text` | target is checked first, then `text` is typed via the CV keyboard | `text` is typed via the CV keyboard |
+| a library action name | recorded gesture replayed **anchored**: the first touch is moved into the found region, all events keep their relative shape | recorded gesture replayed **verbatim** |
 
-### `GET /locations`
+### `POST /run_steps`
 
-Lists the saved location (screen) names.
-
-- **Response `200`:** array of strings.
-  ```json
-  ["main_screen", "profile"]
-  ```
-- **Errors:** `500` on read failure.
-
-### `GET /locations/{location}`
-
-Lists the names of the scripts saved under a location.
-
-- **Path params:** `location` (required).
-- **Response `200`:** array of strings.
-  ```json
-  ["open_profile", "open_settings"]
-  ```
-- **Errors:** `500` on read failure.
-
-### `DELETE /locations/{location}`
-
-Deletes a whole location — its directory and every script inside it.
-
-- **Path params:** `location` (required).
-- **Response `200`:** `{ "status": "ok" }`
-- **Errors:** `400` if `location` is empty.
-
-### `GET /locations/{location}/{name}`
-
-Returns a single script.
-
-- **Path params:** `location`, `name` (both required).
-- **Response `200`:** a [`Script`](#script) object.
-- **Errors:** `400` if `location` is empty, `500` on read failure.
-
-### `DELETE /locations/{location}/{name}`
-
-Deletes a single script (its directory, including template images).
-
-- **Path params:** `location`, `name` (both required).
-- **Response `200`:** `{ "status": "ok" }`
-- **Errors:** `400` if `location` is empty.
-
-### `POST /run_scripts`
-
-Queues one or more scripts for execution on a device, in the given order. If
-the device has no active session, one is opened first. Every entry is validated
-up front (the script must exist and be non-empty) — one bad entry rejects the
-whole batch and nothing is queued. Entries are then appended to the session's
-queue as `location/name`; a per-session worker pops them one by one and
-executes them. Progress is observable via `GET /devices/{serial}/session`:
-`running <name> on <location>` while executing, `idle` when the queue drains,
-or an error text (e.g. `unable to find parameter <type> with value <value> in
-script <location>/<name>`) — a failure also clears the remaining queue.
-
-During execution the script's `params` are located on screen **in order** —
-each must be found before the script's `timeout` expires — progressively
-identifying the element to act on. The script's `events` are then replayed over
-the scrcpy control socket, offset to the **last** parameter's matched region. A
-`type_text` parameter instead types its `value` on the on-screen keyboard. If
-`params` is empty and `events` is not, the events are replayed exactly as
-recorded.
+Queues one or more steps to run in order on a device. If the device has no open
+session, one is opened automatically (scrcpy is started). All steps are
+validated up front — library images and actions referenced by the steps must
+exist — then appended to the session's queue. A per-session worker executes
+steps sequentially, updating the session status; a step failure sets the error
+status and clears the remaining queue.
 
 - **Request body:**
   ```json
   {
     "serial": "ABCD1234",
-    "scripts": [
-      { "location": "main_screen", "name": "open_profile" },
-      { "location": "profile", "name": "logout" }
+    "steps": [
+      { "action": "check", "target": { "type": "yolo", "value": "home" } },
+      { "action": "tap", "target": { "type": "image", "value": "x5_catalog_cart_icon" } },
+      { "action": "swipe_x5_catalog_1" },
+      { "action": "tap", "target": { "type": "text", "value": "Corn", "locale": "eng" }, "timeout": 10 },
+      { "action": "type_text", "text": "hello", "locale": "eng" }
     ]
   }
   ```
-  `serial` and a non-empty `scripts` array are required; every entry needs both
-  `location` and `name`.
-- **Response `200`:** `{ "status": "ok" }` — the scripts were queued, not yet run.
-- **Errors:** `400` on invalid JSON, empty `serial`, or an empty `scripts`
-  array; `500` if an entry is invalid, its script is empty/missing, or the
-  session could not be started.
-
-### `POST /save_rectangle`
-
-Takes a screenshot of the device, crops the given rectangle out of it, and
-saves it as `<value>.png` in the script's directory
-(`locations/<location>/<name>/`, created if missing). This is the template image
-that a `template` parameter with the same `value` is matched against.
-
-- **Request body:**
-  ```json
-  {
-    "serial": "ABCD1234",
-    "location": "main_screen",
-    "name": "open_profile",
-    "value": "login_button",
-    "rectangle": { "left_x": 100, "right_x": 300, "top_y": 200, "bottom_y": 260 }
-  }
-  ```
-  All fields are required; `rectangle` must be non-empty.
-- **Response `200`:** `{ "status": "ok" }`
-- **Errors:** `400` on invalid JSON or a missing field, `500` if the screenshot
-  or crop fails.
-
-### `POST /save_script`
-
-Creates a new script or replaces an existing one with the same `location` + `name`.
-The body is a whole [`Script`](#script) object.
-
-- **Request body:**
-  ```json
-  {
-    "name": "open_profile",
-    "location": "main_screen",
-    "next_location": ["profile"],
-    "params": [
-      { "type": "text", "value": "Profile" },
-      { "type": "template", "value": "" }
-    ],
-    "events": [ /* Event, see models */ ],
-    "timeout": 15
-  }
-  ```
-  `name` and `location` are required (both are trimmed). The body is stored as-is
-  to `locations/<location>/<name>/run.json`. `timeout` is optional (seconds to keep
-  locating a parameter's target before failing; values omitted or `<= 0` fall
-  back to `15` at run time). Template images referenced by `template`
-  parameters are saved separately via
-  [`POST /save_rectangle`](#post-save_rectangle).
-- **Response `200`:** `{ "status": "ok" }`
-- **Errors:** `400` on invalid JSON or empty `location`/`name`, `500` if not saved.
-
-### `POST /edit_script`
-
-Updates an existing script. Unlike [`POST /save_script`](#post-save_script),
-it also handles a location change: when `prev_location` differs from the
-script's `location`, the whole script directory — `run.json` plus its template
-PNGs — is moved from `locations/<prev_location>/<name>/` to
-`locations/<location>/<name>/` before the updated script is written.
-
-- **Request body:**
-  ```json
-  {
-    "prev_location": "main_screen",
-    "script": { /* Script, see models */ }
-  }
-  ```
-  `script.name` and `script.location` are required. `prev_location` is the
-  location the script is currently stored under; when it is empty or equal to
-  `script.location`, the endpoint behaves like `save_script`.
-- **Response `200`:** `{ "status": "ok" }`
-- **Errors:** `400` on invalid JSON or empty `script.location`/`script.name`,
-  `500` if the move or the save fails.
+  `serial` and a non-empty `steps` array are required; every entry must be a
+  valid [`Step`](#step).
+- **Response `200`:** `{ "status": "ok" }` — the steps were queued. Track
+  execution via [`GET /devices/{serial}/session`](#get-devicesserialsession).
+- **Errors:** `400` on invalid JSON or an invalid step, `500` when a referenced
+  library image/action does not exist or the session could not be started.
 
 ### `GET /devices/{serial}/find_text`
 
@@ -267,9 +139,9 @@ Takes a screenshot and runs OCR to locate matching text on the current screen.
 
 ## Library
 
-The library holds reusable, uniquely named building blocks that are independent
-of locations and scripts: **images** (template crops, stored as
-`images/<name>.png`) and **actions** (recorded gesture event streams, stored as
+The library holds the reusable, uniquely named building blocks that steps
+compose: **images** (template crops, stored as `images/<name>.png`) and
+**actions** (recorded gesture event streams, stored as
 `actions/<name>.json`). Names are flat — pick descriptive ones like
 `x5_catalog_cart_icon` or `swipe_x5_catalog_1`, since the name is the only
 context an item carries. Saving under an existing name overwrites the item.
@@ -290,8 +162,8 @@ Lists everything in the library.
 ### `POST /save_image`
 
 Takes a screenshot of the device, crops the given rectangle out of it, and
-saves it as `images/<name>.png`. The library counterpart of
-[`POST /save_rectangle`](#post-save_rectangle).
+saves it as `images/<name>.png` — the template that an `image` step target
+with the same `value` is matched against.
 
 - **Request body:**
   ```json
@@ -430,11 +302,12 @@ Returns the session's status.
 
 - **Response `200`:** `{ "status": "<status>" }` where `<status>` is one of:
   - `closed` — no active session for this serial;
-  - `idle` — session is open, script queue is empty;
-  - `running <script> on <location>` — a queued script is executing;
-  - an error text (e.g. `unable to find parameter <type> with value <value> in
-    script <location>/<name>`) — the last queued script failed; the queue was
-    cleared. The error stays until the next script is queued.
+  - `idle` — session is open, step queue is empty;
+  - `running <step>` (e.g. `running tap on image x5_catalog_cart_icon`) — a
+    queued step is executing;
+  - an error text (e.g. `unable to find <target type> <value> on screen`) —
+    the last queued step failed; the queue was cleared. The error stays until
+    the next step is queued.
 
 ### `DELETE /devices/{serial}/session`
 
@@ -475,41 +348,38 @@ Closes the session: stops the scrcpy server and tears down the sockets.
 | TopY | `top_y` | int |
 | BottomY | `bottom_y` | int |
 
-### Script
+### Step
 
-`server/pkg/models/script.go`
+`server/pkg/models/step.go`
 
 ```json
 {
-  "name": "open_profile",
-  "location": "main_screen",
-  "next_location": ["profile"],
-  "params": [ /* Parameter */ ],
-  "events": [ /* Event */ ],
+  "action": "tap",
+  "target": { "type": "image", "value": "x5_catalog_cart_icon" },
+  "text": "",
+  "locale": "",
   "timeout": 15
 }
 ```
 
 | Field | JSON | Type | Notes |
 | ----- | ---- | ---- | ----- |
-| Name | `name` | string | Script name; with `location` it forms the script's identity |
-| Location | `location` | string | The screen this script is recorded on |
-| NextLocation | `next_location` | string array | omitempty; the screens this script can lead to |
-| Params | `params` | [Parameter](#parameter) array | Locators matched **in order** to narrow the interactive zone |
-| Events | `events` | [Event](#event) array | omitempty; replayed against the **last** matched param, or verbatim when `params` is empty |
-| Timeout | `timeout` | int | Seconds to locate a param's target before failing (default `15` when omitted or `<= 0`) |
+| Action | `action` | string | `tap`, `long_tap`, `type_text`, `check`, or the name of a library action |
+| Target | `target` | [StepTarget](#steptarget) | omitempty; required for `tap`/`long_tap`/`check`, optional pre-check for `type_text` and library actions |
+| Text | `text` | string | omitempty; the text to type, required for `type_text` |
+| Locale | `locale` | string | omitempty; keyboard locale for `type_text` |
+| Timeout | `timeout` | int | omitempty; seconds to locate the target before failing (default `15` when omitted or `<= 0`) |
 
-### Parameter
+### StepTarget
 
-A parameter locates an element on screen. Parameters are matched **in order**,
-progressively identifying the element to act on; the script's `events` are
-applied to the last one's region.
+A target locates an element on the live screen. The runner grabs the latest
+video frame and retries roughly once per second until the step's timeout.
 
 | Field | JSON | Type | Notes |
 | ----- | ---- | ---- | ----- |
-| Type | `type` | string | One of `template`, `text`, `type_text`, `yolo_class`, `command` |
-| Value | `value` | string | Template image name for `template` (matched against `<value>.png`), OCR text for `text`, YOLO class name for `yolo_class`, text to type for `type_text` |
-| Locale | `locale` | string | omitempty; OCR language/locale, and the keyboard locale for `type_text` |
+| Type | `type` | string | One of `image` (template match against `images/<value>.png`), `text` (OCR), `yolo` (detection class) |
+| Value | `value` | string | Library image name, OCR text, or YOLO class name |
+| Locale | `locale` | string | omitempty; OCR language/locale for `text` targets |
 
 ### Event
 
