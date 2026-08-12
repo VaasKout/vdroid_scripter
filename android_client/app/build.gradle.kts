@@ -17,8 +17,8 @@ android {
         applicationId = "com.vision.scripter"
         minSdk = 24
         targetSdk = 37
-        versionCode = 3
-        versionName = "alpha-3.0"
+        versionCode = 4
+        versionName = "beta-1.0"
         multiDexEnabled = true
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
