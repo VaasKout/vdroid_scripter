@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -48,6 +49,37 @@ func (c *apiClient) request(method string, path string, reqBody io.Reader) ([]by
 
 func (c *apiClient) getDevices() (string, error) {
 	body, err := c.request(http.MethodGet, "/devices", nil)
+	return string(body), err
+}
+
+func (c *apiClient) getLibrary() (string, error) {
+	body, err := c.request(http.MethodGet, "/library", nil)
+	return string(body), err
+}
+
+func (c *apiClient) queueSteps(serial string, steps []stepInput) error {
+	var payload = struct {
+		Serial string      `json:"serial"`
+		Steps  []stepInput `json:"steps"`
+	}{
+		Serial: serial,
+		Steps:  steps,
+	}
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return err
+	}
+	_, err = c.request(http.MethodPost, "/run_steps", bytes.NewReader(body))
+	return err
+}
+
+func (c *apiClient) findText(serial string, text string, locale string) (string, error) {
+	var path = "/devices/" + url.PathEscape(serial) +
+		"/find_text?text=" + url.QueryEscape(text)
+	if locale != "" {
+		path += "&locale=" + url.QueryEscape(locale)
+	}
+	body, err := c.request(http.MethodGet, path, nil)
 	return string(body), err
 }
 

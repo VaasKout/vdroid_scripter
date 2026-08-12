@@ -17,9 +17,15 @@ const (
 	defaultWaitSec = 60
 )
 
-const serverInstructions = `vdroid-scripter drives Android devices with CV-located steps (tap, long_tap, type_text, check, recorded gestures).
+const serverInstructions = `vdroid-scripter drives Android devices with CV-located steps composed from a human-curated library.
 
-Call list_devices first to get a serial, manage the device session with open_session/close_session, and track execution with get_session_status or wait_for_session.`
+Workflow: list_devices for a serial, get_library for the available images (template crops) and actions (recorded gestures), queue_steps with the planned steps (they run in order; a session opens automatically), wait_for_session for the outcome. Library names carry their context as <app>_<screen>_<what>[_variant] — e.g. swipe_x5_catalog_1 is a swipe recorded on the Pyaterochka catalog screen, first variant.
+
+Steps: every step is an action plus an optional CV target (image = template match of a library image, text = OCR, yolo = detected class). tap, long_tap, and check require a target. type_text types text on the CV-detected keyboard. Any library action name replays that recorded gesture: anchored at the target's region when a target is given (e.g. a drag starting from an icon), verbatim without one (e.g. a scroll swipe).
+
+Verify and recover: after a state-changing step, verify with a cheap check step on something the new screen must show. A failed step clears the remaining queue and stores the error as the session status. When a target is not visible the screen may need scrolling: queue the screen's swipe action (try variants _1, _2, ...) followed by a retry of the failed step. When the screen is unknown, probe it with find_text before re-planning.
+
+Queue conservatively: prefer short queues with checks between state changes over one long blind queue — a failure in a long queue discards every remaining step.`
 
 type Server struct {
 	api *apiClient
@@ -53,6 +59,41 @@ type waitInput struct {
 	TimeoutSeconds int    `json:"timeout_seconds,omitempty" jsonschema:"max seconds to wait, default 60"`
 }
 
+type stepTargetInput struct {
+	Type   string `json:"type" jsonschema:"target type: image (template match of a library image), text (OCR), or yolo (detected class)"`
+	Value  string `json:"value" jsonschema:"library image name, text to find on screen, or yolo class name"`
+	Locale string `json:"locale,omitempty" jsonschema:"OCR language for text targets, e.g. eng or rus"`
+}
+
+type stepInput struct {
+	Action  string           `json:"action" jsonschema:"tap, long_tap, type_text, check, or the name of a library action to replay"`
+	Target  *stepTargetInput `json:"target,omitempty" jsonschema:"CV target to locate on screen; required for tap/long_tap/check, optional for type_text and library actions (anchors the gesture at the found region when present)"`
+	Text    string           `json:"text,omitempty" jsonschema:"text to type, required for type_text"`
+	Locale  string           `json:"locale,omitempty" jsonschema:"keyboard locale for type_text, e.g. eng"`
+	Timeout int              `json:"timeout,omitempty" jsonschema:"seconds to keep locating the target before failing, default 15"`
+}
+
+type queueStepsInput struct {
+	Serial string      `json:"serial" jsonschema:"device serial number, get it from list_devices"`
+	Steps  []stepInput `json:"steps" jsonschema:"steps to queue, executed in the given order"`
+}
+
+type findTextInput struct {
+	Serial string `json:"serial" jsonschema:"device serial number"`
+	Text   string `json:"text" jsonschema:"text to locate on the current screen"`
+	Locale string `json:"locale,omitempty" jsonschema:"OCR language, e.g. eng or rus"`
+}
+
+func (s *stepInput) describe() string {
+	if s.Action == "type_text" {
+		return fmt.Sprintf("%s %q", s.Action, s.Text)
+	}
+	if s.Target != nil {
+		return fmt.Sprintf("%s on %s %s", s.Action, s.Target.Type, s.Target.Value)
+	}
+	return s.Action
+}
+
 func (s *Server) registerTools() {
 	mcp.AddTool(s.mcp, &mcp.Tool{
 		Name: "list_devices",
@@ -61,9 +102,40 @@ func (s *Server) registerTools() {
 	}, s.handleListDevices)
 
 	mcp.AddTool(s.mcp, &mcp.Tool{
+		Name: "get_library",
+		Description: "List the automation library: 'images' are template crops the human " +
+			"saved from device screens (usable as image targets), 'actions' are recorded " +
+			"gestures like swipes that cannot be generated (usable as a step's action). " +
+			"Names encode their context as <app>_<screen>_<what>[_variant]. " +
+			"Call this before planning steps.",
+	}, s.handleGetLibrary)
+
+	mcp.AddTool(s.mcp, &mcp.Tool{
+		Name: "queue_steps",
+		Description: "Queue steps to run in order on the device; a session opens " +
+			"automatically if none exists. Each step applies an action to an optional " +
+			"CV-located target. Actions: 'tap'/'long_tap' (target required; the generated " +
+			"touch lands at a random point inside the found region), 'check' (target " +
+			"required; visibility assertion only, no touch), 'type_text' (types 'text' on " +
+			"the CV keyboard; target optional as a pre-check), or a library action name " +
+			"(replays the gesture anchored to the target region when given, verbatim " +
+			"otherwise — queue a screen's swipe action without target to scroll). " +
+			"A step failure clears the remaining queue and sets the error status. " +
+			"After queueing, call wait_for_session.",
+	}, s.handleQueueSteps)
+
+	mcp.AddTool(s.mcp, &mcp.Tool{
+		Name: "find_text",
+		Description: "OCR the current screen for a text string without queueing a step; " +
+			"returns the matching regions as JSON, [] when not found. Use it to probe an " +
+			"unknown screen or to quickly verify an effect. Works without an open session.",
+	}, s.handleFindText)
+
+	mcp.AddTool(s.mcp, &mcp.Tool{
 		Name: "open_session",
 		Description: "Open a device session (starts screen capture). A session is required " +
-			"before steps can execute.",
+			"before steps can execute; queue_steps opens one automatically, so call this " +
+			"only when you want the session up beforehand.",
 	}, s.handleOpenSession)
 
 	mcp.AddTool(s.mcp, &mcp.Tool{
@@ -106,6 +178,60 @@ func (s *Server) handleListDevices(
 		return nil, nil, err
 	}
 	return textResult(devices), nil, nil
+}
+
+func (s *Server) handleGetLibrary(
+	ctx context.Context,
+	req *mcp.CallToolRequest,
+	in emptyInput,
+) (*mcp.CallToolResult, any, error) {
+	library, err := s.api.getLibrary()
+	if err != nil {
+		return nil, nil, err
+	}
+	return textResult(library), nil, nil
+}
+
+func (s *Server) handleQueueSteps(
+	ctx context.Context,
+	req *mcp.CallToolRequest,
+	in queueStepsInput,
+) (*mcp.CallToolResult, any, error) {
+	if in.Serial == "" || len(in.Steps) == 0 {
+		return nil, nil, fmt.Errorf("serial and steps are required")
+	}
+	for index := range in.Steps {
+		if in.Steps[index].Action == "" {
+			return nil, nil, fmt.Errorf("every step needs an action")
+		}
+	}
+
+	err := s.api.queueSteps(in.Serial, in.Steps)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	var names = make([]string, 0, len(in.Steps))
+	for index := range in.Steps {
+		names = append(names, in.Steps[index].describe())
+	}
+	var text = "queued " + strings.Join(names, ", ")
+	return textResult(text), nil, nil
+}
+
+func (s *Server) handleFindText(
+	ctx context.Context,
+	req *mcp.CallToolRequest,
+	in findTextInput,
+) (*mcp.CallToolResult, any, error) {
+	if in.Serial == "" || in.Text == "" {
+		return nil, nil, fmt.Errorf("serial and text are required")
+	}
+	result, err := s.api.findText(in.Serial, in.Text, in.Locale)
+	if err != nil {
+		return nil, nil, err
+	}
+	return textResult(result), nil, nil
 }
 
 func (s *Server) handleOpenSession(
