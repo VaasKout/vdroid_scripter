@@ -15,6 +15,8 @@ const (
 	KeyboardDir    = "keyboards"
 	ScrcpyDir      = "scrcpy"
 	YoloDir        = "yolo"
+	ImagesDir      = "images"
+	ActionsDir     = "actions"
 	ScrcpyVersion  = "3.3.4"
 	ServerPort     = ":8080"
 	BaseSocketPort = 3001
@@ -40,6 +42,8 @@ type FilesProps struct {
 	Keyboards string
 	Scrcpy    string
 	Yolo      string
+	Images    string
+	Actions   string
 }
 
 // ScrcpyProps ...
@@ -98,6 +102,16 @@ func New() *Config {
 		yoloDir = YoloDir
 	}
 
+	imagesDir := os.Getenv("IMAGES_DIR")
+	if imagesDir == "" {
+		imagesDir = ImagesDir
+	}
+
+	actionsDir := os.Getenv("ACTIONS_DIR")
+	if actionsDir == "" {
+		actionsDir = ActionsDir
+	}
+
 	scrcpyVersion := os.Getenv("SCRCPY_VERSION")
 	if scrcpyVersion == "" {
 		scrcpyVersion = ScrcpyVersion
@@ -114,6 +128,8 @@ func New() *Config {
 			Keyboards: filepath.Join(cachePath, keyboardsDir),
 			Scrcpy:    filepath.Join(cachePath, scrcpyDir),
 			Yolo:      filepath.Join(cachePath, yoloDir),
+			Images:    filepath.Join(cachePath, imagesDir),
+			Actions:   filepath.Join(cachePath, actionsDir),
 		},
 		ScrcpyProps: &ScrcpyProps{
 			ScrcpyVersion: scrcpyVersion,

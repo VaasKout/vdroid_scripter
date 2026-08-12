@@ -56,6 +56,7 @@ func (s *serverImpl) ListenAndServe() {
 	s.handleScriptsFunctions()
 	s.handleKeyboardFunctions()
 	s.handleSessionFunctions()
+	s.handleLibraryFunctions()
 
 	s.logger.Info(
 		fmt.Sprintf("START LISTENING AT PORT %s", s.serverProps.Port),

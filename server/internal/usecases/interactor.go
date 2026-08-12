@@ -26,6 +26,7 @@ type Interactor interface {
 	ScrcpyUseCase
 	KeyboardUseCase
 	SessionUseCase
+	LibraryUseCase
 }
 
 type interactorImpl struct {

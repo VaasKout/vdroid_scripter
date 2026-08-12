@@ -13,6 +13,8 @@ type Create interface {
 	CreateKeyboardDir(args ...string) string
 	CreateScrcpyDir(args ...string) string
 	CreateOnnxDir(args ...string) string
+	CreateImagesDir(args ...string) string
+	CreateActionsDir(args ...string) string
 }
 
 // CreateLogsDir ...
@@ -58,6 +60,24 @@ func (f *filesDBImpl) CreateScriptDir(args ...string) string {
 // CreateKeyboardDir ...
 func (f *filesDBImpl) CreateKeyboardDir(args ...string) string {
 	var dirName = filepath.Join(f.filesProps.Keyboards, filepath.Join(args...))
+	if ok := file.CreateDirIfNotExist(dirName); !ok {
+		fmt.Printf("couldn't create dir %s\n", dirName)
+		return ""
+	}
+	return dirName
+}
+
+func (f *filesDBImpl) CreateImagesDir(args ...string) string {
+	var dirName = filepath.Join(f.filesProps.Images, filepath.Join(args...))
+	if ok := file.CreateDirIfNotExist(dirName); !ok {
+		fmt.Printf("couldn't create dir %s\n", dirName)
+		return ""
+	}
+	return dirName
+}
+
+func (f *filesDBImpl) CreateActionsDir(args ...string) string {
+	var dirName = filepath.Join(f.filesProps.Actions, filepath.Join(args...))
 	if ok := file.CreateDirIfNotExist(dirName); !ok {
 		fmt.Printf("couldn't create dir %s\n", dirName)
 		return ""

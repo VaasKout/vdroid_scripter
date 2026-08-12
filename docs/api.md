@@ -42,6 +42,11 @@ This document describes every HTTP endpoint exposed by the server, defined in
 | POST | `/save_script` | Create or replace a script |
 | POST | `/edit_script` | Update a script, moving its files if the location changed |
 | GET | `/devices/{serial}/find_text` | OCR: locate text on the current screen |
+| GET | `/library` | List image and action names in the library |
+| POST | `/save_image` | Crop and save a named template image into the library |
+| POST | `/save_action` | Save a named recorded gesture into the library |
+| DELETE | `/images/{name}` | Delete a library image |
+| DELETE | `/actions/{name}` | Delete a library action |
 | GET | `/devices/{serial}/keyboard` | Detect on-screen keyboard keys |
 | POST | `/devices/{serial}/edit_keyboard` | Override a keyboard key's rectangle |
 | GET | `/devices/{serial}/reset_keyboard` | Reset keyboard keys to defaults |
@@ -260,6 +265,83 @@ Takes a screenshot and runs OCR to locate matching text on the current screen.
   ```
 - **Errors:** `400` if `serial` is empty.
 
+## Library
+
+The library holds reusable, uniquely named building blocks that are independent
+of locations and scripts: **images** (template crops, stored as
+`images/<name>.png`) and **actions** (recorded gesture event streams, stored as
+`actions/<name>.json`). Names are flat — pick descriptive ones like
+`x5_catalog_cart_icon` or `swipe_x5_catalog_1`, since the name is the only
+context an item carries. Saving under an existing name overwrites the item.
+
+### `GET /library`
+
+Lists everything in the library.
+
+- **Response `200`:**
+  ```json
+  {
+    "images": ["tg_chat_send_button", "x5_catalog_cart_icon"],
+    "actions": ["swipe_x5_catalog_1", "swipe_x5_catalog_2"]
+  }
+  ```
+  Both arrays are sorted and `[]` when empty.
+
+### `POST /save_image`
+
+Takes a screenshot of the device, crops the given rectangle out of it, and
+saves it as `images/<name>.png`. The library counterpart of
+[`POST /save_rectangle`](#post-save_rectangle).
+
+- **Request body:**
+  ```json
+  {
+    "serial": "ABCD1234",
+    "name": "x5_catalog_cart_icon",
+    "rectangle": { "left_x": 100, "right_x": 300, "top_y": 200, "bottom_y": 260 }
+  }
+  ```
+  All fields are required; `name` must not contain path separators;
+  `rectangle` must be non-empty. An existing image with the same name is
+  overwritten.
+- **Response `200`:** `{ "status": "ok" }`
+- **Errors:** `400` on invalid JSON, a bad `name`, or a missing field, `500` if
+  the screenshot or crop fails.
+
+### `POST /save_action`
+
+Saves a recorded gesture as `actions/<name>.json`. The body is a whole
+[`Action`](#action) object.
+
+- **Request body:**
+  ```json
+  {
+    "name": "swipe_x5_catalog_1",
+    "screen_width": 1080,
+    "screen_height": 2400,
+    "events": [ /* Event, see models */ ]
+  }
+  ```
+  `name` (trimmed, no path separators) and a non-empty `events` array are
+  required. An existing action with the same name is overwritten.
+- **Response `200`:** `{ "status": "ok" }`
+- **Errors:** `400` on invalid JSON, a bad `name`, or empty `events`, `500` if
+  not saved.
+
+### `DELETE /images/{name}`
+
+Deletes `images/<name>.png`.
+
+- **Response `200`:** `{ "status": "ok" }`
+- **Errors:** `404` if no image with that name exists.
+
+### `DELETE /actions/{name}`
+
+Deletes `actions/<name>.json`.
+
+- **Response `200`:** `{ "status": "ok" }`
+- **Errors:** `404` if no action with that name exists.
+
 ## Keyboard
 
 ### `GET /devices/{serial}/keyboard`
@@ -435,6 +517,26 @@ applied to the last one's region.
 | ----- | ---- | ---- | ----- |
 | Time | `time` | int64 | Timestamp / delay |
 | Data | `data` | ControlBytes | Serialized as an **array of ints** (one per byte), 32 bytes (`ControlBytesSize`) |
+
+### Action
+
+`server/pkg/models/action.go`
+
+```json
+{
+  "name": "swipe_x5_catalog_1",
+  "screen_width": 1080,
+  "screen_height": 2400,
+  "events": [ /* Event */ ]
+}
+```
+
+| Field | JSON | Type | Notes |
+| ----- | ---- | ---- | ----- |
+| Name | `name` | string | Unique library name |
+| ScreenWidth | `screen_width` | int | Screen width of the recording device |
+| ScreenHeight | `screen_height` | int | Screen height of the recording device |
+| Events | `events` | [Event](#event) array | The recorded gesture |
 
 ### OCRResult
 
