@@ -4,12 +4,65 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"image"
+	"math/rand/v2"
 )
 
 // Size of control bytes buffer
 const (
 	ControlBytesSize = 32
 )
+
+const (
+	TypeInjectTouchEvent byte = 2
+
+	PointerIDGenericFinger uint64 = 0xFFFFFFFFFFFFFFFE
+	PressureMax            uint16 = 0xFFFF
+
+	TapDurationMinMs    = 50
+	TapDurationJitterMs = 70
+
+	LongTapDurationMinMs    = 700
+	LongTapDurationJitterMs = 200
+)
+
+func GenerateTapEvents(screenWidth int, screenHeight int) []Event {
+	upTime := int64(TapDurationMinMs + rand.IntN(TapDurationJitterMs))
+	return generateTapPair(screenWidth, screenHeight, upTime)
+}
+
+func GenerateLongTapEvents(screenWidth int, screenHeight int) []Event {
+	upTime := int64(LongTapDurationMinMs + rand.IntN(LongTapDurationJitterMs))
+	return generateTapPair(screenWidth, screenHeight, upTime)
+}
+
+func generateTapPair(screenWidth int, screenHeight int, upTime int64) []Event {
+	return []Event{
+		{
+			Time: 0,
+			Data: generateTouchData(ActionDown, screenWidth, screenHeight, PressureMax),
+		},
+		{
+			Time: upTime,
+			Data: generateTouchData(ActionUp, screenWidth, screenHeight, 0),
+		},
+	}
+}
+
+func generateTouchData(
+	action byte,
+	screenWidth int,
+	screenHeight int,
+	pressure uint16,
+) ControlBytes {
+	data := make(ControlBytes, ControlBytesSize)
+	data[0] = TypeInjectTouchEvent
+	data[1] = action
+	binary.BigEndian.PutUint64(data[2:10], PointerIDGenericFinger)
+	binary.BigEndian.PutUint16(data[18:20], uint16(screenWidth))
+	binary.BigEndian.PutUint16(data[20:22], uint16(screenHeight))
+	binary.BigEndian.PutUint16(data[22:24], pressure)
+	return data
+}
 
 // ControlBytes ...
 type ControlBytes []byte
