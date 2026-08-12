@@ -19,13 +19,13 @@ const (
 
 const serverInstructions = `vdroid-scripter drives Android devices with CV-located steps composed from a human-curated library.
 
-Workflow: list_devices for a serial, get_library for the available images (template crops) and actions (recorded gestures), queue_steps with the planned steps (they run in order; a session opens automatically), wait_for_session for the outcome. Library names carry their context as <app>_<screen>_<what>[_variant] — e.g. swipe_x5_catalog_1 is a swipe recorded on the Pyaterochka catalog screen, first variant.
+Workflow: list_devices for a serial, get_library for the available images (template crops) and actions (recorded gestures), then queue steps and wait for the outcome. Library names carry their context as <app>_<screen>_<what>[_variant] — e.g. swipe_x5_catalog_1 is a swipe recorded on the Pyaterochka catalog screen, first variant.
+
+Batching: when given a sequence of steps ("tap text1, tap yolo class home, swipe, type hi..."), translate the WHOLE sequence into ONE queue_steps call with the steps in the given order. Never queue one step at a time and never poll get_session_status between steps — the server executes the queue sequentially on its own. After the single call, call wait_for_session once: 'idle' means every step succeeded.
 
 Steps: every step is an action plus an optional CV target (image = template match of a library image, text = OCR, yolo = detected class). tap, long_tap, and check require a target. type_text types text on the CV-detected keyboard. Any library action name replays that recorded gesture: anchored at the target's region when a target is given (e.g. a drag starting from an icon), verbatim without one (e.g. a scroll swipe).
 
-Verify and recover: after a state-changing step, verify with a cheap check step on something the new screen must show. A failed step clears the remaining queue and stores the error as the session status. When a target is not visible the screen may need scrolling: queue the screen's swipe action (try variants _1, _2, ...) followed by a retry of the failed step. When the screen is unknown, probe it with find_text before re-planning.
-
-Queue conservatively: prefer short queues with checks between state changes over one long blind queue — a failure in a long queue discards every remaining step.`
+Failure and recovery: a failed step clears the remaining queue and stores the error as the session status, so the final status names the target that could not be found. Recover from the failure point: scroll with the screen's swipe action (try variants _1, _2, ...) or probe an unknown screen with find_text, then re-queue the remaining steps from the failed one onward — again in one call.`
 
 type Server struct {
 	api *apiClient
@@ -113,15 +113,17 @@ func (s *Server) registerTools() {
 	mcp.AddTool(s.mcp, &mcp.Tool{
 		Name: "queue_steps",
 		Description: "Queue steps to run in order on the device; a session opens " +
-			"automatically if none exists. Each step applies an action to an optional " +
-			"CV-located target. Actions: 'tap'/'long_tap' (target required; the generated " +
-			"touch lands at a random point inside the found region), 'check' (target " +
-			"required; visibility assertion only, no touch), 'type_text' (types 'text' on " +
-			"the CV keyboard; target optional as a pre-check), or a library action name " +
-			"(replays the gesture anchored to the target region when given, verbatim " +
-			"otherwise — queue a screen's swipe action without target to scroll). " +
-			"A step failure clears the remaining queue and sets the error status. " +
-			"After queueing, call wait_for_session.",
+			"automatically if none exists. Put a whole multi-step sequence into ONE call " +
+			"— the server executes the queue sequentially; do not queue steps one at a " +
+			"time or check status in between, just call wait_for_session once afterwards. " +
+			"Each step applies an action to an optional CV-located target. Actions: " +
+			"'tap'/'long_tap' (target required; the generated touch lands at a random " +
+			"point inside the found region), 'check' (target required; visibility " +
+			"assertion only, no touch), 'type_text' (types 'text' on the CV keyboard; " +
+			"target optional as a pre-check), or a library action name (replays the " +
+			"gesture anchored to the target region when given, verbatim otherwise — " +
+			"queue a screen's swipe action without target to scroll). A step failure " +
+			"clears the remaining queue and sets the error status.",
 	}, s.handleQueueSteps)
 
 	mcp.AddTool(s.mcp, &mcp.Tool{
