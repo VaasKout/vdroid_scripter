@@ -112,5 +112,6 @@ func (s *serverImpl) logURL(r *http.Request) {
 		scheme = "https"
 	}
 	fullURL := scheme + "://" + r.Host + r.RequestURI
-	s.logger.Info(fullURL)
+	fullLog := fmt.Sprintf("%s - %s", fullURL, r.Method)
+	s.logger.Info(fullLog)
 }
