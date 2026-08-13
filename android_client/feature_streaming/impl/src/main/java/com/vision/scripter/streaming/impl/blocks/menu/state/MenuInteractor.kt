@@ -243,7 +243,11 @@ class MenuInteractor @Inject constructor(
                 serial = serial,
                 rectangle = selected.adjustToServer(screenSizes),
             )
-            notifySaved(saved)
+            if (saved) {
+                eventRepository.sendEvent(StreamingEvent.ShowItemSavedSnackbar)
+            } else {
+                eventRepository.sendEvent(StreamingEvent.ShowNetworkError)
+            }
             recordRepository.clear()
             dropState()
         }
@@ -261,18 +265,14 @@ class MenuInteractor @Inject constructor(
             }
 
             val saved = recordRepository.saveAction(screenSizes)
-            notifySaved(saved)
+            if (saved) {
+                eventRepository.sendEvent(StreamingEvent.ShowItemSavedSnackbar)
+            } else {
+                eventRepository.sendEvent(StreamingEvent.ShowNetworkError)
+            }
             recordRepository.clear()
             dropState()
         }
-    }
-
-    private fun notifySaved(saved: Boolean) {
-        if (saved) {
-            eventRepository.sendEvent(StreamingEvent.ShowItemSavedSnackbar)
-            return
-        }
-        eventRepository.sendEvent(StreamingEvent.ShowNetworkError)
     }
 
     private fun switchCvMode(cvMode: CVMode) {

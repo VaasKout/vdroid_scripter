@@ -39,9 +39,7 @@ class RecordRepository @Inject constructor(
 
     @OptIn(ExperimentalUnsignedTypes::class)
     fun recordBytes(bytesArray: UByteArray?) {
-        if (bytesArray == null) return
-        if (!currentState.recording) return
-
+        if (bytesArray == null || !currentState.recording) return
         val elapsedMs = if (startRecordingTime == 0L) {
             startRecordingTime = System.nanoTime()
             0L

@@ -1,5 +1,6 @@
 package com.vision.scripter.streaming.impl.blocks.menu.ui
 
+import com.vision.scripter.streaming.impl.data.ItemType
 import com.vision.scripter.ui.CommandFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -13,7 +14,7 @@ internal class MenuPreviewUiStateHolder(state: MenuUiState) : MenuUiStateHolder 
 
     override fun init(serial: String) {}
     override fun onAddClicked() {}
-    override fun onAddItemConfirmed(name: String, isImage: Boolean) {}
+    override fun onAddItemConfirmed(name: String, itemType: ItemType) {}
     override fun onCvModeClicked() {}
     override fun onTextModeClicked() {}
     override fun onTryToFindText(text: String, locale: String) {}
