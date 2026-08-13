@@ -153,5 +153,6 @@ func (i *interactorImpl) runSessionQueue(serial string) {
 			session.Status = models.StatusIdle
 		}
 		i.sessionsCache.Add(serial, session)
+		time.Sleep(300 * time.Millisecond) // animation delay
 	}
 }
