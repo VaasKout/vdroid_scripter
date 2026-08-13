@@ -23,7 +23,7 @@ Workflow: list_devices for a serial, get_library for the available images (templ
 
 Batching: when given a sequence of steps ("tap text1, tap yolo class home, swipe, type hi..."), translate the WHOLE sequence into ONE queue_steps call with the steps in the given order. Never queue one step at a time and never poll get_session_status between steps — the server executes the queue sequentially on its own. After the single call, call wait_for_session once: 'idle' means every step succeeded.
 
-Steps: every step is an action plus an optional CV target (image = template match of a library image, text = OCR, yolo = detected class). tap, long_tap, and check require a target. type_text types text on the CV-detected keyboard. Any library action name replays that recorded gesture: anchored at the target's region when a target is given (e.g. a drag starting from an icon), verbatim without one (e.g. a scroll swipe).
+Steps: a step is an event applied to a CV target (type = image | text | yolo, value = library image name / text to find / yolo class). Events tap and long_tap require a target and touch it. type_text types 'value' on the CV-detected keyboard (locale = keyboard locale). An EMPTY event is a pure visibility check of the target. Any other event name replays that recorded library event: anchored at the target's region when a target is given (e.g. a drag starting from an icon), verbatim without one (e.g. a scroll swipe).
 
 Failure and recovery: a failed step clears the remaining queue and stores the error as the session status, so the final status names the target that could not be found. Recover from the failure point: scroll with the screen's swipe action (try variants _1, _2, ...) or probe an unknown screen with find_text, then re-queue the remaining steps from the failed one onward — again in one call.`
 
@@ -59,18 +59,12 @@ type waitInput struct {
 	TimeoutSeconds int    `json:"timeout_seconds,omitempty" jsonschema:"max seconds to wait, default 60"`
 }
 
-type stepTargetInput struct {
-	Type   string `json:"type" jsonschema:"target type: image (template match of a library image), text (OCR), or yolo (detected class)"`
-	Value  string `json:"value" jsonschema:"library image name, text to find on screen, or yolo class name"`
-	Locale string `json:"locale,omitempty" jsonschema:"OCR language for text targets, e.g. eng or rus"`
-}
-
 type stepInput struct {
-	Action  string           `json:"action" jsonschema:"tap, long_tap, type_text, check, or the name of a library action to replay"`
-	Target  *stepTargetInput `json:"target,omitempty" jsonschema:"CV target to locate on screen; required for tap/long_tap/check, optional for type_text and library actions (anchors the gesture at the found region when present)"`
-	Text    string           `json:"text,omitempty" jsonschema:"text to type, required for type_text"`
-	Locale  string           `json:"locale,omitempty" jsonschema:"keyboard locale for type_text, e.g. eng"`
-	Timeout int              `json:"timeout,omitempty" jsonschema:"seconds to keep locating the target before failing, default 15"`
+	Event   string `json:"event,omitempty" jsonschema:"tap, long_tap, type_text, the name of a library event to replay, or EMPTY for a pure visibility check of the target"`
+	Type    string `json:"type,omitempty" jsonschema:"target type: image (template match of a library image), text (OCR), or yolo (detected class); leave empty to replay a library event verbatim"`
+	Value   string `json:"value,omitempty" jsonschema:"target value: library image name, text to find on screen, or yolo class name; for type_text the text to type"`
+	Locale  string `json:"locale,omitempty" jsonschema:"OCR language for text targets and keyboard locale for type_text, e.g. eng or rus"`
+	Timeout int    `json:"timeout,omitempty" jsonschema:"seconds to keep locating the target before failing, default 15"`
 }
 
 type queueStepsInput struct {
@@ -85,13 +79,16 @@ type findTextInput struct {
 }
 
 func (s *stepInput) describe() string {
-	if s.Action == "type_text" {
-		return fmt.Sprintf("%s %q", s.Action, s.Text)
+	if s.Event == "" {
+		return fmt.Sprintf("check on %s %s", s.Type, s.Value)
 	}
-	if s.Target != nil {
-		return fmt.Sprintf("%s on %s %s", s.Action, s.Target.Type, s.Target.Value)
+	if s.Event == "type_text" {
+		return fmt.Sprintf("%s %q", s.Event, s.Value)
 	}
-	return s.Action
+	if s.Type != "" {
+		return fmt.Sprintf("%s on %s %s", s.Event, s.Type, s.Value)
+	}
+	return s.Event
 }
 
 func (s *Server) registerTools() {
@@ -116,14 +113,14 @@ func (s *Server) registerTools() {
 			"automatically if none exists. Put a whole multi-step sequence into ONE call " +
 			"— the server executes the queue sequentially; do not queue steps one at a " +
 			"time or check status in between, just call wait_for_session once afterwards. " +
-			"Each step applies an action to an optional CV-located target. Actions: " +
+			"Each step applies an event to a CV-located target (type + value). Events: " +
 			"'tap'/'long_tap' (target required; the generated touch lands at a random " +
-			"point inside the found region), 'check' (target required; visibility " +
-			"assertion only, no touch), 'type_text' (types 'text' on the CV keyboard; " +
-			"target optional as a pre-check), or a library action name (replays the " +
-			"gesture anchored to the target region when given, verbatim otherwise — " +
-			"queue a screen's swipe action without target to scroll). A step failure " +
-			"clears the remaining queue and sets the error status.",
+			"point inside the found region), 'type_text' (types 'value' on the CV " +
+			"keyboard), an EMPTY event (visibility check of the target, no touch), or a " +
+			"library event name (replays the gesture anchored to the target region when " +
+			"given, verbatim otherwise — queue a screen's swipe event without a target " +
+			"to scroll). A step failure clears the remaining queue and sets the error " +
+			"status.",
 	}, s.handleQueueSteps)
 
 	mcp.AddTool(s.mcp, &mcp.Tool{
@@ -196,8 +193,8 @@ func (s *Server) handleQueueSteps(
 		return nil, nil, fmt.Errorf("serial and steps are required")
 	}
 	for index := range in.Steps {
-		if in.Steps[index].Action == "" {
-			return nil, nil, fmt.Errorf("every step needs an action")
+		if in.Steps[index].Event == "" && in.Steps[index].Value == "" {
+			return nil, nil, fmt.Errorf("every step needs an event or a target")
 		}
 	}
 

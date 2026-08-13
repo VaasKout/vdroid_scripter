@@ -81,24 +81,24 @@ Returns all ADB devices currently visible to the server.
 
 ## Steps
 
-A **step** is the unit of execution: an action applied to an optional CV-located
-target. Steps compose the [library](#library) at runtime — targets locate a
-region on the live screen (a library image, OCR text, or a YOLO class) and
-actions act on it (generated taps, CV keyboard typing, or a recorded gesture
-from the library).
+A **step** is the unit of execution: an **event** applied to a CV-located
+target. Steps compose the [library](#library) at runtime — the target
+(`type` + `value`) locates a region on the live screen (a library image, OCR
+text, or a YOLO class) and the event acts on it (generated taps, CV keyboard
+typing, or a recorded gesture from the library).
 
-| `action` | with `target` | without `target` |
-| -------- | ------------- | ---------------- |
-| `check` | visibility assertion only, no touch | invalid |
-| `tap` / `long_tap` | generated tap pair placed at a random point inside the found region | invalid |
-| `type_text` | target is checked first, then `text` is typed via the CV keyboard | `text` is typed via the CV keyboard |
-| a library action name | recorded gesture replayed **anchored**: the first touch is moved into the found region, all events keep their relative shape | recorded gesture replayed **verbatim** |
+| `event` | Behavior |
+| ------- | -------- |
+| *(empty)* | Visibility check of the target — no touch. Target required. |
+| `tap` / `long_tap` | Generated tap pair placed at a random point inside the found region. Target required. |
+| `type_text` | `value` **is the text to type**, typed via the CV keyboard (`locale` = keyboard locale). No target. |
+| any other name | The library event with that name is replayed: **anchored** when a target is given (first touch moved into the found region, relative shape preserved), **verbatim** without one. |
 
 ### `POST /run_steps`
 
 Queues one or more steps to run in order on a device. If the device has no open
 session, one is opened automatically (scrcpy is started). All steps are
-validated up front — library images and actions referenced by the steps must
+validated up front — library images and events referenced by the steps must
 exist — then appended to the session's queue. A per-session worker executes
 steps sequentially, updating the session status; a step failure sets the error
 status and clears the remaining queue.
@@ -108,11 +108,11 @@ status and clears the remaining queue.
   {
     "serial": "ABCD1234",
     "steps": [
-      { "action": "check", "target": { "type": "yolo", "value": "home" } },
-      { "action": "tap", "target": { "type": "image", "value": "x5_catalog_cart_icon" } },
-      { "action": "swipe_x5_catalog_1" },
-      { "action": "tap", "target": { "type": "text", "value": "Corn", "locale": "eng" }, "timeout": 10 },
-      { "action": "type_text", "text": "hello", "locale": "eng" }
+      { "type": "yolo", "value": "home" },
+      { "event": "tap", "type": "image", "value": "catalog_cart_icon" },
+      { "event": "swipe_catalog_1" },
+      { "event": "tap", "type": "text", "value": "Corn", "locale": "eng", "timeout": 10 },
+      { "event": "type_text", "value": "hello", "locale": "eng" }
     ]
   }
   ```
@@ -143,7 +143,7 @@ The library holds the reusable, uniquely named building blocks that steps
 compose: **images** (template crops, stored as `images/<name>.png`) and
 **actions** (recorded gesture event streams, stored as
 `actions/<name>.json`). Names are flat — pick descriptive ones like
-`x5_catalog_cart_icon` or `swipe_x5_catalog_1`, since the name is the only
+`catalog_cart_icon` or `swipe_catalog_1`, since the name is the only
 context an item carries. Saving under an existing name overwrites the item.
 
 ### `GET /library`
@@ -153,8 +153,8 @@ Lists everything in the library.
 - **Response `200`:**
   ```json
   {
-    "images": ["tg_chat_send_button", "x5_catalog_cart_icon"],
-    "actions": ["swipe_x5_catalog_1", "swipe_x5_catalog_2"]
+    "images": ["tg_chat_send_button", "catalog_cart_icon"],
+    "actions": ["swipe_catalog_1", "swipe_catalog_2"]
   }
   ```
   Both arrays are sorted and `[]` when empty.
@@ -169,7 +169,7 @@ with the same `value` is matched against.
   ```json
   {
     "serial": "ABCD1234",
-    "name": "x5_catalog_cart_icon",
+    "name": "catalog_cart_icon",
     "rectangle": { "left_x": 100, "right_x": 300, "top_y": 200, "bottom_y": 260 }
   }
   ```
@@ -188,7 +188,7 @@ Saves a recorded gesture as `actions/<name>.json`. The body is a whole
 - **Request body:**
   ```json
   {
-    "name": "swipe_x5_catalog_1",
+    "name": "swipe_catalog_1",
     "screen_width": 1080,
     "screen_height": 2400,
     "events": [ /* Event, see models */ ]
@@ -303,7 +303,7 @@ Returns the session's status.
 - **Response `200`:** `{ "status": "<status>" }` where `<status>` is one of:
   - `closed` — no active session for this serial;
   - `idle` — session is open, step queue is empty;
-  - `running <step>` (e.g. `running tap on image x5_catalog_cart_icon`) — a
+  - `running <step>` (e.g. `running tap on image catalog_cart_icon`) — a
     queued step is executing;
   - an error text (e.g. `unable to find <target type> <value> on screen`) —
     the last queued step failed; the queue was cleared. The error stays until
@@ -354,9 +354,9 @@ Closes the session: stops the scrcpy server and tears down the sockets.
 
 ```json
 {
-  "action": "tap",
-  "target": { "type": "image", "value": "x5_catalog_cart_icon" },
-  "text": "",
+  "event": "tap",
+  "type": "image",
+  "value": "catalog_cart_icon",
   "locale": "",
   "timeout": 15
 }
@@ -364,22 +364,11 @@ Closes the session: stops the scrcpy server and tears down the sockets.
 
 | Field | JSON | Type | Notes |
 | ----- | ---- | ---- | ----- |
-| Action | `action` | string | `tap`, `long_tap`, `type_text`, `check`, or the name of a library action |
-| Target | `target` | [StepTarget](#steptarget) | omitempty; required for `tap`/`long_tap`/`check`, optional pre-check for `type_text` and library actions |
-| Text | `text` | string | omitempty; the text to type, required for `type_text` |
-| Locale | `locale` | string | omitempty; keyboard locale for `type_text` |
-| Timeout | `timeout` | int | omitempty; seconds to locate the target before failing (default `15` when omitted or `<= 0`) |
-
-### StepTarget
-
-A target locates an element on the live screen. The runner grabs the latest
-video frame and retries roughly once per second until the step's timeout.
-
-| Field | JSON | Type | Notes |
-| ----- | ---- | ---- | ----- |
-| Type | `type` | string | One of `image` (template match against `images/<value>.png`), `text` (OCR), `yolo` (detection class) |
-| Value | `value` | string | Library image name, OCR text, or YOLO class name |
-| Locale | `locale` | string | omitempty; OCR language/locale for `text` targets |
+| Event | `event` | string | `tap`, `long_tap`, `type_text`, the name of a library event, or **empty for a visibility check** |
+| Type | `type` | string | Target type: `image` (template match against `images/<value>.png`), `text` (OCR), `yolo` (detection class); empty for a target-less library event and for `type_text` |
+| Value | `value` | string | Target value: library image name, OCR text, or YOLO class name — except for `type_text`, where it is the text to type |
+| Locale | `locale` | string | omitempty; OCR language for `text` targets, keyboard locale for `type_text` |
+| Timeout | `timeout` | int | omitempty; seconds to locate the target before failing (default `15` when omitted or `<= 0`). The runner grabs the latest video frame and retries roughly once per second until the deadline. |
 
 ### Event
 
@@ -394,7 +383,7 @@ video frame and retries roughly once per second until the step's timeout.
 
 ```json
 {
-  "name": "swipe_x5_catalog_1",
+  "name": "swipe_catalog_1",
   "screen_width": 1080,
   "screen_height": 2400,
   "events": [ /* Event */ ]

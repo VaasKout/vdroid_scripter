@@ -9,30 +9,23 @@ import (
 const DefaultTimeout int = 15
 
 const (
-	StepTap      = "tap"
-	StepLongTap  = "long_tap"
-	StepTypeText = "type_text"
-	StepCheck    = "check"
+	TapEvent      = "tap"
+	LongTapEvent  = "long_tap"
+	TypeTextEvent = "type_text"
 )
 
 const (
-	TargetImage = "image"
-	TargetText  = "text"
-	TargetYolo  = "yolo"
+	Image = "image"
+	Text  = "text"
+	Yolo  = "yolo"
 )
 
 type Step struct {
-	Action  string      `json:"action"`
-	Target  *StepTarget `json:"target,omitempty"`
-	Text    string      `json:"text,omitempty"`
-	Locale  string      `json:"locale,omitempty"`
-	Timeout int         `json:"timeout,omitempty"`
-}
-
-type StepTarget struct {
-	Type   string `json:"type"`
-	Value  string `json:"value"`
-	Locale string `json:"locale,omitempty"`
+	Event   string `json:"event"`
+	Type    string `json:"type"`
+	Value   string `json:"value"`
+	Locale  string `json:"locale,omitempty"`
+	Timeout int    `json:"timeout,omitempty"`
 }
 
 func (s *Step) GetTimeout() time.Duration {
@@ -43,49 +36,62 @@ func (s *Step) GetTimeout() time.Duration {
 }
 
 func (s *Step) Valid() bool {
-	if s == nil || strings.TrimSpace(s.Action) == "" {
+	if s == nil {
 		return false
 	}
 
-	switch s.Action {
-	case StepTap, StepLongTap, StepCheck:
-		return s.Target.Valid()
-	case StepTypeText:
-		return strings.TrimSpace(s.Text) != "" &&
-			(s.Target == nil || s.Target.Valid())
+	switch s.Event {
+	case TapEvent, LongTapEvent:
+		return s.HasType()
+	case TypeTextEvent:
+		return strings.TrimSpace(s.Value) != ""
 	}
-	return s.Target == nil || s.Target.Valid()
+	if s.IsCheckEvent() {
+		return s.HasType()
+	}
+	return strings.TrimSpace(s.Type) == "" || s.HasType()
 }
 
-func (s *Step) IsCustomAction() bool {
-	switch s.Action {
-	case StepTap, StepLongTap, StepTypeText, StepCheck:
+func (s *Step) IsCheckEvent() bool {
+	return s != nil && strings.TrimSpace(s.Event) == ""
+}
+
+func (s *Step) IsCustomEvent() bool {
+	if s == nil || s.IsCheckEvent() {
+		return false
+	}
+
+	switch s.Event {
+	case TapEvent, LongTapEvent, TypeTextEvent:
 		return false
 	}
 	return true
 }
 
-func (s *Step) Describe() string {
+func (s *Step) HasType() bool {
 	if s == nil {
-		return ""
-	}
-	if s.Action == StepTypeText {
-		return fmt.Sprintf("%s %q", s.Action, s.Text)
-	}
-	if s.Target != nil {
-		return fmt.Sprintf("%s on %s %s", s.Action, s.Target.Type, s.Target.Value)
-	}
-	return s.Action
-}
-
-func (t *StepTarget) Valid() bool {
-	if t == nil {
 		return false
 	}
 
-	switch t.Type {
-	case TargetImage, TargetText, TargetYolo:
-		return strings.TrimSpace(t.Value) != ""
+	switch s.Type {
+	case Image, Text, Yolo:
+		return strings.TrimSpace(s.Value) != ""
 	}
 	return false
+}
+
+func (s *Step) ToString() string {
+	if s == nil {
+		return ""
+	}
+	if s.IsCheckEvent() {
+		return fmt.Sprintf("check on %s %s", s.Type, s.Value)
+	}
+	if s.Event == TypeTextEvent {
+		return fmt.Sprintf("%s %q", s.Event, s.Value)
+	}
+	if s.HasType() {
+		return fmt.Sprintf("%s on %s %s", s.Event, s.Type, s.Value)
+	}
+	return s.Event
 }

@@ -136,7 +136,7 @@ func (i *interactorImpl) runSessionQueue(serial string) {
 
 		var step = session.Query[0]
 		session.Query = session.Query[1:]
-		session.Status = fmt.Sprintf(models.StatusRunningStep, step.Describe())
+		session.Status = fmt.Sprintf(models.StatusRunningStep, step.ToString())
 		i.sessionsCache.Add(serial, session)
 
 		err := i.executeStep(serial, &step)

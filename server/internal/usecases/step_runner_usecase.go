@@ -30,30 +30,32 @@ func (i *interactorImpl) executeStep(serial string, step *models.Step) error {
 		return errors.New("step is empty")
 	}
 
-	i.logger.Info(fmt.Sprintf("running step %s... ⏳", step.Describe()))
+	i.logger.Info(fmt.Sprintf("running step %s... ⏳", step.ToString()))
 
 	err := i.runStepAction(serial, step)
 	if err != nil {
 		return err
 	}
 
-	i.logger.Info(fmt.Sprintf("step %s is COMPLETE ✅", step.Describe()))
+	i.logger.Info(fmt.Sprintf("step %s is COMPLETE ✅", step.ToString()))
 	return nil
 }
 
 func (i *interactorImpl) runStepAction(serial string, step *models.Step) error {
-	switch step.Action {
-	case models.StepCheck:
-		_, err := i.findTargetRect(serial, step.Target, step.GetTimeout())
+	if step.IsCheckEvent() {
+		_, err := i.findTargetRect(serial, step, step.GetTimeout())
 		return err
-	case models.StepTap:
+	}
+
+	switch step.Event {
+	case models.TapEvent:
 		return i.playGeneratedTap(serial, step, false)
-	case models.StepLongTap:
+	case models.LongTapEvent:
 		return i.playGeneratedTap(serial, step, true)
-	case models.StepTypeText:
+	case models.TypeTextEvent:
 		return i.typeTextStep(serial, step)
 	}
-	return i.playCustomAction(serial, step)
+	return i.playCustomEvent(serial, step)
 }
 
 func (i *interactorImpl) playGeneratedTap(
@@ -61,7 +63,7 @@ func (i *interactorImpl) playGeneratedTap(
 	step *models.Step,
 	longTap bool,
 ) error {
-	foundRect, err := i.findTargetRect(serial, step.Target, step.GetTimeout())
+	foundRect, err := i.findTargetRect(serial, step, step.GetTimeout())
 	if err != nil {
 		return err
 	}
@@ -80,32 +82,24 @@ func (i *interactorImpl) playGeneratedTap(
 }
 
 func (i *interactorImpl) typeTextStep(serial string, step *models.Step) error {
-	var timeout = step.GetTimeout()
-	if step.Target != nil {
-		_, err := i.findTargetRect(serial, step.Target, timeout)
-		if err != nil {
-			return err
-		}
-	}
-
 	width, height, err := i.waitForFrameSizes(serial)
 	if err != nil {
 		return err
 	}
 
 	tapEvents := models.GenerateTapEvents(width, height)
-	return i.typeText(serial, timeout, step.Text, step.Locale, tapEvents)
+	return i.typeText(serial, step.GetTimeout(), step.Value, step.Locale, tapEvents)
 }
 
-func (i *interactorImpl) playCustomAction(serial string, step *models.Step) error {
-	action, err := i.getAction(step.Action)
+func (i *interactorImpl) playCustomEvent(serial string, step *models.Step) error {
+	action, err := i.getAction(step.Event)
 	if err != nil {
 		return err
 	}
 
 	var foundRect *image.Rectangle
-	if step.Target != nil {
-		foundRect, err = i.findTargetRect(serial, step.Target, step.GetTimeout())
+	if step.HasType() {
+		foundRect, err = i.findTargetRect(serial, step, step.GetTimeout())
 		if err != nil {
 			return err
 		}
@@ -118,10 +112,10 @@ func (i *interactorImpl) playCustomAction(serial string, step *models.Step) erro
 
 func (i *interactorImpl) findTargetRect(
 	serial string,
-	target *models.StepTarget,
+	step *models.Step,
 	timeout time.Duration,
 ) (*image.Rectangle, error) {
-	if !target.Valid() {
+	if !step.HasType() {
 		return nil, errors.New("step target is empty")
 	}
 
@@ -139,7 +133,7 @@ func (i *interactorImpl) findTargetRect(
 			continue
 		}
 
-		foundRect, err = i.findRectByTarget(serial, mat, target)
+		foundRect, err = i.findRectByTarget(serial, mat, step)
 		mat.Close()
 
 		if err != nil {
@@ -155,7 +149,7 @@ func (i *interactorImpl) findTargetRect(
 	}
 
 	if models.ImageRectIsEmpty(foundRect) {
-		return nil, fmt.Errorf(models.StatusError, target.Type, target.Value)
+		return nil, fmt.Errorf(models.StatusError, step.Type, step.Value)
 	}
 
 	return foundRect, nil
@@ -164,29 +158,29 @@ func (i *interactorImpl) findTargetRect(
 func (i *interactorImpl) findRectByTarget(
 	serial string,
 	mat *gocv.Mat,
-	target *models.StepTarget,
+	step *models.Step,
 ) (*image.Rectangle, error) {
 
-	if target.Type == models.TargetImage {
+	if step.Type == models.Image {
 		imagesDir := i.filesDB.CreateImagesDir()
 		if imagesDir == "" {
 			return nil, errors.New("images dir not found")
 		}
-		tmpImage := filepath.Join(imagesDir, strings.TrimSpace(target.Value)+ImageExt)
+		tmpImage := filepath.Join(imagesDir, strings.TrimSpace(step.Value)+ImageExt)
 		if !file.Exists(tmpImage) {
-			return nil, fmt.Errorf("image not found in library: %s", target.Value)
+			return nil, fmt.Errorf("image not found in library: %s", step.Value)
 		}
 		return i.cv.FindImage(mat, tmpImage)
 	}
 
-	if target.Type == models.TargetText {
+	if step.Type == models.Text {
 		tesseractDir := i.filesDB.CreateLogsDir(serial, filesdb.TesseractDir)
 		if tesseractDir == "" {
 			return nil, fmt.Errorf("tesseract dir was not found")
 		}
 		var ocrParams = cv.InitOcrParams(
-			target.Value,
-			target.Locale,
+			step.Value,
+			step.Locale,
 			cv.PsmText,
 			cv.OemText,
 		)
@@ -200,17 +194,17 @@ func (i *interactorImpl) findRectByTarget(
 		return rectangles[0].Rectangle.ToImageRectangle(), nil
 	}
 
-	if target.Type == models.TargetYolo {
+	if step.Type == models.Yolo {
 		var labels = i.yolo.DetectLabels(*mat)
 		for _, rect := range labels {
-			if strings.EqualFold(rect.Label, target.Value) {
+			if strings.EqualFold(rect.Label, step.Value) {
 				return rect.ToImageRectangle(), nil
 			}
 		}
-		return nil, fmt.Errorf("yolo class not found: %s", target.Value)
+		return nil, fmt.Errorf("yolo class not found: %s", step.Value)
 	}
 
-	return nil, fmt.Errorf("unknown target type %s", target.Type)
+	return nil, fmt.Errorf("unknown target type %s", step.Type)
 }
 
 func (i *interactorImpl) typeText(

@@ -49,7 +49,7 @@ func (i *interactorImpl) RunSteps(
 	for index := range steps {
 		step := &steps[index]
 		if !step.Valid() {
-			return fmt.Errorf("invalid step: %s", step.Describe())
+			return fmt.Errorf("invalid step: %s", step.ToString())
 		}
 		if err := i.checkStepAssets(step); err != nil {
 			return err
@@ -69,32 +69,32 @@ func (i *interactorImpl) RunSteps(
 }
 
 func (i *interactorImpl) checkStepAssets(step *models.Step) error {
-	if step.IsCustomAction() {
-		if !ValidLibraryName(step.Action) {
-			return fmt.Errorf("invalid action name: %s", step.Action)
+	if step.IsCustomEvent() {
+		if !ValidLibraryName(step.Event) {
+			return fmt.Errorf("invalid event name: %s", step.Event)
 		}
 		actionPath := filepath.Join(
 			i.filesDB.CreateActionsDir(),
-			strings.TrimSpace(step.Action)+ActionExt,
+			strings.TrimSpace(step.Event)+ActionExt,
 		)
 		if !file.Exists(actionPath) {
-			return fmt.Errorf("action not found in library: %s", step.Action)
+			return fmt.Errorf("event not found in library: %s", step.Event)
 		}
 	}
 
-	if step.Target == nil || step.Target.Type != models.TargetImage {
+	if step.Type != models.Image || !step.HasType() {
 		return nil
 	}
 
-	if !ValidLibraryName(step.Target.Value) {
-		return fmt.Errorf("invalid image name: %s", step.Target.Value)
+	if !ValidLibraryName(step.Value) {
+		return fmt.Errorf("invalid image name: %s", step.Value)
 	}
 	imagePath := filepath.Join(
 		i.filesDB.CreateImagesDir(),
-		strings.TrimSpace(step.Target.Value)+ImageExt,
+		strings.TrimSpace(step.Value)+ImageExt,
 	)
 	if !file.Exists(imagePath) {
-		return fmt.Errorf("image not found in library: %s", step.Target.Value)
+		return fmt.Errorf("image not found in library: %s", step.Value)
 	}
 	return nil
 }
