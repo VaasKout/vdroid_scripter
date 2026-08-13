@@ -83,11 +83,6 @@ func (c *apiClient) findText(serial string, text string, locale string) (string,
 	return string(body), err
 }
 
-func (c *apiClient) openSession(serial string) (string, error) {
-	body, err := c.request(http.MethodPost, "/devices/"+url.PathEscape(serial)+"/session", nil)
-	return string(body), err
-}
-
 func (c *apiClient) closeSession(serial string) error {
 	_, err := c.request(http.MethodDelete, "/devices/"+url.PathEscape(serial)+"/session", nil)
 	return err

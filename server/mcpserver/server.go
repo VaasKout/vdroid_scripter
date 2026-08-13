@@ -134,13 +134,6 @@ func (s *Server) registerTools() {
 	}, s.handleFindText)
 
 	mcp.AddTool(s.mcp, &mcp.Tool{
-		Name: "open_session",
-		Description: "Open a device session (starts screen capture). A session is required " +
-			"before steps can execute; queue_steps opens one automatically, so call this " +
-			"only when you want the session up beforehand.",
-	}, s.handleOpenSession)
-
-	mcp.AddTool(s.mcp, &mcp.Tool{
 		Name: "close_session",
 		Description: "Close the device session and stop screen capture. " +
 			"Call when the flow is finished.",
@@ -234,21 +227,6 @@ func (s *Server) handleFindText(
 		return nil, nil, err
 	}
 	return textResult(result), nil, nil
-}
-
-func (s *Server) handleOpenSession(
-	ctx context.Context,
-	req *mcp.CallToolRequest,
-	in serialInput,
-) (*mcp.CallToolResult, any, error) {
-	if in.Serial == "" {
-		return nil, nil, fmt.Errorf("serial is required")
-	}
-	ports, err := s.api.openSession(in.Serial)
-	if err != nil {
-		return nil, nil, err
-	}
-	return textResult("session opened: " + ports), nil, nil
 }
 
 func (s *Server) handleCloseSession(
