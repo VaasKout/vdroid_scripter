@@ -26,6 +26,12 @@ const (
 	ImagesFormField = "image"
 )
 
+// ANSI colors for terminal logs
+const (
+	greenColor = "\033[92m"
+	resetColor = "\033[0m"
+)
+
 // API ...
 type API interface {
 	ListenAndServe()
@@ -112,6 +118,6 @@ func (s *serverImpl) logURL(r *http.Request) {
 		scheme = "https"
 	}
 	fullURL := scheme + "://" + r.Host + r.RequestURI
-	fullLog := fmt.Sprintf("%s - %s", fullURL, r.Method)
+	fullLog := fmt.Sprintf("%s%s - %s%s", greenColor, fullURL, r.Method, resetColor)
 	s.logger.Info(fullLog)
 }
