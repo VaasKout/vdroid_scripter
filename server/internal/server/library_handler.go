@@ -71,14 +71,18 @@ func (s *serverImpl) handleGetLibrary(w http.ResponseWriter, r *http.Request) {
 func (s *serverImpl) handleSaveImage(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 
-	var data = &usecases.SaveImageDto{}
-	err := json.NewDecoder(r.Body).Decode(data)
-	if err != nil || !data.Valid() {
+	var data = struct {
+		Serial    string           `json:"serial"`
+		Rectangle models.Rectangle `json:"rectangle"`
+	}{}
+	err := json.NewDecoder(r.Body).Decode(&data)
+	if err != nil || data.Serial == "" ||
+		data.Rectangle.IsEmpty() || !usecases.ValidName(data.Rectangle.Label) {
 		http.Error(w, "Invalid JSON", http.StatusBadRequest)
 		return
 	}
 
-	saved := s.interactor.SaveImage(data)
+	saved := s.interactor.SaveImage(data.Serial, &data.Rectangle)
 	if saved {
 		s.sendStatusOk(w)
 		return
@@ -92,7 +96,7 @@ func (s *serverImpl) handleSaveAction(w http.ResponseWriter, r *http.Request) {
 
 	var data = &models.Action{}
 	err := json.NewDecoder(r.Body).Decode(data)
-	if err != nil || data.IsEmpty() || !usecases.ValidLibraryName(data.Name) {
+	if err != nil || data.IsEmpty() || !usecases.ValidName(data.Name) {
 		http.Error(w, "Invalid JSON", http.StatusBadRequest)
 		return
 	}

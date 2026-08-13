@@ -85,13 +85,13 @@ class ScripterDataSourceImpl @Inject constructor(
 
     override suspend fun saveImage(
         serial: String,
-        name: String,
         rectangle: CvRectangle?,
     ): Boolean {
-        if (serial.isEmpty() || name.isEmpty() || rectangle.isEmpty()) return false
+        if (serial.isEmpty() || rectangle.isEmpty() || rectangle?.label.isNullOrEmpty()) {
+            return false
+        }
         val request = SaveImageRequest(
             serial = serial,
-            name = name,
             rectangle = rectangle,
         )
         val body = Json.encodeToString(request)

@@ -70,7 +70,7 @@ func (i *interactorImpl) RunSteps(
 
 func (i *interactorImpl) checkStepAssets(step *models.Step) error {
 	if step.IsCustomEvent() {
-		if !ValidLibraryName(step.Event) {
+		if !ValidName(step.Event) {
 			return fmt.Errorf("invalid event name: %s", step.Event)
 		}
 		actionPath := filepath.Join(
@@ -86,7 +86,7 @@ func (i *interactorImpl) checkStepAssets(step *models.Step) error {
 		return nil
 	}
 
-	if !ValidLibraryName(step.Value) {
+	if !ValidName(step.Value) {
 		return fmt.Errorf("invalid image name: %s", step.Value)
 	}
 	imagePath := filepath.Join(

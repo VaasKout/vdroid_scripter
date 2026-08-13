@@ -15,8 +15,6 @@ data class Library(
 data class SaveImageRequest(
     @SerialName("serial")
     val serial: String = "",
-    @SerialName("name")
-    val name: String = "",
     @SerialName("rectangle")
     val rectangle: CvRectangle? = null,
 )

@@ -17,23 +17,12 @@ const (
 	ActionExt = ".json"
 )
 
-type Library struct {
+type LibraryResponse struct {
 	Images  []string `json:"images"`
 	Actions []string `json:"actions"`
 }
 
-type SaveImageDto struct {
-	Serial    string           `json:"serial"`
-	Name      string           `json:"name"`
-	Rectangle models.Rectangle `json:"rectangle"`
-}
-
-func (s *SaveImageDto) Valid() bool {
-	return s != nil && strings.TrimSpace(s.Serial) != "" &&
-		ValidLibraryName(s.Name) && s.Rectangle.IsNotEmpty()
-}
-
-func ValidLibraryName(name string) bool {
+func ValidName(name string) bool {
 	name = strings.TrimSpace(name)
 	if name == "" || name == "." || name == ".." {
 		return false
@@ -42,15 +31,15 @@ func ValidLibraryName(name string) bool {
 }
 
 type LibraryUseCase interface {
-	GetLibrary() *Library
-	SaveImage(data *SaveImageDto) bool
+	GetLibrary() *LibraryResponse
+	SaveImage(serial string, rectangle *models.Rectangle) bool
 	DeleteImage(name string) bool
 	SaveAction(action *models.Action) bool
 	DeleteAction(name string) bool
 }
 
-func (i *interactorImpl) GetLibrary() *Library {
-	return &Library{
+func (i *interactorImpl) GetLibrary() *LibraryResponse {
+	return &LibraryResponse{
 		Images:  i.libraryNames(i.filesDB.CreateImagesDir(), ImageExt),
 		Actions: i.libraryNames(i.filesDB.CreateActionsDir(), ActionExt),
 	}
@@ -71,8 +60,14 @@ func (i *interactorImpl) libraryNames(dir string, ext string) []string {
 	return names
 }
 
-func (i *interactorImpl) SaveImage(data *SaveImageDto) bool {
-	if !data.Valid() {
+func (i *interactorImpl) SaveImage(serial string, rectangle *models.Rectangle) bool {
+	serial = strings.TrimSpace(serial)
+	if serial == "" || rectangle.IsEmpty() {
+		return false
+	}
+
+	name := strings.TrimSpace(rectangle.Label)
+	if !ValidName(name) {
 		return false
 	}
 
@@ -81,24 +76,24 @@ func (i *interactorImpl) SaveImage(data *SaveImageDto) bool {
 		return false
 	}
 
-	imgPath := filepath.Join(imagesDir, strings.TrimSpace(data.Name)+ImageExt)
+	imgPath := filepath.Join(imagesDir, name+ImageExt)
 	created := file.CreateFileIfNotExist(imgPath)
 	if !created {
 		return false
 	}
 
-	screenShot := i.cmd.ScreenShot(data.Serial)
+	screenShot := i.cmd.ScreenShot(serial)
 	if screenShot == "" {
 		return false
 	}
 
-	imgRect := data.Rectangle.ToImageRectangle()
+	imgRect := rectangle.ToImageRectangle()
 	i.cv.CutZone(screenShot, imgPath, imgRect)
 	return true
 }
 
 func (i *interactorImpl) DeleteImage(name string) bool {
-	if !ValidLibraryName(name) {
+	if !ValidName(name) {
 		return false
 	}
 
@@ -110,7 +105,7 @@ func (i *interactorImpl) DeleteImage(name string) bool {
 }
 
 func (i *interactorImpl) SaveAction(action *models.Action) bool {
-	if action.IsEmpty() || !ValidLibraryName(action.Name) {
+	if action.IsEmpty() || !ValidName(action.Name) {
 		return false
 	}
 
@@ -157,7 +152,7 @@ func (i *interactorImpl) getAction(name string) (*models.Action, error) {
 }
 
 func (i *interactorImpl) DeleteAction(name string) bool {
-	if !ValidLibraryName(name) {
+	if !ValidName(name) {
 		return false
 	}
 

@@ -19,7 +19,6 @@ interface ScripterDataSource {
 
     suspend fun saveImage(
         serial: String,
-        name: String,
         rectangle: CvRectangle?,
     ): Boolean
 

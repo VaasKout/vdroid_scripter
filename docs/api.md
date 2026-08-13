@@ -169,15 +169,14 @@ with the same `value` is matched against.
   ```json
   {
     "serial": "ABCD1234",
-    "name": "catalog_cart_icon",
-    "rectangle": { "left_x": 100, "right_x": 300, "top_y": 200, "bottom_y": 260 }
+    "rectangle": { "left_x": 100, "right_x": 300, "top_y": 200, "bottom_y": 260, "label": "catalog_cart_icon" }
   }
   ```
-  All fields are required; `name` must not contain path separators;
-  `rectangle` must be non-empty. An existing image with the same name is
-  overwritten.
+  The image name comes from `rectangle.label` — required, no path separators.
+  `serial` and a non-empty `rectangle` are required. An existing image with the
+  same name is overwritten.
 - **Response `200`:** `{ "status": "ok" }`
-- **Errors:** `400` on invalid JSON, a bad `name`, or a missing field, `500` if
+- **Errors:** `400` on invalid JSON, a bad `label`, or a missing field, `500` if
   the screenshot or crop fails.
 
 ### `POST /save_action`
@@ -338,7 +337,7 @@ Closes the session: stops the scrcpy server and tears down the sockets.
 `server/pkg/models/rectangle.go`
 
 ```json
-{ "left_x": 0, "right_x": 0, "top_y": 0, "bottom_y": 0 }
+{ "left_x": 0, "right_x": 0, "top_y": 0, "bottom_y": 0, "label": "" }
 ```
 
 | Field | JSON | Type |
@@ -347,6 +346,7 @@ Closes the session: stops the scrcpy server and tears down the sockets.
 | RightX | `right_x` | int |
 | TopY | `top_y` | int |
 | BottomY | `bottom_y` | int |
+| Label | `label` | string (omitempty; YOLO class in detections, the image name in `save_image`) |
 
 ### Step
 

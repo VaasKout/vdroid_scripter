@@ -71,8 +71,7 @@ class RecordRepository @Inject constructor(
         if (record.name.isEmpty()) return false
         return scripterDataSource.saveImage(
             serial = serial,
-            name = record.name,
-            rectangle = rectangle,
+            rectangle = rectangle?.copy(label = record.name),
         )
     }
 
