@@ -24,17 +24,10 @@ class RecordRepository @Inject constructor(
 
     private var startRecordingTime = 0L
 
-    fun startImage(name: String) {
+    fun initData(name: String, itemType: ItemType) {
         startRecordingTime = 0L
         _stateFlow.update {
-            Record(name = name, pending = PendingItem.IMAGE)
-        }
-    }
-
-    fun startAction(name: String) {
-        startRecordingTime = 0L
-        _stateFlow.update {
-            Record(name = name, pending = PendingItem.ACTION)
+            Record(name = name, type = itemType)
         }
     }
 
@@ -92,7 +85,7 @@ class RecordRepository @Inject constructor(
     }
 }
 
-enum class PendingItem {
+enum class ItemType {
     NONE,
     IMAGE,
     ACTION,
@@ -100,7 +93,7 @@ enum class PendingItem {
 
 data class Record(
     val name: String = "",
-    val pending: PendingItem = PendingItem.NONE,
+    val type: ItemType = ItemType.NONE,
     val recording: Boolean = false,
     val events: List<Event> = listOf(),
 )

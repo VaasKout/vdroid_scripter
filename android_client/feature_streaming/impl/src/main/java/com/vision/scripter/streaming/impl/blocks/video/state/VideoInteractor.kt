@@ -12,8 +12,8 @@ import com.vision.scripter.prefs.api.DataStoreRepository
 import com.vision.scripter.streaming.impl.blocks.video.ui.VideoUiState
 import com.vision.scripter.streaming.impl.blocks.video.ui.VideoUiStateHolder
 import com.vision.scripter.streaming.impl.data.CvStreamerRepository
+import com.vision.scripter.streaming.impl.data.ItemType
 import com.vision.scripter.streaming.impl.data.KeyboardRepository
-import com.vision.scripter.streaming.impl.data.PendingItem
 import com.vision.scripter.streaming.impl.data.RecordRepository
 import com.vision.scripter.streaming.impl.data.VideoStreamerRepository
 import com.vision.scripter.streaming.impl.screen.StreamingEvent
@@ -186,7 +186,7 @@ class VideoInteractor @Inject constructor(
         coroutineScope.launch {
             touchMutex.withLock {
                 try {
-                    if (record.pending == PendingItem.IMAGE) {
+                    if (record.type == ItemType.IMAGE) {
                         if (event.action == ACTION_DOWN) {
                             cvRepository.selectRectangle(x = event.x.toInt(), y = event.y.toInt())
                         }

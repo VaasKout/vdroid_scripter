@@ -1,6 +1,7 @@
 package com.vision.scripter.streaming.impl.blocks.menu.ui
 
 import androidx.compose.runtime.Stable
+import com.vision.scripter.streaming.impl.data.ItemType
 import com.vision.scripter.ui.CommandFlow
 import kotlinx.coroutines.flow.StateFlow
 
@@ -13,7 +14,7 @@ interface MenuUiStateHolder {
     fun init(serial: String)
 
     fun onAddClicked()
-    fun onAddItemConfirmed(name: String, isImage: Boolean)
+    fun onAddItemConfirmed(name: String, itemType: ItemType)
 
     fun onCvModeClicked()
 

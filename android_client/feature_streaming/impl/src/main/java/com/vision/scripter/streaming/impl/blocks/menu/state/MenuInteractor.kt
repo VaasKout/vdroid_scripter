@@ -6,6 +6,7 @@ import com.vision.scripter.streaming.impl.blocks.menu.ui.MenuUiCommand
 import com.vision.scripter.streaming.impl.blocks.menu.ui.MenuUiState
 import com.vision.scripter.streaming.impl.blocks.menu.ui.MenuUiStateHolder
 import com.vision.scripter.streaming.impl.data.CvStreamerRepository
+import com.vision.scripter.streaming.impl.data.ItemType
 import com.vision.scripter.streaming.impl.data.KeyboardRepository
 import com.vision.scripter.streaming.impl.data.RecordRepository
 import com.vision.scripter.streaming.impl.data.VideoStreamerRepository
@@ -94,20 +95,23 @@ class MenuInteractor @Inject constructor(
         _dialogState.update { DialogState.AddItem }
     }
 
-    override fun onAddItemConfirmed(name: String, isImage: Boolean) {
+    override fun onAddItemConfirmed(name: String, itemType: ItemType) {
         hideDialog()
         val trimmedName = name.trim()
-        if (trimmedName.isEmpty()) return
+        if (trimmedName.isEmpty() || itemType == ItemType.NONE) return
 
-        if (isImage) {
-            recordRepository.startImage(trimmedName)
-            updateMenuType(MenuType.SelectingCV(localCvMode = CVMode.CV_RECTS))
+        recordRepository.initData(name = trimmedName, itemType = itemType)
+        if (itemType == ItemType.IMAGE) {
+            _menuState.update {
+                it.copy(type = MenuType.SelectingCV(localCvMode = CVMode.CV_RECTS))
+            }
             switchCvMode(CVMode.CV_RECTS)
             return
         }
 
-        recordRepository.startAction(trimmedName)
-        updateMenuType(MenuType.CustomAction())
+        if (itemType == ItemType.ACTION) {
+            _menuState.update { it.copy(type = MenuType.CustomAction()) }
+        }
     }
 
     override fun onKeyboardClicked() {
@@ -117,7 +121,7 @@ class MenuInteractor @Inject constructor(
     override fun onExpandClicked() {
         val type = _menuState.value.type
         if (type is MenuType.Usual) {
-            updateMenuType(type.copy(expanded = !type.expanded))
+            _menuState.update { it.copy(type = type.copy(expanded = !type.expanded)) }
         }
     }
 
@@ -131,13 +135,13 @@ class MenuInteractor @Inject constructor(
         when (val type = _menuState.value.type) {
             is MenuType.SelectingCV -> {
                 val cvMode = type.localCvMode.toggleDetection()
-                updateMenuType(type.copy(localCvMode = cvMode))
+                _menuState.update { it.copy(type = type.copy(localCvMode = cvMode)) }
                 switchCvMode(cvMode)
             }
 
             is MenuType.Usual -> {
                 val newCvMode = type.localCvMode.increment()
-                updateMenuType(type.copy(localCvMode = newCvMode))
+                _menuState.update { it.copy(type = type.copy(localCvMode = newCvMode)) }
                 switchCvMode(newCvMode)
             }
 
@@ -149,7 +153,7 @@ class MenuInteractor @Inject constructor(
         val type = _menuState.value.type
         if (type !is MenuType.Usual) return
         if (type.textHighlighted) {
-            updateMenuType(type.copy(textHighlighted = false))
+            _menuState.update { it.copy(type = type.copy(textHighlighted = false)) }
             switchCvMode(CVMode.NO_CV)
             return
         }
@@ -161,7 +165,14 @@ class MenuInteractor @Inject constructor(
         findText(text = text.trim(), locale = locale)
         val type = _menuState.value.type
         if (type is MenuType.Usual) {
-            updateMenuType(type.copy(localCvMode = CVMode.NO_CV, textHighlighted = true))
+            _menuState.update {
+                it.copy(
+                    type = type.copy(
+                        localCvMode = CVMode.NO_CV,
+                        textHighlighted = true
+                    )
+                )
+            }
         }
     }
 
@@ -170,7 +181,7 @@ class MenuInteractor @Inject constructor(
         if (type !is MenuType.Keyboard) return
 
         val newMode = type.mode.increment()
-        updateMenuType(type.copy(mode = newMode))
+        _menuState.update { it.copy(type = type.copy(mode = newMode)) }
         changeKeyboardState(newMode)
     }
 
@@ -193,7 +204,7 @@ class MenuInteractor @Inject constructor(
     override fun onCancelClicked() {
         when (_menuState.value.type) {
             is MenuType.Keyboard -> exitKeyboard()
-            else -> updateMenuType(MenuType.Usual(expanded = true))
+            else -> _menuState.update { it.copy(type = MenuType.Usual(expanded = true)) }
         }
 
         coroutineScope.launch {
@@ -209,7 +220,7 @@ class MenuInteractor @Inject constructor(
     override fun onSaveLocale(locale: String) {
         hideDialog()
         if (_menuState.value.type !is MenuType.Usual) return
-        updateMenuType(MenuType.Keyboard(mode = KeyboardMode.EDIT))
+        _menuState.update { it.copy(type = MenuType.Keyboard(mode = KeyboardMode.EDIT)) }
         openKeyboard(locale)
     }
 
@@ -218,7 +229,7 @@ class MenuInteractor @Inject constructor(
     }
 
     private fun saveImage() {
-        updateMenuType(MenuType.Usual(expanded = true))
+        _menuState.update { it.copy(type = MenuType.Usual(expanded = true)) }
         coroutineScope.launch {
             val screenSizes = videoRepository.observeScreenSizes().value
             val selected = cvRepository.observeSelectedRectangles().value.firstOrNull()
@@ -239,7 +250,7 @@ class MenuInteractor @Inject constructor(
     }
 
     private fun saveAction() {
-        updateMenuType(MenuType.Usual(expanded = true))
+        _menuState.update { it.copy(type = MenuType.Usual(expanded = true)) }
         coroutineScope.launch {
             val screenSizes = videoRepository.observeScreenSizes().value
             val events = recordRepository.observeRecord().value.events
@@ -349,12 +360,12 @@ class MenuInteractor @Inject constructor(
     private fun setKeyboardLoading(isLoading: Boolean) {
         val type = _menuState.value.type
         if (type is MenuType.Keyboard) {
-            updateMenuType(type.copy(isLoading = isLoading))
+            _menuState.update { it.copy(type = type.copy(isLoading = isLoading)) }
         }
     }
 
     private fun exitKeyboard() {
-        updateMenuType(MenuType.Usual(expanded = true))
+        _menuState.update { it.copy(type = MenuType.Usual(expanded = true)) }
         coroutineScope.launch {
             dropState()
         }
@@ -365,10 +376,6 @@ class MenuInteractor @Inject constructor(
         if (type is MenuType.Keyboard) {
             _dialogState.update { DialogState.EditKeyboard(oldKey) }
         }
-    }
-
-    private fun updateMenuType(type: MenuType) {
-        _menuState.update { it.copy(type = type) }
     }
 
     private fun hideDialog() {

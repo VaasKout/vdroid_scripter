@@ -28,15 +28,16 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.vision.scripter.streaming.impl.R
+import com.vision.scripter.streaming.impl.data.ItemType
 import com.vision.scripter.ui.R as CoreR
 
 @Composable
 fun AddItemDialog(
-    onConfirm: (name: String, isImage: Boolean) -> Unit,
+    onConfirm: (name: String, item: ItemType) -> Unit,
     onDismiss: () -> Unit,
 ) {
     var text by remember { mutableStateOf("") }
-    var isImage by remember { mutableStateOf(true) }
+    var itemType by remember { mutableStateOf(ItemType.IMAGE) }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {
@@ -65,18 +66,18 @@ fun AddItemDialog(
 
                 AddItemChoice(
                     text = stringResource(R.string.add_image),
-                    selected = isImage,
-                    onClick = { isImage = true },
+                    selected = itemType == ItemType.IMAGE,
+                    onClick = { itemType = ItemType.IMAGE },
                 )
                 AddItemChoice(
                     text = stringResource(R.string.add_custom_action),
-                    selected = !isImage,
-                    onClick = { isImage = false },
+                    selected = itemType == ItemType.ACTION,
+                    onClick = { itemType = ItemType.ACTION },
                 )
             }
         },
         confirmButton = {
-            TextButton(onClick = { onConfirm(text, isImage) }) {
+            TextButton(onClick = { onConfirm(text, itemType) }) {
                 Text(
                     text = stringResource(CoreR.string.ok),
                     style = TextStyle(
