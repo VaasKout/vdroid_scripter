@@ -1,7 +1,7 @@
 package server
 
 import (
-	"android_vision_scripter/internal/usecases"
+	"android_vision_scripter/pkg/core/file"
 	"android_vision_scripter/pkg/models"
 	"encoding/json"
 	"net/http"
@@ -77,7 +77,7 @@ func (s *serverImpl) handleSaveImage(w http.ResponseWriter, r *http.Request) {
 	}{}
 	err := json.NewDecoder(r.Body).Decode(&data)
 	if err != nil || data.Serial == "" ||
-		data.Rectangle.IsEmpty() || !usecases.ValidName(data.Rectangle.Label) {
+		data.Rectangle.IsEmpty() || !file.ValidName(data.Rectangle.Label) {
 		http.Error(w, "Invalid JSON", http.StatusBadRequest)
 		return
 	}
@@ -96,7 +96,7 @@ func (s *serverImpl) handleSaveAction(w http.ResponseWriter, r *http.Request) {
 
 	var data = &models.Action{}
 	err := json.NewDecoder(r.Body).Decode(data)
-	if err != nil || data.IsEmpty() || !usecases.ValidName(data.Name) {
+	if err != nil || data.IsEmpty() || !file.ValidName(data.Name) {
 		http.Error(w, "Invalid JSON", http.StatusBadRequest)
 		return
 	}

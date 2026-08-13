@@ -70,12 +70,12 @@ func (i *interactorImpl) RunSteps(
 
 func (i *interactorImpl) checkStepAssets(step *models.Step) error {
 	if step.IsCustomEvent() {
-		if !ValidName(step.Event) {
+		if !file.ValidName(step.Event) {
 			return fmt.Errorf("invalid event name: %s", step.Event)
 		}
 		actionPath := filepath.Join(
 			i.filesDB.CreateActionsDir(),
-			strings.TrimSpace(step.Event)+ActionExt,
+			strings.TrimSpace(step.Event)+file.JsonExt,
 		)
 		if !file.Exists(actionPath) {
 			return fmt.Errorf("event not found in library: %s", step.Event)
@@ -86,12 +86,12 @@ func (i *interactorImpl) checkStepAssets(step *models.Step) error {
 		return nil
 	}
 
-	if !ValidName(step.Value) {
+	if !file.ValidName(step.Value) {
 		return fmt.Errorf("invalid image name: %s", step.Value)
 	}
 	imagePath := filepath.Join(
 		i.filesDB.CreateImagesDir(),
-		strings.TrimSpace(step.Value)+ImageExt,
+		strings.TrimSpace(step.Value)+file.PngExt,
 	)
 	if !file.Exists(imagePath) {
 		return fmt.Errorf("image not found in library: %s", step.Value)

@@ -3,7 +3,6 @@ package cv
 import (
 	"android_vision_scripter/pkg/core/file"
 	"android_vision_scripter/pkg/models"
-	"fmt"
 	"image"
 	"path/filepath"
 	"strings"
@@ -119,7 +118,7 @@ func (c *cvImpl) ResetKeyboardKeys(
 			text = strings.ToLower(text)
 		}
 
-		keyPath := filepath.Join(keyboardDir, fmt.Sprintf("%s.png", text))
+		keyPath := filepath.Join(keyboardDir, text+file.PngExt)
 		if file.Exists(keyPath) {
 			cropped.Close()
 			continue

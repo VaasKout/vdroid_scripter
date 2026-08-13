@@ -141,6 +141,21 @@ func GetFileName(path string) string {
 	return filename
 }
 
+// Common file extensions
+const (
+	PngExt  = ".png"
+	JsonExt = ".json"
+)
+
+// ValidName ...
+func ValidName(name string) bool {
+	name = strings.TrimSpace(name)
+	if name == "" || name == "." || name == ".." {
+		return false
+	}
+	return !strings.ContainsAny(name, `/\`)
+}
+
 // Exists ...
 func Exists(path string) bool {
 	_, err := os.Stat(path)

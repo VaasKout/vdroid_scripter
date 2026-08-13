@@ -166,7 +166,7 @@ func (i *interactorImpl) findRectByTarget(
 		if imagesDir == "" {
 			return nil, errors.New("images dir not found")
 		}
-		tmpImage := filepath.Join(imagesDir, strings.TrimSpace(step.Value)+ImageExt)
+		tmpImage := filepath.Join(imagesDir, strings.TrimSpace(step.Value)+file.PngExt)
 		if !file.Exists(tmpImage) {
 			return nil, fmt.Errorf("image not found in library: %s", step.Value)
 		}

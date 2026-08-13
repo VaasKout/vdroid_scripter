@@ -3,8 +3,8 @@ package usecases
 import (
 	"android_vision_scripter/internal/cv"
 	"android_vision_scripter/internal/filesdb"
+	"android_vision_scripter/pkg/core/file"
 	"android_vision_scripter/pkg/models"
-	"fmt"
 	"path/filepath"
 
 	"gocv.io/x/gocv"
@@ -75,7 +75,7 @@ func (i *interactorImpl) EditKeyboardKey(
 
 	var imgRect = rectangle.ToImageRectangle()
 	keyboardDir := i.filesDB.CreateKeyboardDir(modelOs, locale)
-	var keyboardKeyPath = filepath.Join(keyboardDir, fmt.Sprintf("%s.png", name))
+	var keyboardKeyPath = filepath.Join(keyboardDir, name+file.PngExt)
 	i.cv.CutZone(screenshot, keyboardKeyPath, imgRect)
 
 	return true
@@ -119,5 +119,5 @@ func (i *interactorImpl) DeleteButton(
 		return false
 	}
 
-	return i.filesDB.DeletePathInKeyboardDir(modelOs, locale, fmt.Sprintf("%s.png", name))
+	return i.filesDB.DeletePathInKeyboardDir(modelOs, locale, name+file.PngExt)
 }

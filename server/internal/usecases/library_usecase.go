@@ -12,22 +12,9 @@ import (
 	"strings"
 )
 
-const (
-	ImageExt  = ".png"
-	ActionExt = ".json"
-)
-
 type LibraryResponse struct {
 	Images  []string `json:"images"`
 	Actions []string `json:"actions"`
-}
-
-func ValidName(name string) bool {
-	name = strings.TrimSpace(name)
-	if name == "" || name == "." || name == ".." {
-		return false
-	}
-	return !strings.ContainsAny(name, `/\`)
 }
 
 type LibraryUseCase interface {
@@ -40,8 +27,8 @@ type LibraryUseCase interface {
 
 func (i *interactorImpl) GetLibrary() *LibraryResponse {
 	return &LibraryResponse{
-		Images:  i.libraryNames(i.filesDB.CreateImagesDir(), ImageExt),
-		Actions: i.libraryNames(i.filesDB.CreateActionsDir(), ActionExt),
+		Images:  i.libraryNames(i.filesDB.CreateImagesDir(), file.PngExt),
+		Actions: i.libraryNames(i.filesDB.CreateActionsDir(), file.JsonExt),
 	}
 }
 
@@ -67,7 +54,7 @@ func (i *interactorImpl) SaveImage(serial string, rectangle *models.Rectangle) b
 	}
 
 	name := strings.TrimSpace(rectangle.Label)
-	if !ValidName(name) {
+	if !file.ValidName(name) {
 		return false
 	}
 
@@ -76,7 +63,7 @@ func (i *interactorImpl) SaveImage(serial string, rectangle *models.Rectangle) b
 		return false
 	}
 
-	imgPath := filepath.Join(imagesDir, name+ImageExt)
+	imgPath := filepath.Join(imagesDir, name+file.PngExt)
 	created := file.CreateFileIfNotExist(imgPath)
 	if !created {
 		return false
@@ -93,7 +80,7 @@ func (i *interactorImpl) SaveImage(serial string, rectangle *models.Rectangle) b
 }
 
 func (i *interactorImpl) DeleteImage(name string) bool {
-	if !ValidName(name) {
+	if !file.ValidName(name) {
 		return false
 	}
 
@@ -101,11 +88,11 @@ func (i *interactorImpl) DeleteImage(name string) bool {
 	if imagesDir == "" {
 		return false
 	}
-	return i.filesDB.DeleteFileByName(imagesDir, strings.TrimSpace(name)+ImageExt)
+	return i.filesDB.DeleteFileByName(imagesDir, strings.TrimSpace(name)+file.PngExt)
 }
 
 func (i *interactorImpl) SaveAction(action *models.Action) bool {
-	if action.IsEmpty() || !ValidName(action.Name) {
+	if action.IsEmpty() || !file.ValidName(action.Name) {
 		return false
 	}
 
@@ -120,7 +107,7 @@ func (i *interactorImpl) SaveAction(action *models.Action) bool {
 		return false
 	}
 
-	actionPath := filepath.Join(actionsDir, action.Name+ActionExt)
+	actionPath := filepath.Join(actionsDir, action.Name+file.JsonExt)
 	err := os.WriteFile(actionPath, bytes, 0644)
 	if err != nil {
 		i.logger.Error(err.Error())
@@ -134,7 +121,7 @@ func (i *interactorImpl) getAction(name string) (*models.Action, error) {
 		return nil, errors.New("actions dir not found")
 	}
 
-	actionPath := filepath.Join(actionsDir, strings.TrimSpace(name)+ActionExt)
+	actionPath := filepath.Join(actionsDir, strings.TrimSpace(name)+file.JsonExt)
 	bytes, err := os.ReadFile(actionPath)
 	if err != nil {
 		return nil, fmt.Errorf("action not found in library: %s", name)
@@ -152,7 +139,7 @@ func (i *interactorImpl) getAction(name string) (*models.Action, error) {
 }
 
 func (i *interactorImpl) DeleteAction(name string) bool {
-	if !ValidName(name) {
+	if !file.ValidName(name) {
 		return false
 	}
 
@@ -160,5 +147,5 @@ func (i *interactorImpl) DeleteAction(name string) bool {
 	if actionsDir == "" {
 		return false
 	}
-	return i.filesDB.DeleteFileByName(actionsDir, strings.TrimSpace(name)+ActionExt)
+	return i.filesDB.DeleteFileByName(actionsDir, strings.TrimSpace(name)+file.JsonExt)
 }
