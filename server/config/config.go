@@ -9,7 +9,7 @@ import (
 
 // Default values
 const (
-	BasePath       = "android_vision_scripter"
+	BasePath       = "vdroid_scripter"
 	LogsDir        = "logs"
 	KeyboardDir    = "keyboards"
 	ScrcpyDir      = "scrcpy"
