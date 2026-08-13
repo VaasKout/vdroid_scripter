@@ -19,6 +19,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.serialization.json.Json
 import java.util.concurrent.atomic.AtomicReference
 import javax.inject.Inject
+import kotlin.time.Duration.Companion.milliseconds
 
 @StreamingScope
 class CvStreamerRepository @Inject constructor(
@@ -69,7 +70,7 @@ class CvStreamerRepository @Inject constructor(
     ) {
         while (true) {
             if (cvMode.value == CVMode.NO_CV) {
-                delay(100)
+                delay(100.milliseconds)
                 continue
             }
             val buffer = cvStreamer.readRectangles() ?: continue
@@ -143,12 +144,6 @@ class CvStreamerRepository @Inject constructor(
 
     fun restoreSelectedRectangles() {
         _selectedRectangles.value = selectedRectanglesSnapshot.getAndSet(listOf())
-    }
-
-    fun clearAllRectangles() {
-        _cvRectanglesFlow.update { listOf() }
-        _yoloRectanglesFlow.update { listOf() }
-        _selectedRectangles.update { listOf() }
     }
 
     fun close() {

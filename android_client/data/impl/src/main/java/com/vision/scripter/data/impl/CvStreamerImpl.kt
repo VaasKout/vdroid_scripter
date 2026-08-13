@@ -13,6 +13,7 @@ import java.net.InetSocketAddress
 import java.net.Socket
 import javax.inject.Inject
 import javax.net.SocketFactory
+import kotlin.time.Duration.Companion.milliseconds
 
 class CvStreamerImpl @Inject constructor(
     private val dispatchersFactory: DispatchersFactory,
@@ -79,7 +80,7 @@ class CvStreamerImpl @Inject constructor(
             buffer
         } catch (e: Exception) {
             e.printStackTrace()
-            delay(1000)
+            delay(1000.milliseconds)
             null
         }
     }
