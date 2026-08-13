@@ -1,7 +1,7 @@
 package server
 
 import (
-	"android_vision_scripter/internal/usecases"
+	"android_vision_scripter/pkg/models"
 	"encoding/json"
 	"net/http"
 )
@@ -38,9 +38,12 @@ func (s *serverImpl) handleStepsFunctions() {
 func (s *serverImpl) handleRunSteps(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 
-	var data = &usecases.RunStepsDto{}
-	err := json.NewDecoder(r.Body).Decode(data)
-	if err != nil || !data.Valid() {
+	var data = struct {
+		Serial string        `json:"serial"`
+		Steps  []models.Step `json:"steps"`
+	}{}
+	err := json.NewDecoder(r.Body).Decode(&data)
+	if err != nil || data.Serial == "" || !models.ValidQueue(data.Steps) {
 		http.Error(w, "Invalid JSON", http.StatusBadRequest)
 		return
 	}

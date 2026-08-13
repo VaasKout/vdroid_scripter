@@ -1,6 +1,7 @@
 package scrcpy
 
 import (
+	"android_vision_scripter/pkg/models"
 	"encoding/binary"
 	"fmt"
 	"io"
@@ -9,20 +10,16 @@ import (
 	"gocv.io/x/gocv"
 )
 
-// Control bytes size of buffer
-const (
-	ControlBufSize = 32
-)
-
 // Connection ...
 type Connection interface {
 	WriteControlData(serial string, data []byte)
 	ReadVideoStream(serial string, clientCh chan []byte)
 	GetMatFromLastFrame(serial string, rgb bool) (*gocv.Mat, error)
+	GetScreenSize(serial string) (int, int, error)
 }
 
 func (s *scrcpyImpl) WriteControlData(serial string, data []byte) {
-	if len(data) != ControlBufSize {
+	if len(data) != models.ControlBytesSize {
 		return
 	}
 	if scrcpyData, ok := s.scrcpyCache.Get(serial); ok {
@@ -37,7 +34,7 @@ func (s *scrcpyImpl) WriteControlData(serial string, data []byte) {
 			)
 			return
 		}
-		if n != ControlBufSize {
+		if n != models.ControlBytesSize {
 			s.logAPI.Error(
 				fmt.Sprintf("invalid control buffer size: %d", n),
 			)
@@ -144,6 +141,19 @@ func (s *scrcpyImpl) GetMatFromLastFrame(serial string, rgb bool) (*gocv.Mat, er
 
 	newMat := mat.Clone()
 	return &newMat, nil
+}
+
+func (s *scrcpyImpl) GetScreenSize(serial string) (int, int, error) {
+	scrcpyData, ok := s.scrcpyCache.Get(serial)
+	if !ok || scrcpyData == nil || scrcpyData.Data == nil {
+		return 0, 0, fmt.Errorf("video connecton for %s is not active", serial)
+	}
+
+	width, height := scrcpyData.Data.GetSize()
+	if width <= 0 || height <= 0 {
+		return 0, 0, fmt.Errorf("screen size for %s is not available", serial)
+	}
+	return width, height, nil
 }
 
 func (s *scrcpyImpl) sendVideoMetaData(serial string, ch chan []byte) error {

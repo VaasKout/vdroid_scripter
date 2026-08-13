@@ -1,6 +1,7 @@
 package models
 
 import (
+	"android_vision_scripter/pkg/core/file"
 	"fmt"
 	"strings"
 	"time"
@@ -35,8 +36,26 @@ func (s *Step) GetTimeout() time.Duration {
 	return time.Duration(s.Timeout) * time.Second
 }
 
+func ValidQueue(steps []Step) bool {
+	if len(steps) == 0 {
+		return false
+	}
+	for index := range steps {
+		if !steps[index].Valid() {
+			return false
+		}
+	}
+	return true
+}
+
 func (s *Step) Valid() bool {
 	if s == nil {
+		return false
+	}
+	if s.IsCustomEvent() && !file.ValidName(s.Event) {
+		return false
+	}
+	if s.Type == Image && !file.ValidName(s.Value) {
 		return false
 	}
 

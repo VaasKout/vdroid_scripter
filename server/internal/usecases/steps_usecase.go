@@ -1,33 +1,22 @@
 package usecases
 
 import (
+	"android_vision_scripter/internal/cv"
+	"android_vision_scripter/internal/filesdb"
 	"android_vision_scripter/pkg/core/file"
+	"android_vision_scripter/pkg/core/numutils"
+	"android_vision_scripter/pkg/core/strutils"
 	"android_vision_scripter/pkg/models"
 	"errors"
 	"fmt"
+	"image"
 	"path/filepath"
 	"strings"
 	"time"
+	"unicode"
+
+	"gocv.io/x/gocv"
 )
-
-const frameWaitTimeout = 5 * time.Second
-
-type RunStepsDto struct {
-	Serial string        `json:"serial"`
-	Steps  []models.Step `json:"steps"`
-}
-
-func (r *RunStepsDto) Valid() bool {
-	if r == nil || strings.TrimSpace(r.Serial) == "" || len(r.Steps) == 0 {
-		return false
-	}
-	for index := range r.Steps {
-		if !r.Steps[index].Valid() {
-			return false
-		}
-	}
-	return true
-}
 
 type StepsUseCase interface {
 	RunSteps(serial string, steps []models.Step, basePort int) error
@@ -42,16 +31,12 @@ func (i *interactorImpl) RunSteps(
 	if serial == "" {
 		return errors.New(SerialIsEmptyError)
 	}
-	if len(steps) == 0 {
-		return errors.New("steps are empty")
+	if !models.ValidQueue(steps) {
+		return errors.New("invalid steps")
 	}
 
 	for index := range steps {
-		step := &steps[index]
-		if !step.Valid() {
-			return fmt.Errorf("invalid step: %s", step.ToString())
-		}
-		if err := i.checkStepAssets(step); err != nil {
+		if err := i.checkStepAssets(&steps[index]); err != nil {
 			return err
 		}
 	}
@@ -70,9 +55,6 @@ func (i *interactorImpl) RunSteps(
 
 func (i *interactorImpl) checkStepAssets(step *models.Step) error {
 	if step.IsCustomEvent() {
-		if !file.ValidName(step.Event) {
-			return fmt.Errorf("invalid event name: %s", step.Event)
-		}
 		actionPath := filepath.Join(
 			i.filesDB.CreateActionsDir(),
 			strings.TrimSpace(step.Event)+file.JsonExt,
@@ -82,13 +64,10 @@ func (i *interactorImpl) checkStepAssets(step *models.Step) error {
 		}
 	}
 
-	if step.Type != models.Image || !step.HasType() {
+	if step.Type != models.Image {
 		return nil
 	}
 
-	if !file.ValidName(step.Value) {
-		return fmt.Errorf("invalid image name: %s", step.Value)
-	}
 	imagePath := filepath.Join(
 		i.filesDB.CreateImagesDir(),
 		strings.TrimSpace(step.Value)+file.PngExt,
@@ -99,22 +78,321 @@ func (i *interactorImpl) checkStepAssets(step *models.Step) error {
 	return nil
 }
 
-func (i *interactorImpl) waitForFrameSizes(serial string) (int, int, error) {
-	deadline := time.Now().Add(frameWaitTimeout)
+func (i *interactorImpl) executeStep(serial string, step *models.Step) error {
+	var session *models.Session
+	if result, ok := i.sessionsCache.Get(serial); ok {
+		session = &result
+	}
+	if session == nil || session.VideoPort == 0 {
+		return fmt.Errorf("no connection to %s", serial)
+	}
+	if !step.Valid() {
+		return errors.New("step is empty")
+	}
+
+	i.logger.Info(fmt.Sprintf("running step %s... ⏳", step.ToString()))
+
+	err := i.runStepAction(serial, step)
+	if err != nil {
+		return err
+	}
+
+	i.logger.Info(fmt.Sprintf("step %s is COMPLETE ✅", step.ToString()))
+	return nil
+}
+
+func (i *interactorImpl) runStepAction(serial string, step *models.Step) error {
+	if step.IsCheckEvent() {
+		_, err := i.findTargetRect(serial, step, step.GetTimeout())
+		return err
+	}
+
+	switch step.Event {
+	case models.TapEvent:
+		return i.playGeneratedTap(serial, step, false)
+	case models.LongTapEvent:
+		return i.playGeneratedTap(serial, step, true)
+	case models.TypeTextEvent:
+		return i.typeTextStep(serial, step)
+	}
+	return i.playCustomEvent(serial, step)
+}
+
+func (i *interactorImpl) playGeneratedTap(
+	serial string,
+	step *models.Step,
+	longTap bool,
+) error {
+	foundRect, err := i.findTargetRect(serial, step, step.GetTimeout())
+	if err != nil {
+		return err
+	}
+
+	width, height, err := i.scrcpy.GetScreenSize(serial)
+	if err != nil {
+		return err
+	}
+
+	events := models.GenerateTapEvents(width, height)
+	if longTap {
+		events = models.GenerateLongTapEvents(width, height)
+	}
+	i.playEvent(serial, foundRect, events)
+	return nil
+}
+
+func (i *interactorImpl) typeTextStep(serial string, step *models.Step) error {
+	width, height, err := i.scrcpy.GetScreenSize(serial)
+	if err != nil {
+		return err
+	}
+
+	tapEvents := models.GenerateTapEvents(width, height)
+	return i.typeText(serial, step.GetTimeout(), step.Value, step.Locale, tapEvents)
+}
+
+func (i *interactorImpl) playCustomEvent(serial string, step *models.Step) error {
+	action, err := i.getAction(step.Event)
+	if err != nil {
+		return err
+	}
+
+	var foundRect *image.Rectangle
+	if step.HasType() {
+		foundRect, err = i.findTargetRect(serial, step, step.GetTimeout())
+		if err != nil {
+			return err
+		}
+	}
+
+	i.playEvent(serial, foundRect, action.Events)
+	time.Sleep(300 * time.Millisecond) //animation delay
+	return nil
+}
+
+func (i *interactorImpl) findTargetRect(
+	serial string,
+	step *models.Step,
+	timeout time.Duration,
+) (*image.Rectangle, error) {
+	if !step.HasType() {
+		return nil, errors.New("step target is empty")
+	}
+
+	var foundRect *image.Rectangle
+	deadline := time.Now().Add(timeout)
 	for time.Now().Before(deadline) {
-		mat, err := i.scrcpy.GetMatFromLastFrame(serial, false)
-		if err != nil || mat == nil {
-			time.Sleep(250 * time.Millisecond)
+		mat, err := i.scrcpy.GetMatFromLastFrame(serial, true)
+		if err != nil {
+			i.logger.Error(err.Error())
+			sleepUntilNextSecond()
+			continue
+		}
+		if mat == nil {
+			sleepUntilNextSecond()
 			continue
 		}
 
-		width := mat.Cols()
-		height := mat.Rows()
+		foundRect, err = i.findRectByTarget(serial, mat, step)
 		mat.Close()
-		if width > 0 && height > 0 {
-			return width, height, nil
+
+		if err != nil {
+			i.logger.Error(err.Error())
+			sleepUntilNextSecond()
+			continue
 		}
-		time.Sleep(250 * time.Millisecond)
+		if models.ImageRectIsEmpty(foundRect) {
+			sleepUntilNextSecond()
+			continue
+		}
+		break
 	}
-	return 0, 0, fmt.Errorf("no video frame received for %s", serial)
+
+	if models.ImageRectIsEmpty(foundRect) {
+		return nil, fmt.Errorf(models.StatusError, step.Type, step.Value)
+	}
+
+	return foundRect, nil
+}
+
+func (i *interactorImpl) findRectByTarget(
+	serial string,
+	mat *gocv.Mat,
+	step *models.Step,
+) (*image.Rectangle, error) {
+
+	if step.Type == models.Image {
+		imagesDir := i.filesDB.CreateImagesDir()
+		if imagesDir == "" {
+			return nil, errors.New("images dir not found")
+		}
+		tmpImage := filepath.Join(imagesDir, strings.TrimSpace(step.Value)+file.PngExt)
+		if !file.Exists(tmpImage) {
+			return nil, fmt.Errorf("image not found in library: %s", step.Value)
+		}
+		return i.cv.FindImage(mat, tmpImage)
+	}
+
+	if step.Type == models.Text {
+		tesseractDir := i.filesDB.CreateLogsDir(serial, filesdb.TesseractDir)
+		if tesseractDir == "" {
+			return nil, fmt.Errorf("tesseract dir was not found")
+		}
+		var ocrParams = cv.InitOcrParams(
+			step.Value,
+			step.Locale,
+			cv.PsmText,
+			cv.OemText,
+		)
+		rectangles, err := i.cv.FindTextRectangles(mat, tesseractDir, ocrParams)
+		if err != nil {
+			return nil, err
+		}
+		if len(rectangles) == 0 || rectangles[0].IsEmpty() {
+			return nil, nil
+		}
+		return rectangles[0].Rectangle.ToImageRectangle(), nil
+	}
+
+	if step.Type == models.Yolo {
+		var labels = i.yolo.DetectLabels(*mat)
+		for _, rect := range labels {
+			if strings.EqualFold(rect.Label, step.Value) {
+				return rect.ToImageRectangle(), nil
+			}
+		}
+		return nil, fmt.Errorf("yolo class not found: %s", step.Value)
+	}
+
+	return nil, fmt.Errorf("unknown target type %s", step.Type)
+}
+
+func (i *interactorImpl) typeText(
+	serial string,
+	timeout time.Duration,
+	text string,
+	locale string,
+	tapEvents []models.Event,
+) error {
+	if text == "" {
+		return fmt.Errorf("nothing to type")
+	}
+
+	typed := false
+	deadline := time.Now().Add(timeout)
+attemptsLoop:
+	for time.Now().Before(deadline) {
+		keyboardKeys, err := i.getKeyboardKeys(serial, text, locale)
+		if err != nil {
+			i.logger.Error(err.Error())
+			sleepUntilNextSecond()
+			continue attemptsLoop
+		}
+		chars := []rune(strings.ToLower(text))
+		keysToPress := make([]cv.OCRResult, len(chars))
+
+	charsLoop:
+		for index, ch := range chars {
+			for _, key := range keyboardKeys {
+				if key.Text == "" {
+					return fmt.Errorf("empty keyboard key")
+				}
+
+				if []rune(key.Text)[0] == ch {
+					keysToPress[index] = key
+					continue charsLoop
+				}
+				if key.Text == cv.Space && unicode.IsSpace(ch) {
+					keysToPress[index] = key
+					continue charsLoop
+				}
+			}
+
+			i.logger.Error(fmt.Sprintf("char %c not found", ch))
+			sleepUntilNextSecond()
+			continue attemptsLoop
+		}
+
+		for _, key := range keysToPress {
+			var imgRect = key.Rectangle.ToImageRectangle()
+			i.playEvent(serial, imgRect, tapEvents)
+			time.Sleep(numutils.RandDelay(100, 300) * time.Millisecond)
+		}
+
+		typed = true
+		break
+	}
+
+	if !typed {
+		return fmt.Errorf("unable to type %q", text)
+	}
+	return nil
+}
+
+func (i *interactorImpl) getKeyboardKeys(
+	serial string,
+	text string,
+	locale string,
+) ([]cv.OCRResult, error) {
+	keyboardKeys := []cv.OCRResult{}
+	mat, err := i.scrcpy.GetMatFromLastFrame(serial, true)
+	if err != nil {
+		i.logger.Error(err.Error())
+		return []cv.OCRResult{}, err
+	}
+	if mat == nil {
+		return []cv.OCRResult{}, fmt.Errorf("mat is nil")
+	}
+	defer mat.Close()
+
+	modelOS := i.GetDevice(serial).ToModelOs()
+	keyboardDir := i.filesDB.CreateKeyboardDir(modelOS, locale)
+	keyboardButtons := i.filesDB.GetFiles(keyboardDir)
+
+	chars := strutils.GetUniqueChars(text)
+
+	filteredButtons := []string{}
+	for _, button := range keyboardButtons {
+		for _, ch := range chars {
+			if string(ch) == file.GetFileName(button) {
+				filteredButtons = append(filteredButtons, button)
+			}
+		}
+	}
+
+	if len(filteredButtons) == 0 {
+		return []cv.OCRResult{}, fmt.Errorf("buttons not found")
+	}
+
+	keyboardKeys = i.cv.GetKeyboardKeys(filteredButtons, *mat)
+	return keyboardKeys, nil
+}
+
+func (i *interactorImpl) playEvent(
+	serial string,
+	rect *image.Rectangle,
+	events []models.Event,
+) {
+	var offsetX = 0
+	var offsetY = 0
+	var lastTimeStamp int64
+	for index, event := range events {
+		var data = &event.Data
+		if index == 0 {
+			offsetX, offsetY = data.CountOffset(rect)
+		}
+
+		data.ApplyOffset(offsetX, offsetY)
+		var delay = event.Time - lastTimeStamp
+		time.Sleep(time.Duration(delay) * time.Millisecond)
+		lastTimeStamp = event.Time
+
+		i.scrcpy.WriteControlData(serial, *data)
+	}
+}
+
+func sleepUntilNextSecond() {
+	now := time.Now()
+	next := now.Truncate(time.Second).Add(time.Second)
+	time.Sleep(next.Sub(now))
 }
