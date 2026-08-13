@@ -103,7 +103,7 @@ func (i *interactorImpl) executeStep(serial string, step *models.Step) error {
 
 func (i *interactorImpl) runStepAction(serial string, step *models.Step) error {
 	if step.IsCheckEvent() {
-		_, err := i.findTargetRect(serial, step, step.GetTimeout())
+		_, err := i.findRect(serial, step)
 		return err
 	}
 
@@ -123,7 +123,7 @@ func (i *interactorImpl) playGeneratedTap(
 	step *models.Step,
 	longTap bool,
 ) error {
-	foundRect, err := i.findTargetRect(serial, step, step.GetTimeout())
+	foundRect, err := i.findRect(serial, step)
 	if err != nil {
 		return err
 	}
@@ -159,7 +159,7 @@ func (i *interactorImpl) playCustomEvent(serial string, step *models.Step) error
 
 	var foundRect *image.Rectangle
 	if step.HasType() {
-		foundRect, err = i.findTargetRect(serial, step, step.GetTimeout())
+		foundRect, err = i.findRect(serial, step)
 		if err != nil {
 			return err
 		}
@@ -170,17 +170,16 @@ func (i *interactorImpl) playCustomEvent(serial string, step *models.Step) error
 	return nil
 }
 
-func (i *interactorImpl) findTargetRect(
+func (i *interactorImpl) findRect(
 	serial string,
 	step *models.Step,
-	timeout time.Duration,
 ) (*image.Rectangle, error) {
 	if !step.HasType() {
 		return nil, errors.New("step target is empty")
 	}
 
 	var foundRect *image.Rectangle
-	deadline := time.Now().Add(timeout)
+	deadline := time.Now().Add(step.GetTimeout())
 	for time.Now().Before(deadline) {
 		mat, err := i.scrcpy.GetMatFromLastFrame(serial, true)
 		if err != nil {
@@ -193,7 +192,7 @@ func (i *interactorImpl) findTargetRect(
 			continue
 		}
 
-		foundRect, err = i.findRectByTarget(serial, mat, step)
+		foundRect, err = i.findRectByType(serial, mat, step)
 		mat.Close()
 
 		if err != nil {
@@ -215,12 +214,11 @@ func (i *interactorImpl) findTargetRect(
 	return foundRect, nil
 }
 
-func (i *interactorImpl) findRectByTarget(
+func (i *interactorImpl) findRectByType(
 	serial string,
 	mat *gocv.Mat,
 	step *models.Step,
 ) (*image.Rectangle, error) {
-
 	if step.Type == models.Image {
 		imagesDir := i.filesDB.CreateImagesDir()
 		if imagesDir == "" {

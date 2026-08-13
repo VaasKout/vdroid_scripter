@@ -117,6 +117,7 @@ func (i *interactorImpl) addStepsToQueue(serial string, steps []models.Step) {
 }
 
 func (i *interactorImpl) runSessionQueue(serial string) {
+	defer i.logger.Info(fmt.Sprintf("queue loop closed for %s... 🛑", serial))
 	for {
 		session, ok := i.sessionsCache.Get(serial)
 		if !ok {
@@ -130,7 +131,7 @@ func (i *interactorImpl) runSessionQueue(serial string) {
 		}
 
 		if len(session.Query) == 0 {
-			time.Sleep(500 * time.Millisecond)
+			time.Sleep(300 * time.Millisecond)
 			continue
 		}
 
@@ -140,26 +141,17 @@ func (i *interactorImpl) runSessionQueue(serial string) {
 		i.sessionsCache.Add(serial, session)
 
 		err := i.executeStep(serial, &step)
-		i.finishQueuedStep(serial, err)
-	}
-}
+		if err != nil {
+			i.logger.Error(err.Error())
+			session.Status = err.Error()
+			session.Query = []models.Step{}
+			i.sessionsCache.Add(serial, session)
+			return
+		}
 
-func (i *interactorImpl) finishQueuedStep(serial string, err error) {
-	session, ok := i.sessionsCache.Get(serial)
-	if !ok {
-		return
-	}
-
-	if err != nil {
-		i.logger.Error(err.Error())
-		session.Status = err.Error()
-		session.Query = []models.Step{}
+		if len(session.Query) == 0 {
+			session.Status = models.StatusIdle
+		}
 		i.sessionsCache.Add(serial, session)
-		return
 	}
-
-	if len(session.Query) == 0 {
-		session.Status = models.StatusIdle
-	}
-	i.sessionsCache.Add(serial, session)
 }
