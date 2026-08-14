@@ -6,6 +6,9 @@ PREFIX="${PREFIX:-/usr/local}"
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SERVER_DIR="$REPO_ROOT/server"
 BUILD_OUTPUT=""
+FFMPEG8_VERSION="8.1.2"
+FFMPEG8_TAP="local/ffmpeg8"
+LIBAVCODEC_MAJOR="62"
 
 main() {
   detect_platform
@@ -56,8 +59,45 @@ install_dependencies() {
 
 install_macos() {
   need_cmd brew
-  brew install go android-platform-tools ffmpeg opencv@4 tesseract tesseract-lang
+  brew install go android-platform-tools pkgconf opencv@4 tesseract tesseract-lang
+  install_macos_ffmpeg8
   install_macos_legacy_tessdata
+}
+
+macos_ffmpeg_prefix() {
+  if brew list --versions "ffmpeg@$FFMPEG8_VERSION" >/dev/null 2>&1; then
+    brew --prefix "ffmpeg@$FFMPEG8_VERSION"
+    return
+  fi
+
+  local main_version
+  main_version="$(brew list --versions ffmpeg 2>/dev/null | awk '{print $2}')"
+  case "$main_version" in
+    8.*)
+      brew --prefix ffmpeg
+      return
+      ;;
+  esac
+  return 1
+}
+
+install_macos_ffmpeg8() {
+  if macos_ffmpeg_prefix >/dev/null; then
+    log "FFmpeg 8 is already installed"
+    return
+  fi
+
+  local main_version
+  main_version="$(brew list --versions ffmpeg 2>/dev/null | awk '{print $2}')"
+  if [ -n "$main_version" ]; then
+    log "Unlinking ffmpeg $main_version (go-astiav requires FFmpeg 8)"
+    brew unlink ffmpeg >/dev/null
+  fi
+
+  log "Installing FFmpeg $FFMPEG8_VERSION from source (Homebrew ships no ffmpeg@8 formula; this takes a while)"
+  brew tap | grep -qx "$FFMPEG8_TAP" || brew tap-new "$FFMPEG8_TAP"
+  brew extract --version="$FFMPEG8_VERSION" ffmpeg "$FFMPEG8_TAP" 2>/dev/null || true
+  brew install "$FFMPEG8_TAP/ffmpeg@$FFMPEG8_VERSION"
 }
 
 install_macos_legacy_tessdata() {
@@ -127,9 +167,23 @@ build_server() {
   tmpdir="$(mktemp -d)"
   BUILD_OUTPUT="$tmpdir/$BIN_NAME"
   if [ "$PLATFORM" = "macos" ]; then
-    export PKG_CONFIG_PATH="$(brew --prefix opencv@4)/lib/pkgconfig:$(brew --prefix ffmpeg)/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
+    local ffmpeg_prefix
+    ffmpeg_prefix="$(macos_ffmpeg_prefix)" || die "FFmpeg 8 not found. Re-run this script to install it."
+    export PKG_CONFIG_PATH="$(brew --prefix opencv@4)/lib/pkgconfig:$ffmpeg_prefix/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
   fi
+  check_ffmpeg_version
   (cd "$SERVER_DIR" && go mod download && CGO_ENABLED=1 go build -o "$BUILD_OUTPUT" ./cmd)
+}
+
+check_ffmpeg_version() {
+  need_cmd pkg-config
+  local avcodec
+  avcodec="$(pkg-config --modversion libavcodec 2>/dev/null)" ||
+    die "libavcodec not found via pkg-config. Install FFmpeg 8 with development headers and re-run."
+  case "$avcodec" in
+    "$LIBAVCODEC_MAJOR".*) return ;;
+  esac
+  die "go-astiav requires FFmpeg 8 (libavcodec $LIBAVCODEC_MAJOR.x), but pkg-config found libavcodec $avcodec at $(pkg-config --variable=prefix libavcodec). Install FFmpeg 8 and re-run."
 }
 
 install_binary() {
