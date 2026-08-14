@@ -4,6 +4,7 @@ import (
 	"android_vision_scripter/pkg/models"
 	"encoding/json"
 	"net/http"
+	"strings"
 )
 
 // Keyboard paths
@@ -87,6 +88,7 @@ func (s *serverImpl) handleEditKeyboard(w http.ResponseWriter, r *http.Request) 
 	}
 
 	err := json.NewDecoder(r.Body).Decode(&data)
+	data.Name = strings.TrimSpace(data.Name)
 	if err != nil || data.Serial == "" || data.Name == "" || data.Rectangle.IsEmpty() {
 		http.Error(w, "Invalid JSON", http.StatusBadRequest)
 		return
@@ -130,7 +132,7 @@ func (s *serverImpl) handleDeleteButton(w http.ResponseWriter, r *http.Request) 
 	defer r.Body.Close()
 	var serial = r.PathValue(SerialKey)
 	var locale = r.URL.Query().Get(LocaleKey)
-	var name = r.URL.Query().Get(NameKey)
+	var name = strings.TrimSpace(r.URL.Query().Get(NameKey))
 
 	if serial == "" {
 		http.Error(w, `"serial" query needed`, http.StatusBadRequest)

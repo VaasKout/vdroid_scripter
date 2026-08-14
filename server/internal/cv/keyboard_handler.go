@@ -106,12 +106,16 @@ func (c *cvImpl) ResetKeyboardKeys(
 	for _, rect := range keyboardRects {
 		cropped := img.Region(rect)
 		ocrResult, err := c.FindTextRectangles(&cropped, tesseractDir, ocrParams)
-		if err != nil || len(ocrResult) == 0 || ocrResult[0].Text == "" {
+		if err != nil || len(ocrResult) == 0 {
 			cropped.Close()
 			continue
 		}
 
-		text := ocrResult[0].Text
+		text := strings.TrimSpace(ocrResult[0].Text)
+		if text == "" {
+			cropped.Close()
+			continue
+		}
 		if upperCase {
 			text = strings.ToUpper(text)
 		} else {
