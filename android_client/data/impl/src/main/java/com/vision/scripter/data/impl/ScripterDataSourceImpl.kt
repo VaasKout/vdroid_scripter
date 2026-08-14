@@ -17,6 +17,7 @@ import com.vision.scripter.network.api.ApiResponse
 import com.vision.scripter.network.api.NetworkClient
 import com.vision.scripter.network.api.NetworkError
 import kotlinx.serialization.json.Json
+import java.net.URLEncoder
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -119,13 +120,13 @@ class ScripterDataSourceImpl @Inject constructor(
 
     override suspend fun deleteImage(name: String): Boolean {
         if (name.isEmpty()) return false
-        val result = networkClient.delete("images/$name")
+        val result = networkClient.delete("images/${encodePath(name)}")
         return result is ApiResponse.Success
     }
 
     override suspend fun deleteAction(name: String): Boolean {
         if (name.isEmpty()) return false
-        val result = networkClient.delete("actions/$name")
+        val result = networkClient.delete("actions/${encodePath(name)}")
         return result is ApiResponse.Success
     }
 
@@ -135,7 +136,7 @@ class ScripterDataSourceImpl @Inject constructor(
         locale: String,
     ): ApiResponse<List<RectangleWithText>> {
         return when (val result = networkClient.get(
-            "/devices/$serial/find_text?text=$text&locale=$locale",
+            "/devices/$serial/find_text?text=${encodeQuery(text)}&locale=$locale",
         )) {
             is ApiResponse.Success -> {
                 val json = result.data
@@ -202,8 +203,13 @@ class ScripterDataSourceImpl @Inject constructor(
 
     override suspend fun deleteButton(serial: String, locale: String, name: String): Boolean {
         if (serial.isEmpty() || name.isEmpty()) return false
-        val result = networkClient.get("/devices/$serial/delete_button?locale=$locale&name=$name")
+        val result = networkClient.get(
+            "/devices/$serial/delete_button?locale=$locale&name=${encodeQuery(name)}",
+        )
         return result is ApiResponse.Success
     }
 
+    private fun encodeQuery(value: String): String = URLEncoder.encode(value, "UTF-8")
+
+    private fun encodePath(value: String): String = encodeQuery(value).replace("+", "%20")
 }
