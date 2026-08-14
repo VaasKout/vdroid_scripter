@@ -51,11 +51,21 @@ func (d *DecoderData) Free() {
 	}
 	d.pktMu.Lock() //prevent segmentation fault in CodecContext.SendPacket
 	d.frameMu.Lock()
-	d.Frame.Free()
-	d.PendingFrame.Free()
-	d.DrawFrame.Free()
-	d.Pkt.Free()
-	d.CodecContext.Free()
+	if d.Frame != nil {
+		d.Frame.Free()
+	}
+	if d.PendingFrame != nil {
+		d.PendingFrame.Free()
+	}
+	if d.DrawFrame != nil {
+		d.DrawFrame.Free()
+	}
+	if d.Pkt != nil {
+		d.Pkt.Free()
+	}
+	if d.CodecContext != nil {
+		d.CodecContext.Free()
+	}
 	d.Frame = nil
 	d.PendingFrame = nil
 	d.DrawFrame = nil
