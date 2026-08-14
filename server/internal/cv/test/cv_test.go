@@ -19,12 +19,12 @@ import (
 )
 
 const (
-	TestSerial   = "emulator-5554" //serial number of the device
-	TestImage    = "./test.png"    //example template to compare zone on a screenshot
-	TestLocale    = "eng"
-	TestTextFile  = "./text_template.png"
-	TestTextFile2 = "./text_template_2.png"
-	TestSignWord  = "Sign"
+	TestSerial     = "emulator-5554" //serial number of the device
+	TestImage      = "./test.png"    //example template to compare zone on a screenshot
+	TestLocale     = "eng"
+	TestTextFile   = "./text_template.png"
+	TestTextFile2  = "./text_template_2.png"
+	TestSignPhrase = "Sign In"
 )
 
 func TestGetTextFromImage(t *testing.T) {
@@ -88,7 +88,7 @@ func TestFindSignText(t *testing.T) {
 	}
 	defer img.Close()
 
-	ocrParams := cv.InitOcrParams(TestSignWord, TestLocale, cv.PsmText, cv.OemText)
+	ocrParams := cv.InitOcrParams(TestSignPhrase, TestLocale, cv.PsmText, cv.OemText)
 	ocrResult, err := cvAPI.FindTextRectangles(&img, dir, ocrParams)
 	if err != nil {
 		t.Fatal(err)
@@ -114,7 +114,7 @@ func TestFindSignText(t *testing.T) {
 	}
 
 	if len(rectangles) != 2 {
-		t.Fatalf("expected 2 %q words, found %d", TestSignWord, len(rectangles))
+		t.Fatalf("expected 2 %q phrases, found %d", TestSignPhrase, len(rectangles))
 	}
 }
 

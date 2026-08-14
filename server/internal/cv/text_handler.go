@@ -25,6 +25,8 @@ const (
 	darkRegionMinAreaPx    = 2000.0
 	darkRegionMinFillRatio = 0.5
 
+	phraseMaxGapHeights = 3
+
 	PsmText  = 11
 	PsmChars = 7
 
@@ -250,15 +252,63 @@ func (c *cvImpl) findRectangleInOcrJSON(osrJSONPath string, text string) []OCRRe
 	}
 
 	var ocrArray = OCRJsonToArray(osrJSON)
-	if text == "" {
+	words := strings.Fields(text)
+	if len(words) == 0 {
 		return ocrArray
 	}
 
 	var ocrFilteredArray = []OCRResult{}
-	for _, ocr := range ocrArray {
-		if strings.EqualFold(ocr.Text, text) {
-			ocrFilteredArray = append(ocrFilteredArray, ocr)
+	for index := range ocrArray {
+		phrase, ok := matchPhrase(ocrArray, index, words)
+		if !ok {
+			continue
 		}
+		ocrFilteredArray = append(ocrFilteredArray, phrase)
 	}
 	return ocrFilteredArray
+}
+
+func matchPhrase(ocrArray []OCRResult, start int, words []string) (OCRResult, bool) {
+	if start+len(words) > len(ocrArray) {
+		return OCRResult{}, false
+	}
+
+	merged := ocrArray[start]
+	if !strings.EqualFold(merged.Text, words[0]) {
+		return OCRResult{}, false
+	}
+
+	for i := 1; i < len(words); i++ {
+		prev := ocrArray[start+i-1]
+		next := ocrArray[start+i]
+		if !strings.EqualFold(next.Text, words[i]) {
+			return OCRResult{}, false
+		}
+		if !isNextWordInLine(prev, next) {
+			return OCRResult{}, false
+		}
+
+		merged.Rectangle.LeftX = min(merged.Rectangle.LeftX, next.Rectangle.LeftX)
+		merged.Rectangle.TopY = min(merged.Rectangle.TopY, next.Rectangle.TopY)
+		merged.Rectangle.RightX = max(merged.Rectangle.RightX, next.Rectangle.RightX)
+		merged.Rectangle.BottomY = max(merged.Rectangle.BottomY, next.Rectangle.BottomY)
+	}
+
+	merged.Text = strings.Join(words, " ")
+	return merged, true
+}
+
+func isNextWordInLine(prev OCRResult, next OCRResult) bool {
+	prevRect := prev.Rectangle
+	nextRect := next.Rectangle
+	if nextRect.TopY >= prevRect.BottomY || nextRect.BottomY <= prevRect.TopY {
+		return false
+	}
+	if nextRect.LeftX <= prevRect.LeftX {
+		return false
+	}
+
+	height := prevRect.BottomY - prevRect.TopY
+	gap := nextRect.LeftX - prevRect.RightX
+	return gap <= height*phraseMaxGapHeights
 }
