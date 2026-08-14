@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"image"
+	"image/color"
 	"os"
 	"path/filepath"
 	"strings"
@@ -18,6 +20,10 @@ const (
 	Numbers            = "numbers"
 	Phone              = "phone"
 	MaxThreshHold      = 255
+
+	darkRegionMinAreaRatio = 0.0025
+	darkRegionMinAreaPx    = 2000.0
+	darkRegionMinFillRatio = 0.5
 
 	PsmText  = 11
 	PsmChars = 7
@@ -132,12 +138,65 @@ func (c *cvImpl) createEdges(img *gocv.Mat, dir string) error {
 		gocv.BitwiseNot(edges, &edges)
 	}
 
+	err = invertDarkRegions(&edges)
+	if err != nil {
+		return err
+	}
+
 	var edgesPath = filepath.Join(dir, EdgesPng)
 	ok := gocv.IMWrite(edgesPath, edges)
 	if !ok {
 		return errors.New("could not write " + EdgesPng)
 	}
 	return nil
+}
+
+func invertDarkRegions(edges *gocv.Mat) error {
+	inverted := gocv.NewMat()
+	defer inverted.Close()
+	gocv.BitwiseNot(*edges, &inverted)
+
+	contours := gocv.FindContours(inverted, gocv.RetrievalExternal, gocv.ChainApproxSimple)
+	defer contours.Close()
+
+	regionMask := gocv.Zeros(edges.Rows(), edges.Cols(), gocv.MatTypeCV8UC1)
+	defer regionMask.Close()
+
+	minArea := max(float64(edges.Rows()*edges.Cols())*darkRegionMinAreaRatio, darkRegionMinAreaPx)
+	white := color.RGBA{R: 255, G: 255, B: 255, A: 255}
+	found := false
+	for i := 0; i < contours.Size(); i++ {
+		rect := gocv.BoundingRect(contours.At(i))
+		bboxArea := float64(rect.Dx() * rect.Dy())
+		if bboxArea < minArea {
+			continue
+		}
+
+		region := inverted.Region(rect)
+		fillRatio := float64(gocv.CountNonZero(region)) / bboxArea
+		region.Close()
+		if fillRatio < darkRegionMinFillRatio {
+			continue
+		}
+
+		err := gocv.DrawContours(&regionMask, contours, i, white, -1)
+		if err != nil {
+			return err
+		}
+		found = true
+	}
+
+	if !found {
+		return nil
+	}
+
+	kernel := gocv.GetStructuringElement(gocv.MorphRect, image.Pt(3, 3))
+	defer kernel.Close()
+	err := gocv.Dilate(inverted, &inverted, kernel)
+	if err != nil {
+		return err
+	}
+	return inverted.CopyToWithMask(edges, regionMask)
 }
 
 func (c *cvImpl) readTextFromEdgesImage(

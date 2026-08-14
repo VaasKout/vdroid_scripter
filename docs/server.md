@@ -54,6 +54,14 @@ For development, you can run from source instead:
 cd server && go run cmd/main.go
 ```
 
+On macOS, building or running from source needs the Homebrew `ffmpeg@7` and
+`opencv@4` kegs on the pkg-config path first (`install.sh` does this internally
+when building):
+
+```bash
+export PKG_CONFIG_PATH="$(brew --prefix opencv@4)/lib/pkgconfig:$(brew --prefix ffmpeg@7)/lib/pkgconfig:$PKG_CONFIG_PATH"
+```
+
 ### Building the MCP Server
 
 `server/mcpserver` contains an MCP (Model Context Protocol) server that exposes
@@ -73,7 +81,7 @@ claude mcp add vdroid -- <path>/vdroid-mcp
 ```
 
 The MCP server talks to a running vdroid server at the URL from the
-`VDROID_URL` env var (default `http://127.0.0.1:8081`).
+`VDROID_URL` env var (default `http://127.0.0.1:8080`).
 
 ### API Reference
 

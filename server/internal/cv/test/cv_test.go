@@ -21,8 +21,10 @@ import (
 const (
 	TestSerial   = "emulator-5554" //serial number of the device
 	TestImage    = "./test.png"    //example template to compare zone on a screenshot
-	TestLocale   = "eng"
-	TestTextFile = "./text_template.png"
+	TestLocale    = "eng"
+	TestTextFile  = "./text_template.png"
+	TestTextFile2 = "./text_template_2.png"
+	TestSignWord  = "Sign"
 )
 
 func TestGetTextFromImage(t *testing.T) {
@@ -66,6 +68,53 @@ func TestGetTextFromImage(t *testing.T) {
 	params := []int{gocv.IMWriteJpegQuality, 90}
 	if ok := gocv.IMWriteWithParams(filepath.Join(dir, testImage), img, params); !ok {
 		fmt.Println("could not write image " + testImage)
+	}
+}
+
+func TestFindSignText(t *testing.T) {
+	var fileProps = &config.FilesProps{
+		Logs: "./logs",
+	}
+	var logAPI = logger.New(logger.INFO, true)
+	var filesDB = filesdb.New(fileProps)
+	var cmdRunner = bashcmd.New(filesDB, logAPI)
+	var cvAPI = cv.New(cmdRunner, logAPI)
+
+	dir := filesDB.CreateLogsDir(TestSerial, filesdb.TesseractDir)
+
+	img := gocv.IMRead(TestTextFile2, gocv.IMReadColor)
+	if img.Empty() {
+		t.Fatal("could not read template image")
+	}
+	defer img.Close()
+
+	ocrParams := cv.InitOcrParams(TestSignWord, TestLocale, cv.PsmText, cv.OemText)
+	ocrResult, err := cvAPI.FindTextRectangles(&img, dir, ocrParams)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	t.Log(ocrResult)
+	var rectangles = []image.Rectangle{}
+	for _, ocr := range ocrResult {
+		var imgRect = ocr.Rectangle.ToImageRectangle()
+		if imgRect == nil || models.ImageRectIsEmpty(imgRect) {
+			continue
+		}
+		rectangles = append(rectangles, *imgRect)
+	}
+
+	err = cvAPI.DrawRectangles(img, rectangles, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	params := []int{gocv.IMWriteJpegQuality, 90}
+	if ok := gocv.IMWriteWithParams(filepath.Join(dir, TestTextFile2), img, params); !ok {
+		fmt.Println("could not write image " + TestTextFile2)
+	}
+
+	if len(rectangles) != 2 {
+		t.Fatalf("expected 2 %q words, found %d", TestSignWord, len(rectangles))
 	}
 }
 
@@ -140,7 +189,7 @@ func TestResetKeyboardKeys(t *testing.T) {
 	}
 	defer img.Close()
 
-	keyboardDir := filesDB.CreateLogsDir(TestSerial, filesdb.Keyboards, TestLocale)
+	keyboardDir := filesDB.CreateKeyboardDir(TestSerial, TestLocale)
 	tesseractDir := filesDB.CreateLogsDir(TestSerial, filesdb.TesseractDir)
 
 	start := time.Now()
@@ -182,7 +231,7 @@ func TestGetKeyboardKeys(t *testing.T) {
 	}
 	defer img.Close()
 
-	keyboardDir := filesDB.CreateLogsDir(TestSerial, filesdb.Keyboards, TestLocale)
+	keyboardDir := filesDB.CreateKeyboardDir(TestSerial, TestLocale)
 	keyboardButtons := filesDB.GetFiles(keyboardDir)
 
 	if len(keyboardButtons) == 0 {
