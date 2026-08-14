@@ -3,7 +3,7 @@ module android_vision_scripter
 go 1.26
 
 require (
-	github.com/asticode/go-astiav v0.41.0
+	github.com/asticode/go-astiav v0.39.0
 	github.com/joho/godotenv v1.5.1
 	github.com/lmittmann/tint v1.2.0
 	github.com/modelcontextprotocol/go-sdk v1.7.0

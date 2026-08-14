@@ -56,7 +56,7 @@ install_dependencies() {
 
 install_macos() {
   need_cmd brew
-  brew install go android-platform-tools ffmpeg opencv@4 tesseract tesseract-lang
+  brew install go android-platform-tools ffmpeg@7 opencv@4 tesseract tesseract-lang
   install_macos_legacy_tessdata
 }
 
@@ -127,7 +127,7 @@ build_server() {
   tmpdir="$(mktemp -d)"
   BUILD_OUTPUT="$tmpdir/$BIN_NAME"
   if [ "$PLATFORM" = "macos" ]; then
-    export PKG_CONFIG_PATH="$(brew --prefix opencv@4)/lib/pkgconfig:$(brew --prefix ffmpeg)/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
+    export PKG_CONFIG_PATH="$(brew --prefix opencv@4)/lib/pkgconfig:$(brew --prefix ffmpeg@7)/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
   fi
   (cd "$SERVER_DIR" && go mod download && CGO_ENABLED=1 go build -o "$BUILD_OUTPUT" ./cmd)
 }
