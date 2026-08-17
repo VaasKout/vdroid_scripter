@@ -73,16 +73,6 @@ func (c *apiClient) queueSteps(serial string, steps []stepInput) error {
 	return err
 }
 
-func (c *apiClient) findText(serial string, text string, locale string) (string, error) {
-	var path = "/devices/" + url.PathEscape(serial) +
-		"/find_text?text=" + url.QueryEscape(text)
-	if locale != "" {
-		path += "&locale=" + url.QueryEscape(locale)
-	}
-	body, err := c.request(http.MethodGet, path, nil)
-	return string(body), err
-}
-
 func (c *apiClient) closeSession(serial string) error {
 	_, err := c.request(http.MethodDelete, "/devices/"+url.PathEscape(serial)+"/session", nil)
 	return err

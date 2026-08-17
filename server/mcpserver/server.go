@@ -25,7 +25,9 @@ Batching: when given a sequence of steps ("tap text1, tap yolo class home, swipe
 
 Steps: a step is an event applied to a CV target (type = image | text | yolo, value = library image name / text to find / yolo class). Events tap and long_tap require a target and touch it. type_text types 'value' on the CV-detected keyboard (locale = keyboard locale). An EMPTY event is a pure visibility check of the target. Any other event name replays that recorded library event: anchored at the target's region when a target is given (e.g. a drag starting from an icon), verbatim without one (e.g. a scroll swipe).
 
-Failure and recovery: a failed step clears the remaining queue and stores the error as the session status, so the final status names the target that could not be found. Recover from the failure point: scroll with the screen's swipe action (try variants _1, _2, ...) or probe an unknown screen with find_text, then re-queue the remaining steps from the failed one onward — again in one call.`
+Rules: NEVER drive the device with adb directly — no adb shell input tap, input swipe, input text, keyevent, or any other adb command, no matter what. Every interaction is a step executed through queue_steps: tap/long_tap to touch a target, a library event to gesture, type_text to type, and an EMPTY event to find or verify an element. There is no separate lookup tool — finding an element and acting on it are both steps.
+
+Failure and recovery: a failed step clears the remaining queue and stores the error as the session status, so the final status names the target that could not be found. Recover from the failure point: scroll with the screen's swipe action (try variants _1, _2, ...) or probe an unknown screen with visibility-check steps (EMPTY event, text targets), then re-queue the remaining steps from the failed one onward — again in one call.`
 
 type Server struct {
 	api *apiClient
@@ -72,12 +74,6 @@ type queueStepsInput struct {
 	Steps  []stepInput `json:"steps" jsonschema:"steps to queue, executed in the given order"`
 }
 
-type findTextInput struct {
-	Serial string `json:"serial" jsonschema:"device serial number"`
-	Text   string `json:"text" jsonschema:"text to locate on the current screen"`
-	Locale string `json:"locale,omitempty" jsonschema:"OCR language, e.g. eng or rus"`
-}
-
 func (s *stepInput) describe() string {
 	if s.Event == "" {
 		return fmt.Sprintf("check on %s %s", s.Type, s.Value)
@@ -122,13 +118,6 @@ func (s *Server) registerTools() {
 			"to scroll). A step failure clears the remaining queue and sets the error " +
 			"status.",
 	}, s.handleQueueSteps)
-
-	mcp.AddTool(s.mcp, &mcp.Tool{
-		Name: "find_text",
-		Description: "OCR the current screen for a text string without queueing a step; " +
-			"returns the matching regions as JSON, [] when not found. Use it to probe an " +
-			"unknown screen or to quickly verify an effect. Works without an open session.",
-	}, s.handleFindText)
 
 	mcp.AddTool(s.mcp, &mcp.Tool{
 		Name: "close_session",
@@ -209,21 +198,6 @@ func (s *Server) handleQueueSteps(
 	}
 	var text = "queued " + strings.Join(names, ", ")
 	return textResult(text), nil, nil
-}
-
-func (s *Server) handleFindText(
-	ctx context.Context,
-	req *mcp.CallToolRequest,
-	in findTextInput,
-) (*mcp.CallToolResult, any, error) {
-	if in.Serial == "" || in.Text == "" {
-		return nil, nil, fmt.Errorf("serial and text are required")
-	}
-	result, err := s.api.findText(in.Serial, in.Text, in.Locale)
-	if err != nil {
-		return nil, nil, err
-	}
-	return textResult(result), nil, nil
 }
 
 func (s *Server) handleCloseSession(
