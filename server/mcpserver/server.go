@@ -25,6 +25,8 @@ Batching: when given a sequence of steps ("tap text1, tap yolo class home, swipe
 
 Steps: a step is an event applied to a CV target (type = image | text | yolo, value = library image name / text to find / yolo class). Events tap and long_tap require a target and touch it. type_text types 'value' on the CV-detected keyboard (locale = keyboard locale). An EMPTY event is a pure visibility check of the target. Any other event name replays that recorded library event: anchored at the target's region when a target is given (e.g. a drag starting from an icon), verbatim without one (e.g. a scroll swipe).
 
+Locale: for text targets and type_text, always set the step's locale to the Tesseract language code of the value's language. This holds for every language Tesseract supports (rus, deu, fra, jpn, ...); eng is the default. Pass the text exactly as the user wrote it, never transliterate or translate it.
+
 Rules: NEVER drive the device with adb directly — no adb shell input tap, input swipe, input text, keyevent, or any other adb command, no matter what. Every interaction is a step executed through queue_steps: tap/long_tap to touch a target, a library event to gesture, type_text to type, and an EMPTY event to find or verify an element. There is no separate lookup tool — finding an element and acting on it are both steps.
 
 Failure and recovery: a failed step clears the remaining queue and stores the error as the session status, so the final status names the target that could not be found. Recover from the failure point: scroll with the screen's swipe action (try variants _1, _2, ...) or probe an unknown screen with visibility-check steps (EMPTY event, text targets), then re-queue the remaining steps from the failed one onward — again in one call.`
@@ -65,7 +67,7 @@ type stepInput struct {
 	Event   string `json:"event,omitempty" jsonschema:"tap, long_tap, type_text, the name of a library event to replay, or EMPTY for a pure visibility check of the target"`
 	Type    string `json:"type,omitempty" jsonschema:"target type: image (template match of a library image), text (OCR), or yolo (detected class); leave empty to replay a library event verbatim"`
 	Value   string `json:"value,omitempty" jsonschema:"target value: library image name, text to find on screen, or yolo class name; for type_text the text to type"`
-	Locale  string `json:"locale,omitempty" jsonschema:"OCR language for text targets and keyboard locale for type_text, e.g. eng or rus"`
+	Locale  string `json:"locale,omitempty" jsonschema:"OCR language for text targets and keyboard locale for type_text; the Tesseract lang code matching the language of value (rus, deu, jpn, ...), default eng"`
 	Timeout int    `json:"timeout,omitempty" jsonschema:"seconds to keep locating the target before failing, default 15"`
 }
 
