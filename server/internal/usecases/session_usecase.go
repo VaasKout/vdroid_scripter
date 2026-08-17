@@ -22,13 +22,13 @@ func (i *interactorImpl) StartSession(serial string, basePort int) bool {
 	if session == nil {
 		return false
 	}
-	i.sessionsCache.Add(serial, *session)
 
 	started := i.StartScrcpyServer(serial, session.ServerPort)
 	if !started {
 		return false
 	}
 
+    i.sessionsCache.Add(serial, *session)
 	i.setScrcpyState(serial, true)
 	go i.runSessionQueue(serial)
 	return true
@@ -146,7 +146,7 @@ func (i *interactorImpl) runSessionQueue(serial string) {
 			session.Status = err.Error()
 			session.Query = []models.Step{}
 			i.sessionsCache.Add(serial, session)
-			return
+			continue
 		}
 
 		if len(session.Query) == 0 {
