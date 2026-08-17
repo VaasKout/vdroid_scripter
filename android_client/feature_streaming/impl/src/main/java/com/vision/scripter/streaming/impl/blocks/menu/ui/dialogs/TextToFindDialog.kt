@@ -36,6 +36,7 @@ fun TextToFindDialog(
 ) {
     var text by remember { mutableStateOf("") }
     var selectedLocale by remember { mutableStateOf(locales.first()) }
+    var isError by remember { mutableStateOf(false) }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {
@@ -55,13 +56,17 @@ fun TextToFindDialog(
             ) {
                 OutlinedTextField(
                     value = text,
-                    onValueChange = { text = it },
+                    onValueChange = {
+                        text = it
+                        isError = false
+                    },
                     label = {
                         Text(
                             text = stringResource(CoreR.string.name)
                         )
                     },
                     singleLine = true,
+                    isError = isError,
                 )
                 SimpleDropdownMenu(
                     options = locales,
@@ -72,7 +77,15 @@ fun TextToFindDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = { onTryToFindText(text, selectedLocale) }) {
+            TextButton(
+                onClick = {
+                    if (text.isBlank()) {
+                        isError = true
+                    } else {
+                        onTryToFindText(text, selectedLocale)
+                    }
+                }
+            ) {
                 Text(
                     text = stringResource(CoreR.string.ok),
                     style = TextStyle(
