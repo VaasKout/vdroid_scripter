@@ -89,7 +89,10 @@ func (s *Step) Valid() bool {
 		last := s.LastAnchor()
 		return last != nil && strings.TrimSpace(last.Value) != ""
 	}
-	return s.ValidAnchors()
+	if s.IsCheckEvent() {
+		return s.ValidAnchors()
+	}
+	return len(s.Anchors) == 0 || s.ValidAnchors()
 }
 
 func (s *Step) IsCheckEvent() bool {
