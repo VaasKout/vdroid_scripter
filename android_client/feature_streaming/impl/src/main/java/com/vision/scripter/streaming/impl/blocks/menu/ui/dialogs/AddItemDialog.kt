@@ -38,6 +38,7 @@ fun AddItemDialog(
 ) {
     var text by remember { mutableStateOf("") }
     var itemType by remember { mutableStateOf(ItemType.IMAGE) }
+    var isError by remember { mutableStateOf(false) }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {
@@ -55,13 +56,17 @@ fun AddItemDialog(
             Column {
                 OutlinedTextField(
                     value = text,
-                    onValueChange = { text = it },
+                    onValueChange = {
+                        text = it
+                        isError = false
+                    },
                     label = {
                         Text(
                             text = stringResource(CoreR.string.name)
                         )
                     },
                     singleLine = true,
+                    isError = isError,
                 )
 
                 AddItemChoice(
@@ -77,7 +82,15 @@ fun AddItemDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = { onConfirm(text, itemType) }) {
+            TextButton(
+                onClick = {
+                    if (text.isBlank()) {
+                        isError = true
+                    } else {
+                        onConfirm(text, itemType)
+                    }
+                }
+            ) {
                 Text(
                     text = stringResource(CoreR.string.ok),
                     style = TextStyle(
