@@ -81,18 +81,26 @@ Returns all ADB devices currently visible to the server.
 
 ## Steps
 
-A **step** is the unit of execution: an **event** applied to a CV-located
-target. Steps compose the [library](#library) at runtime — the target
-(`type` + `value`) locates a region on the live screen (a library image, OCR
-text, or a YOLO class) and the event acts on it (generated taps, CV keyboard
-typing, or a recorded gesture from the library).
+A **step** is the unit of execution: an **event** applied to a chain of
+CV-located **anchors**. Steps compose the [library](#library) at runtime —
+each anchor (`type` + `value`) locates a region on the live screen (a library
+image, OCR text, or a YOLO class) and the event acts on the **last** anchor's
+region (generated taps, CV keyboard typing, or a recorded gesture from the
+library).
+
+The chain resolves on a single video frame: the first anchor picks its best
+match on screen, every following anchor picks the candidate of its value
+**nearest** (by center distance) to the previous anchor, and the event applies
+to the last anchor. One anchor is the normal case; a preceding unique anchor
+disambiguates duplicates — "the toggle next to *Show refresh rate*" is
+`anchors: [{text "Show refresh rate"}, {image "toggle"}]`.
 
 | `event` | Behavior |
 | ------- | -------- |
-| *(empty)* | Visibility check of the target — no touch. Target required. |
-| `tap` / `long_tap` | Generated tap pair placed at a random point inside the found region. Target required. |
-| `type_text` | `value` **is the text to type**, typed via the CV keyboard (`locale` = keyboard locale). No target. |
-| any other name | The library event with that name is replayed: **anchored** when a target is given (first touch moved into the found region, relative shape preserved), **verbatim** without one. |
+| *(empty)* | Visibility check of the anchor chain — no touch. Anchors required. |
+| `tap` / `long_tap` | Generated tap pair placed at a random point inside the last anchor's region. Anchors required. |
+| `type_text` | The **last anchor's `value` is the text to type**, typed via the CV keyboard (its `locale` = keyboard locale). Nothing is located on screen. |
+| any other name | The library event with that name is replayed: **anchored** when anchors are given (first touch moved into the last anchor's region, relative shape preserved), **verbatim** without them. |
 
 ### `POST /run_steps`
 
@@ -108,11 +116,12 @@ status and clears the remaining queue.
   {
     "serial": "ABCD1234",
     "steps": [
-      { "type": "yolo", "value": "home" },
-      { "event": "tap", "type": "image", "value": "catalog_cart_icon" },
+      { "anchors": [{ "type": "yolo", "value": "home" }] },
+      { "event": "tap", "anchors": [{ "type": "image", "value": "catalog_cart_icon" }] },
       { "event": "swipe_catalog_1" },
-      { "event": "tap", "type": "text", "value": "Corn", "locale": "eng", "timeout": 10 },
-      { "event": "type_text", "value": "hello", "locale": "eng" }
+      { "event": "tap", "anchors": [{ "type": "text", "value": "Corn", "locale": "eng" }], "timeout": 10 },
+      { "event": "tap", "anchors": [{ "type": "text", "value": "Show refresh rate" }, { "type": "image", "value": "toggle" }] },
+      { "event": "type_text", "anchors": [{ "type": "text", "value": "hello", "locale": "eng" }] }
     ]
   }
   ```
@@ -355,9 +364,10 @@ Closes the session: stops the scrcpy server and tears down the sockets.
 ```json
 {
   "event": "tap",
-  "type": "image",
-  "value": "catalog_cart_icon",
-  "locale": "",
+  "anchors": [
+    { "type": "text", "value": "Show refresh rate", "locale": "eng" },
+    { "type": "image", "value": "toggle" }
+  ],
   "timeout": 15
 }
 ```
@@ -365,10 +375,16 @@ Closes the session: stops the scrcpy server and tears down the sockets.
 | Field | JSON | Type | Notes |
 | ----- | ---- | ---- | ----- |
 | Event | `event` | string | `tap`, `long_tap`, `type_text`, the name of a library event, or **empty for a visibility check** |
-| Type | `type` | string | Target type: `image` (template match against `images/<value>.png`), `text` (OCR), `yolo` (detection class); empty for a target-less library event and for `type_text` |
-| Value | `value` | string | Target value: library image name, OCR text, or YOLO class name — except for `type_text`, where it is the text to type |
-| Locale | `locale` | string | omitempty; OCR language for `text` targets, keyboard locale for `type_text` |
-| Timeout | `timeout` | int | omitempty; seconds to locate the target before failing (default `15` when omitted or `<= 0`). The runner grabs the latest video frame and retries roughly once per second until the deadline. |
+| Anchors | `anchors` | []Anchor | omitempty; the target chain — resolved in order on one frame, each anchor found nearest to the previous one, the event applies to the **last** one. Empty only for a target-less library event replay. |
+| Timeout | `timeout` | int | omitempty; seconds to locate the anchors before failing (default `15` when omitted or `<= 0`). The runner grabs the latest video frame and retries roughly once per second until the deadline. |
+
+### Anchor
+
+| Field | JSON | Type | Notes |
+| ----- | ---- | ---- | ----- |
+| Type | `type` | string | `image` (template match against `images/<value>.png`), `text` (OCR), or `yolo` (detection class) |
+| Value | `value` | string | Library image name, OCR text, or YOLO class name — for `type_text`'s last anchor, the text to type |
+| Locale | `locale` | string | omitempty; OCR language for `text` anchors, keyboard locale for `type_text` |
 
 ### Event
 

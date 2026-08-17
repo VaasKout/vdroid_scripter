@@ -3,6 +3,7 @@ package models
 import (
 	"android_vision_scripter/pkg/core/numutils"
 	"image"
+	"math"
 )
 
 // Offset from rectangle borders
@@ -112,4 +113,32 @@ func GetRandomXY(r *image.Rectangle) (int, int) {
 // ImageRectIsEmpty ...
 func ImageRectIsEmpty(r *image.Rectangle) bool {
 	return r == nil || (r.Dy() == 0 && r.Dx() == 0)
+}
+
+func ClosestRect(rects []image.Rectangle, target *image.Rectangle) *image.Rectangle {
+	if len(rects) == 0 {
+		return nil
+	}
+	if target == nil {
+		return &rects[0]
+	}
+
+	best := &rects[0]
+	bestDist := centerDistance(*best, *target)
+	for index := 1; index < len(rects); index++ {
+		dist := centerDistance(rects[index], *target)
+		if dist < bestDist {
+			best = &rects[index]
+			bestDist = dist
+		}
+	}
+	return best
+}
+
+func centerDistance(a image.Rectangle, b image.Rectangle) float64 {
+	ax := float64(a.Min.X+a.Max.X) / 2
+	ay := float64(a.Min.Y+a.Max.Y) / 2
+	bx := float64(b.Min.X+b.Max.X) / 2
+	by := float64(b.Min.Y+b.Max.Y) / 2
+	return math.Hypot(ax-bx, ay-by)
 }

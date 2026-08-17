@@ -23,9 +23,9 @@ Workflow: list_devices for a serial, get_library for the available images (templ
 
 Batching: when given a sequence of steps ("tap text1, tap yolo class home, swipe, type hi..."), translate the WHOLE sequence into ONE queue_steps call with the steps in the given order. Never queue one step at a time and never poll get_session_status between steps — the server executes the queue sequentially on its own. After the single call, call wait_for_session once: 'idle' means every step succeeded.
 
-Steps: a step is an event applied to a CV target (type = image | text | yolo, value = library image name / text to find / yolo class). Events tap and long_tap require a target and touch it. type_text types 'value' on the CV-detected keyboard (locale = keyboard locale). An EMPTY event is a pure visibility check of the target. Any other event name replays that recorded library event: anchored at the target's region when a target is given (e.g. a drag starting from an icon), verbatim without one (e.g. a scroll swipe).
+Steps: a step is an event applied to a chain of anchors. Each anchor is a CV target (type = image | text | yolo, value = library image name / text to find / yolo class; text anchors also carry locale). The chain resolves on ONE video frame: the first anchor picks its best match on screen, every following anchor picks the candidate of its value NEAREST to the previous anchor, and the event applies to the LAST anchor. One anchor is the normal case ("tap the cart icon" = one image anchor). Put a nearby unique element first to disambiguate duplicates: "tap the toggle next to 'Show refresh rate'" = anchors [{type text, value Show refresh rate}, {type image, value toggle}]. Events tap and long_tap touch the last anchor's region. type_text types the LAST anchor's value on the CV-detected keyboard (that anchor's locale = keyboard locale; nothing is located on screen). An EMPTY event is a pure visibility check of the anchor chain. Any other event name replays that recorded library event: anchored at the last anchor's region when anchors are given (e.g. a drag starting from an icon), verbatim without anchors (e.g. a scroll swipe).
 
-Locale: for text targets and type_text, always set the step's locale to the Tesseract language code of the value's language. This holds for every language Tesseract supports (rus, deu, fra, jpn, ...); eng is the default. Pass the text exactly as the user wrote it, never transliterate or translate it.
+Locale: for text anchors and type_text, always set the anchor's locale to the Tesseract language code of its value's language. This holds for every language Tesseract supports (rus, deu, fra, jpn, ...); eng is the default. Pass the text exactly as the user wrote it, never transliterate or translate it.
 
 Rules: NEVER drive the device with adb directly — no adb shell input tap, input swipe, input text, keyevent, or any other adb command, no matter what. Every interaction is a step executed through queue_steps: tap/long_tap to touch a target, a library event to gesture, type_text to type, and an EMPTY event to find or verify an element. There is no separate lookup tool — finding an element and acting on it are both steps.
 
@@ -65,12 +65,16 @@ type waitInput struct {
 	TimeoutSeconds int    `json:"timeout_seconds,omitempty" jsonschema:"max seconds to wait, default 60"`
 }
 
+type anchorInput struct {
+	Type   string `json:"type" jsonschema:"anchor type: image (template match of a library image), text (OCR), or yolo (detected class)"`
+	Value  string `json:"value" jsonschema:"library image name, text to find on screen, or yolo class name; for type_text the text to type"`
+	Locale string `json:"locale,omitempty" jsonschema:"for text anchors and type_text: the Tesseract lang code matching the language of value (rus, deu, jpn, ...), default eng"`
+}
+
 type stepInput struct {
-	Event   string `json:"event,omitempty" jsonschema:"tap, long_tap, type_text, the name of a library event to replay, or EMPTY for a pure visibility check of the target"`
-	Type    string `json:"type,omitempty" jsonschema:"target type: image (template match of a library image), text (OCR), or yolo (detected class); leave empty to replay a library event verbatim"`
-	Value   string `json:"value,omitempty" jsonschema:"target value: library image name, text to find on screen, or yolo class name; for type_text the text to type"`
-	Locale  string `json:"locale,omitempty" jsonschema:"OCR language for text targets and keyboard locale for type_text; the Tesseract lang code matching the language of value (rus, deu, jpn, ...), default eng"`
-	Timeout int    `json:"timeout,omitempty" jsonschema:"seconds to keep locating the target before failing, default 15"`
+	Event   string        `json:"event,omitempty" jsonschema:"tap, long_tap, type_text, the name of a library event to replay, or EMPTY for a pure visibility check of the target"`
+	Anchors []anchorInput `json:"anchors,omitempty" jsonschema:"target chain resolved on one video frame: each anchor is located NEAREST to the previous one and the event applies to the LAST anchor; one anchor for a plain target, a preceding unique anchor to disambiguate duplicates; leave empty to replay a library event verbatim"`
+	Timeout int           `json:"timeout,omitempty" jsonschema:"seconds to keep locating the target before failing, default 15"`
 }
 
 type queueStepsInput struct {
@@ -79,14 +83,23 @@ type queueStepsInput struct {
 }
 
 func (s *stepInput) describe() string {
+	var target string
+	if len(s.Anchors) > 0 {
+		var last = s.Anchors[len(s.Anchors)-1]
+		target = fmt.Sprintf("%s %s", last.Type, last.Value)
+	}
+
 	if s.Event == "" {
-		return fmt.Sprintf("check on %s %s", s.Type, s.Value)
+		return "check on " + target
 	}
 	if s.Event == "type_text" {
-		return fmt.Sprintf("%s %q", s.Event, s.Value)
+		if len(s.Anchors) == 0 {
+			return s.Event
+		}
+		return fmt.Sprintf("%s %q", s.Event, s.Anchors[len(s.Anchors)-1].Value)
 	}
-	if s.Type != "" {
-		return fmt.Sprintf("%s on %s %s", s.Event, s.Type, s.Value)
+	if target != "" {
+		return fmt.Sprintf("%s on %s", s.Event, target)
 	}
 	return s.Event
 }
@@ -113,14 +126,15 @@ func (s *Server) registerTools() {
 			"automatically if none exists. Put a whole multi-step sequence into ONE call " +
 			"— the server executes the queue sequentially; do not queue steps one at a " +
 			"time or check status in between, just call wait_for_session once afterwards. " +
-			"Each step applies an event to a CV-located target (type + value). Events: " +
-			"'tap'/'long_tap' (target required; the generated touch lands at a random " +
-			"point inside the found region), 'type_text' (types 'value' on the CV " +
-			"keyboard), an EMPTY event (visibility check of the target, no touch), or a " +
-			"library event name (replays the gesture anchored to the target region when " +
-			"given, verbatim otherwise — queue a screen's swipe event without a target " +
-			"to scroll). A step failure clears the remaining queue and sets the error " +
-			"status.",
+			"Each step applies an event to the LAST anchor of its chain; anchors resolve " +
+			"on one frame, each located nearest to the previous one. Events: " +
+			"'tap'/'long_tap' (anchors required; the generated touch lands at a random " +
+			"point inside the found region), 'type_text' (types the last anchor's value " +
+			"on the CV keyboard), an EMPTY event (visibility check of the chain, no " +
+			"touch), or a library event name (replays the gesture anchored to the found " +
+			"region when anchors are given, verbatim otherwise — queue a screen's swipe " +
+			"event without anchors to scroll). A step failure clears the remaining queue " +
+			"and sets the error status.",
 	}, s.handleQueueSteps)
 
 	mcp.AddTool(s.mcp, &mcp.Tool{
@@ -185,8 +199,8 @@ func (s *Server) handleQueueSteps(
 	if in.Serial == "" || len(in.Steps) == 0 {
 		return nil, nil, fmt.Errorf("serial and steps are required")
 	}
-	for index := range in.Steps {
-		if in.Steps[index].Event == "" && in.Steps[index].Value == "" {
+	for _, step := range in.Steps {
+		if step.Event == "" && len(step.Anchors) == 0 {
 			return nil, nil, fmt.Errorf("every step needs an event or a target")
 		}
 	}
@@ -197,8 +211,8 @@ func (s *Server) handleQueueSteps(
 	}
 
 	var names = make([]string, 0, len(in.Steps))
-	for index := range in.Steps {
-		names = append(names, in.Steps[index].describe())
+	for _, step := range in.Steps {
+		names = append(names, step.describe())
 	}
 	var text = "queued " + strings.Join(names, ", ")
 	return textResult(text), nil, nil

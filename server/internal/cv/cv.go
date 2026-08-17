@@ -8,8 +8,9 @@ import (
 
 // CV rectangles contants
 const (
-	MinBorderDistance = 20
-	MatchCoefficient  = 0.9
+	MinBorderDistance  = 20
+	MatchCoefficient   = 0.9
+	MaxTemplateMatches = 50
 )
 
 // API ...

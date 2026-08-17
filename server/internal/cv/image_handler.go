@@ -14,6 +14,7 @@ import (
 type ImageHandler interface {
 	FindAllRectangles(img *gocv.Mat) ([]image.Rectangle, error)
 	FindImage(img *gocv.Mat, template string) (*image.Rectangle, error)
+	FindAllImages(img *gocv.Mat, template string) ([]image.Rectangle, error)
 	DrawRectangles(
 		img gocv.Mat,
 		rectangles []image.Rectangle,
@@ -69,6 +70,57 @@ func (c *cvImpl) FindImage(
 	)
 
 	return &rectangle, nil
+}
+
+func (c *cvImpl) FindAllImages(
+	img *gocv.Mat,
+	template string,
+) ([]image.Rectangle, error) {
+	if img == nil || template == "" {
+		return nil, errors.New("empty params")
+	}
+
+	templateMat := gocv.IMRead(template, gocv.IMReadColor)
+	if templateMat.Empty() {
+		return nil, errors.New("could not read template")
+	}
+	defer templateMat.Close()
+
+	result := gocv.NewMat()
+	defer result.Close()
+	err := gocv.MatchTemplate(*img, templateMat, &result, gocv.TmCcoeffNormed, result)
+	if err != nil {
+		return nil, err
+	}
+
+	rectangles := []image.Rectangle{}
+	for len(rectangles) < MaxTemplateMatches {
+		_, maxVal, _, maxLoc := gocv.MinMaxLoc(result)
+		if maxVal < MatchCoefficient {
+			break
+		}
+
+		rectangles = append(rectangles, image.Rect(
+			maxLoc.X,
+			maxLoc.Y,
+			maxLoc.X+templateMat.Cols(),
+			maxLoc.Y+templateMat.Rows(),
+		))
+		suppressMatch(&result, maxLoc, templateMat.Cols(), templateMat.Rows())
+	}
+
+	return rectangles, nil
+}
+
+func suppressMatch(result *gocv.Mat, loc image.Point, width int, height int) {
+	x0 := max(loc.X-width/2, 0)
+	y0 := max(loc.Y-height/2, 0)
+	x1 := min(loc.X+width/2+1, result.Cols())
+	y1 := min(loc.Y+height/2+1, result.Rows())
+
+	region := result.Region(image.Rect(x0, y0, x1, y1))
+	defer region.Close()
+	region.SetTo(gocv.NewScalar(0, 0, 0, 0))
 }
 
 func (c *cvImpl) CutZone(imgPath string, outputPath string, zone *image.Rectangle) {

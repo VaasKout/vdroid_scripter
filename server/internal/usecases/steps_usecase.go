@@ -35,10 +35,8 @@ func (i *interactorImpl) RunSteps(
 		return errors.New("invalid steps")
 	}
 
-	for index := range steps {
-		if err := i.checkStepAssets(&steps[index]); err != nil {
-			return err
-		}
+	if err := i.checkStepAssets(steps); err != nil {
+		return err
 	}
 
 	if _, ok := i.sessionsCache.Get(serial); !ok {
@@ -53,27 +51,35 @@ func (i *interactorImpl) RunSteps(
 	return nil
 }
 
-func (i *interactorImpl) checkStepAssets(step *models.Step) error {
-	if step.IsCustomEvent() {
-		actionPath := filepath.Join(
-			i.filesDB.CreateActionsDir(),
-			strings.TrimSpace(step.Event)+file.JsonExt,
-		)
-		if !file.Exists(actionPath) {
-			return fmt.Errorf("event not found in library: %s", step.Event)
+func (i *interactorImpl) checkStepAssets(steps []models.Step) error {
+	for _, step := range steps {
+		if step.IsCustomEvent() {
+			actionPath := filepath.Join(
+				i.filesDB.CreateActionsDir(),
+				strings.TrimSpace(step.Event)+file.JsonExt,
+			)
+			if !file.Exists(actionPath) {
+				return fmt.Errorf("event not found in library: %s", step.Event)
+			}
 		}
-	}
 
-	if step.Type != models.Image {
-		return nil
-	}
+		if step.Event == models.TypeTextEvent {
+			continue
+		}
 
-	imagePath := filepath.Join(
-		i.filesDB.CreateImagesDir(),
-		strings.TrimSpace(step.Value)+file.PngExt,
-	)
-	if !file.Exists(imagePath) {
-		return fmt.Errorf("image not found in library: %s", step.Value)
+		for _, anchor := range step.Anchors {
+			if anchor.Type != models.Image {
+				continue
+			}
+
+			imagePath := filepath.Join(
+				i.filesDB.CreateImagesDir(),
+				strings.TrimSpace(anchor.Value)+file.PngExt,
+			)
+			if !file.Exists(imagePath) {
+				return fmt.Errorf("image not found in library: %s", anchor.Value)
+			}
+		}
 	}
 	return nil
 }
@@ -142,13 +148,18 @@ func (i *interactorImpl) playGeneratedTap(
 }
 
 func (i *interactorImpl) typeTextStep(serial string, step *models.Step) error {
+	last := step.LastAnchor()
+	if last == nil {
+		return fmt.Errorf("nothing to type")
+	}
+
 	width, height, err := i.scrcpy.GetScreenSize(serial)
 	if err != nil {
 		return err
 	}
 
 	tapEvents := models.GenerateTapEvents(width, height)
-	return i.typeText(serial, step.GetTimeout(), step.Value, step.Locale, tapEvents)
+	return i.typeText(serial, step.GetTimeout(), last.Value, last.Locale, tapEvents)
 }
 
 func (i *interactorImpl) playCustomEvent(serial string, step *models.Step) error {
@@ -158,7 +169,7 @@ func (i *interactorImpl) playCustomEvent(serial string, step *models.Step) error
 	}
 
 	var foundRect *image.Rectangle
-	if step.HasType() {
+	if step.ValidAnchors() {
 		foundRect, err = i.findRect(serial, step)
 		if err != nil {
 			return err
@@ -174,11 +185,10 @@ func (i *interactorImpl) findRect(
 	serial string,
 	step *models.Step,
 ) (*image.Rectangle, error) {
-	if !step.HasType() {
+	if !step.ValidAnchors() {
 		return nil, errors.New("step target is empty")
 	}
 
-	var foundRect *image.Rectangle
 	deadline := time.Now().Add(step.GetTimeout())
 	for time.Now().Before(deadline) {
 		mat, err := i.scrcpy.GetMatFromLastFrame(serial, true)
@@ -192,7 +202,7 @@ func (i *interactorImpl) findRect(
 			continue
 		}
 
-		foundRect, err = i.findRectByType(serial, mat, step)
+		foundRect, err := i.findAnchorChain(serial, mat, step)
 		mat.Close()
 
 		if err != nil {
@@ -200,69 +210,88 @@ func (i *interactorImpl) findRect(
 			sleepUntilNextSecond()
 			continue
 		}
-		if models.ImageRectIsEmpty(foundRect) {
-			sleepUntilNextSecond()
-			continue
-		}
-		break
+		return foundRect, nil
 	}
 
-	if models.ImageRectIsEmpty(foundRect) {
-		return nil, fmt.Errorf(models.StatusError, step.Type, step.Value)
-	}
-
-	return foundRect, nil
+	last := step.LastAnchor()
+	return nil, fmt.Errorf(models.StatusError, last.Type, last.Value)
 }
 
-func (i *interactorImpl) findRectByType(
+func (i *interactorImpl) findAnchorChain(
 	serial string,
 	mat *gocv.Mat,
 	step *models.Step,
 ) (*image.Rectangle, error) {
-	if step.Type == models.Image {
+	var prevRect *image.Rectangle
+	for _, anchor := range step.Anchors {
+		candidates, err := i.findAnchorCandidates(serial, mat, &anchor)
+		if err != nil {
+			return nil, err
+		}
+
+		foundRect := models.ClosestRect(candidates, prevRect)
+		if models.ImageRectIsEmpty(foundRect) {
+			return nil, fmt.Errorf(models.StatusError, anchor.Type, anchor.Value)
+		}
+		prevRect = foundRect
+	}
+	return prevRect, nil
+}
+
+func (i *interactorImpl) findAnchorCandidates(
+	serial string,
+	mat *gocv.Mat,
+	anchor *models.Anchor,
+) ([]image.Rectangle, error) {
+	if anchor.Type == models.Image {
 		imagesDir := i.filesDB.CreateImagesDir()
 		if imagesDir == "" {
 			return nil, errors.New("images dir not found")
 		}
-		tmpImage := filepath.Join(imagesDir, strings.TrimSpace(step.Value)+file.PngExt)
+		tmpImage := filepath.Join(imagesDir, strings.TrimSpace(anchor.Value)+file.PngExt)
 		if !file.Exists(tmpImage) {
-			return nil, fmt.Errorf("image not found in library: %s", step.Value)
+			return nil, fmt.Errorf("image not found in library: %s", anchor.Value)
 		}
-		return i.cv.FindImage(mat, tmpImage)
+		return i.cv.FindAllImages(mat, tmpImage)
 	}
 
-	if step.Type == models.Text {
+	if anchor.Type == models.Text {
 		tesseractDir := i.filesDB.CreateLogsDir(serial, filesdb.TesseractDir)
 		if tesseractDir == "" {
 			return nil, fmt.Errorf("tesseract dir was not found")
 		}
 		var ocrParams = cv.InitOcrParams(
-			step.Value,
-			step.Locale,
+			anchor.Value,
+			anchor.Locale,
 			cv.PsmText,
 			cv.OemText,
 		)
-		rectangles, err := i.cv.FindTextRectangles(mat, tesseractDir, ocrParams)
+		ocrResults, err := i.cv.FindTextRectangles(mat, tesseractDir, ocrParams)
 		if err != nil {
 			return nil, err
 		}
-		if len(rectangles) == 0 || rectangles[0].IsEmpty() {
-			return nil, nil
+
+		rectangles := []image.Rectangle{}
+		for _, result := range ocrResults {
+			if result.IsEmpty() {
+				continue
+			}
+			rectangles = append(rectangles, *result.Rectangle.ToImageRectangle())
 		}
-		return rectangles[0].Rectangle.ToImageRectangle(), nil
+		return rectangles, nil
 	}
 
-	if step.Type == models.Yolo {
-		var labels = i.yolo.DetectLabels(*mat)
-		for _, rect := range labels {
-			if strings.EqualFold(rect.Label, step.Value) {
-				return rect.ToImageRectangle(), nil
+	if anchor.Type == models.Yolo {
+		rectangles := []image.Rectangle{}
+		for _, detection := range i.yolo.DetectLabels(*mat) {
+			if strings.EqualFold(detection.Label, anchor.Value) {
+				rectangles = append(rectangles, *detection.ToImageRectangle())
 			}
 		}
-		return nil, fmt.Errorf("yolo class not found: %s", step.Value)
+		return rectangles, nil
 	}
 
-	return nil, fmt.Errorf("unknown target type %s", step.Type)
+	return nil, fmt.Errorf("unknown target type %s", anchor.Type)
 }
 
 func (i *interactorImpl) typeText(

@@ -21,12 +21,38 @@ const (
 	Yolo  = "yolo"
 )
 
+type Anchor struct {
+	Type   string `json:"type"`
+	Value  string `json:"value"`
+	Locale string `json:"locale,omitempty"`
+}
+
+func (a *Anchor) Valid() bool {
+	if a == nil {
+		return false
+	}
+	if a.Type == Image && !file.ValidName(a.Value) {
+		return false
+	}
+
+	switch a.Type {
+	case Image, Text, Yolo:
+		return strings.TrimSpace(a.Value) != ""
+	}
+	return false
+}
+
+func (a *Anchor) ToString() string {
+	if a == nil {
+		return ""
+	}
+	return fmt.Sprintf("%s %s", a.Type, a.Value)
+}
+
 type Step struct {
-	Event   string `json:"event"`
-	Type    string `json:"type"`
-	Value   string `json:"value"`
-	Locale  string `json:"locale,omitempty"`
-	Timeout int    `json:"timeout,omitempty"`
+	Event   string   `json:"event"`
+	Anchors []Anchor `json:"anchors,omitempty"`
+	Timeout int      `json:"timeout,omitempty"`
 }
 
 func (s *Step) GetTimeout() time.Duration {
@@ -40,8 +66,8 @@ func ValidQueue(steps []Step) bool {
 	if len(steps) == 0 {
 		return false
 	}
-	for index := range steps {
-		if !steps[index].Valid() {
+	for _, step := range steps {
+		if !step.Valid() {
 			return false
 		}
 	}
@@ -55,20 +81,15 @@ func (s *Step) Valid() bool {
 	if s.IsCustomEvent() && !file.ValidName(s.Event) {
 		return false
 	}
-	if s.Type == Image && !file.ValidName(s.Value) {
-		return false
-	}
 
 	switch s.Event {
 	case TapEvent, LongTapEvent:
-		return s.HasType()
+		return s.ValidAnchors()
 	case TypeTextEvent:
-		return strings.TrimSpace(s.Value) != ""
+		last := s.LastAnchor()
+		return last != nil && strings.TrimSpace(last.Value) != ""
 	}
-	if s.IsCheckEvent() {
-		return s.HasType()
-	}
-	return strings.TrimSpace(s.Type) == "" || s.HasType()
+	return s.ValidAnchors()
 }
 
 func (s *Step) IsCheckEvent() bool {
@@ -87,16 +108,34 @@ func (s *Step) IsCustomEvent() bool {
 	return true
 }
 
-func (s *Step) HasType() bool {
-	if s == nil {
+func (s *Step) ValidAnchors() bool {
+	if s == nil || len(s.Anchors) == 0 {
 		return false
 	}
-
-	switch s.Type {
-	case Image, Text, Yolo:
-		return strings.TrimSpace(s.Value) != ""
+	for _, anchor := range s.Anchors {
+		if !anchor.Valid() {
+			return false
+		}
 	}
-	return false
+	return true
+}
+
+func (s *Step) LastAnchor() *Anchor {
+	if s == nil || len(s.Anchors) == 0 {
+		return nil
+	}
+	return &s.Anchors[len(s.Anchors)-1]
+}
+
+func (s *Step) AnchorsToString() string {
+	if s == nil {
+		return ""
+	}
+	parts := make([]string, 0, len(s.Anchors))
+	for _, anchor := range s.Anchors {
+		parts = append(parts, anchor.ToString())
+	}
+	return strings.Join(parts, " -> ")
 }
 
 func (s *Step) ToString() string {
@@ -104,13 +143,17 @@ func (s *Step) ToString() string {
 		return ""
 	}
 	if s.IsCheckEvent() {
-		return fmt.Sprintf("check on %s %s", s.Type, s.Value)
+		return fmt.Sprintf("check on %s", s.AnchorsToString())
 	}
 	if s.Event == TypeTextEvent {
-		return fmt.Sprintf("%s %q", s.Event, s.Value)
+		last := s.LastAnchor()
+		if last == nil {
+			return s.Event
+		}
+		return fmt.Sprintf("%s %q", s.Event, last.Value)
 	}
-	if s.HasType() {
-		return fmt.Sprintf("%s on %s %s", s.Event, s.Type, s.Value)
+	if s.ValidAnchors() {
+		return fmt.Sprintf("%s on %s", s.Event, s.AnchorsToString())
 	}
 	return s.Event
 }
