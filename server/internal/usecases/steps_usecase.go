@@ -252,7 +252,7 @@ func (i *interactorImpl) findAnchorCandidates(
 		if !file.Exists(tmpImage) {
 			return nil, fmt.Errorf("image not found in library: %s", anchor.Value)
 		}
-		return i.cv.FindAllImages(mat, tmpImage)
+		return i.cv.FindImages(mat, tmpImage)
 	}
 
 	if anchor.Type == models.Text {

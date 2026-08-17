@@ -322,10 +322,14 @@ func TestFindTemplate(t *testing.T) {
 	}
 	defer img.Close()
 
-	rectangle, err := cvAPI.FindImage(&img, TestImage)
+	rectangles, err := cvAPI.FindImages(&img, TestImage)
 	if err != nil {
 		t.Fatal(err)
 	}
+	if len(rectangles) == 0 {
+		t.Fatal("template not found")
+	}
+	rectangle := &rectangles[0]
 	t.Log(rectangle)
 
 	elapsed := time.Since(start)

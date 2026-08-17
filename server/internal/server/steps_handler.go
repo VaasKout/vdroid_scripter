@@ -8,11 +8,6 @@ import (
 
 const (
 	RunSteps = "/run_steps"
-	FindText = "/devices/{" + SerialKey + "}/find_text"
-)
-
-const (
-	TextKey = "text"
 )
 
 func (s *serverImpl) handleStepsFunctions() {
@@ -23,15 +18,6 @@ func (s *serverImpl) handleStepsFunctions() {
 			return
 		}
 		http.Error(w, "use POST method", http.StatusMethodNotAllowed)
-	})
-
-	http.HandleFunc(FindText, func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodGet {
-			s.logURL(r)
-			s.handleFindText(w, r)
-			return
-		}
-		http.Error(w, "use GET method", http.StatusMethodNotAllowed)
 	})
 }
 
@@ -54,20 +40,4 @@ func (s *serverImpl) handleRunSteps(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.sendStatusOk(w)
-}
-
-func (s *serverImpl) handleFindText(w http.ResponseWriter, r *http.Request) {
-	defer r.Body.Close()
-	var serial = r.PathValue(SerialKey)
-	var text = r.URL.Query().Get(TextKey)
-	var locale = r.URL.Query().Get(LocaleKey)
-
-	if serial == "" {
-		http.Error(w, `"serial" query needed`, http.StatusBadRequest)
-		return
-	}
-
-	result := s.interactor.FindText(serial, text, locale)
-	s.setHeaders(w)
-	json.NewEncoder(w).Encode(result)
 }

@@ -49,12 +49,12 @@ func (c *cvImpl) GetKeyboardKeys(
 ) []OCRResult {
 	var ocrResult = []OCRResult{}
 	for _, buttonPath := range keyboardButtons {
-		rect, err := c.FindImage(&img, buttonPath)
-		if err != nil || models.ImageRectIsEmpty(rect) {
+		rects, err := c.FindImages(&img, buttonPath)
+		if err != nil || len(rects) == 0 {
 			continue
 		}
 
-		var imgRectangle = models.ImgRectangleToDomain(rect)
+		var imgRectangle = models.ImgRectangleToDomain(&rects[0])
 		if imgRectangle.IsEmpty() {
 			continue
 		}

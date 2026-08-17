@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"strings"
 	"time"
 
@@ -26,6 +27,8 @@ Batching: when given a sequence of steps ("tap text1, tap yolo class home, swipe
 Steps: a step is an event applied to a chain of anchors. Each anchor is a CV target (type = image | text | yolo, value = library image name / text to find / yolo class; text anchors also carry locale). The chain resolves on ONE video frame: the first anchor picks its best match on screen, every following anchor picks the candidate of its value NEAREST to the previous anchor, and the event applies to the LAST anchor. One anchor is the normal case ("tap the cart icon" = one image anchor). Put a nearby unique element first to disambiguate duplicates: "tap the toggle next to 'Show refresh rate'" = anchors [{type text, value Show refresh rate}, {type image, value toggle}]. Events tap and long_tap touch the last anchor's region. type_text types the LAST anchor's value on the CV-detected keyboard (that anchor's locale = keyboard locale; nothing is located on screen). An EMPTY event is a pure visibility check of the anchor chain. Any other event name replays that recorded library event: anchored at the last anchor's region when anchors are given (e.g. a drag starting from an icon), verbatim without anchors (e.g. a scroll swipe).
 
 Locale: for text anchors and type_text, always set the anchor's locale to the Tesseract language code of its value's language. This holds for every language Tesseract supports (rus, deu, fra, jpn, ...); eng is the default. Pass the text exactly as the user wrote it, never transliterate or translate it.
+
+Library curation: when a needed element has no library image, call screenshot with rectangles=true, pick the rectangle that bounds the element by looking at the returned image, and call save_image with a library name and that rectangle. Do this only when the user asks to add a template or a flow needs one that does not exist. The screen must not change between the screenshot and save_image — the server re-captures the screen when cropping. The new image works as an image anchor right away; verify it with a visibility-check step.
 
 Rules: NEVER drive the device with adb directly — no adb shell input tap, input swipe, input text, keyevent, or any other adb command, no matter what. Every interaction is a step executed through queue_steps: tap/long_tap to touch a target, a library event to gesture, type_text to type, and an EMPTY event to find or verify an element. There is no separate lookup tool — finding an element and acting on it are both steps.
 
@@ -82,6 +85,24 @@ type queueStepsInput struct {
 	Steps  []stepInput `json:"steps" jsonschema:"steps to queue, executed in the given order"`
 }
 
+type screenshotInput struct {
+	Serial     string `json:"serial" jsonschema:"device serial number, get it from list_devices"`
+	Rectangles bool   `json:"rectangles,omitempty" jsonschema:"true to also return detected UI element rectangles as JSON, for picking a crop region"`
+}
+
+type rectangleInput struct {
+	LeftX   int `json:"left_x" jsonschema:"left edge X in screenshot pixels"`
+	RightX  int `json:"right_x" jsonschema:"right edge X in screenshot pixels"`
+	TopY    int `json:"top_y" jsonschema:"top edge Y in screenshot pixels"`
+	BottomY int `json:"bottom_y" jsonschema:"bottom edge Y in screenshot pixels"`
+}
+
+type saveImageInput struct {
+	Serial    string         `json:"serial" jsonschema:"device serial number"`
+	Name      string         `json:"name" jsonschema:"library name for the template, <app>_<screen>_<what>[_variant]; a duplicate name overwrites"`
+	Rectangle rectangleInput `json:"rectangle" jsonschema:"the region to crop from the current screen, in screenshot pixel coordinates"`
+}
+
 func (s *stepInput) describe() string {
 	var target string
 	if len(s.Anchors) > 0 {
@@ -119,6 +140,24 @@ func (s *Server) registerTools() {
 			"Names encode their context as <app>_<screen>_<what>[_variant]. " +
 			"Call this before planning steps.",
 	}, s.handleGetLibrary)
+
+	mcp.AddTool(s.mcp, &mcp.Tool{
+		Name: "screenshot",
+		Description: "Take a screenshot of the device's current screen. With " +
+			"rectangles=true it also returns detected UI element rectangles as a JSON " +
+			"array (left_x, right_x, top_y, bottom_y) — use it to pick the region of " +
+			"an element you want to save as a library template with save_image.",
+	}, s.handleScreenshot)
+
+	mcp.AddTool(s.mcp, &mcp.Tool{
+		Name: "save_image",
+		Description: "Crop a region of the device's CURRENT screen into the library " +
+			"as a named template image, immediately usable as an image anchor in " +
+			"steps. The server re-captures the screen when cropping, so the screen " +
+			"must still show what the screenshot showed. Name it " +
+			"<app>_<screen>_<what>[_variant]; a duplicate name overwrites. Verify the " +
+			"result with a visibility-check step (EMPTY event) on the new image.",
+	}, s.handleSaveImage)
 
 	mcp.AddTool(s.mcp, &mcp.Tool{
 		Name: "queue_steps",
@@ -189,6 +228,45 @@ func (s *Server) handleGetLibrary(
 		return nil, nil, err
 	}
 	return textResult(library), nil, nil
+}
+
+func (s *Server) handleScreenshot(
+	ctx context.Context,
+	req *mcp.CallToolRequest,
+	in screenshotInput,
+) (*mcp.CallToolResult, any, error) {
+	if in.Serial == "" {
+		return nil, nil, fmt.Errorf("serial is required")
+	}
+
+	image, rectangles, err := s.api.getScreenshot(in.Serial, in.Rectangles)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	content := []mcp.Content{
+		&mcp.ImageContent{Data: image, MIMEType: http.DetectContentType(image)},
+	}
+	if rectangles != "" {
+		content = append(content, &mcp.TextContent{Text: rectangles})
+	}
+	return &mcp.CallToolResult{Content: content}, nil, nil
+}
+
+func (s *Server) handleSaveImage(
+	ctx context.Context,
+	req *mcp.CallToolRequest,
+	in saveImageInput,
+) (*mcp.CallToolResult, any, error) {
+	if in.Serial == "" || in.Name == "" {
+		return nil, nil, fmt.Errorf("serial and name are required")
+	}
+
+	err := s.api.saveImage(in.Serial, in.Name, in.Rectangle)
+	if err != nil {
+		return nil, nil, err
+	}
+	return textResult("saved " + in.Name), nil, nil
 }
 
 func (s *Server) handleQueueSteps(
