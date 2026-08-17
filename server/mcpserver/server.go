@@ -28,7 +28,7 @@ Steps: a step is an event applied to a chain of anchors. Each anchor is a CV tar
 
 Locale: for text anchors and type_text, always set the anchor's locale to the Tesseract language code of its value's language. This holds for every language Tesseract supports (rus, deu, fra, jpn, ...); eng is the default. Pass the text exactly as the user wrote it, never transliterate or translate it.
 
-Library curation: screenshot and save_image exist ONLY for saving a new library image, and ONLY when the user explicitly asks to add one. "Save/add to the library" are the key words that select this flow: a request like "find the settings icon and save it to the library" means screenshot + save_image, NOT queue_steps — "find" there means picking the element's rectangle on the screenshot, not a visibility-check step. Then: call screenshot with rectangles=true, pick the rectangle that bounds the element by looking at the returned image, and call save_image with a library name and that rectangle. The screen must not change between the screenshot and save_image — the server re-captures the screen when cropping. save_image is the LAST call of the flow: after it, stop — no visibility-check step, no session, no further tool calls of any kind. The new image works as an image anchor whenever the user later references it. NEVER call screenshot on your own while running steps — not to locate an element, not to verify state, not to inspect a failure. Finding and verifying elements is always done with steps (EMPTY event visibility checks).
+Library curation: screenshot and save_image exist ONLY for saving a new library image, and ONLY when the user explicitly asks to add one. "Save/add to the library" are the key words that select this flow: a request like "find the settings icon and save it to the library" means screenshot + save_image, NOT queue_steps — "find" there means picking the element's rectangle on the screenshot, not a visibility-check step. Then: call screenshot with rectangles=true, pick the rectangle that bounds the element by looking at the returned image, and call save_image with a library name and that rectangle. The screen must not change between the screenshot and save_image — the server re-captures the screen when cropping. save_image is the LAST call of the flow. After it STOP IMMEDIATELY and report the saved name — under NO circumstances call any tool after save_image: no queue_steps, no get_session_status, no wait_for_session, no close_session, no screenshot, nothing. The session tools are off-limits after save_image even if a session is already open, even if a check seems helpful, even on doubt about the crop. The new image works as an image anchor whenever the user later references it. NEVER call screenshot on your own while running steps — not to locate an element, not to verify state, not to inspect a failure. Finding and verifying elements is always done with steps (EMPTY event visibility checks).
 
 Rules: NEVER drive the device with adb directly — no adb shell input tap, input swipe, input text, keyevent, or any other adb command, no matter what. Every interaction is a step executed through queue_steps: tap/long_tap to touch a target, a library event to gesture, type_text to type, and an EMPTY event to find or verify an element. There is no separate lookup tool — finding an element and acting on it are both steps. The one exception: when the user asks to SAVE an element to the library, that is the curation flow below (screenshot + save_image), not steps.
 
@@ -159,8 +159,9 @@ func (s *Server) registerTools() {
 			"steps. The server re-captures the screen when cropping, so the screen " +
 			"must still show what the screenshot showed. Name it " +
 			"<app>_<screen>_<what>[_variant]; a duplicate name overwrites. This is " +
-			"the last call of the flow: after it, stop — no verification steps, no " +
-			"session, no further tool calls.",
+			"the LAST call of the flow: after it make NO further tool calls under any " +
+			"circumstances — no queue_steps, get_session_status, wait_for_session, " +
+			"close_session or screenshot. Report the saved name and finish.",
 	}, s.handleSaveImage)
 
 	mcp.AddTool(s.mcp, &mcp.Tool{
@@ -270,7 +271,9 @@ func (s *Server) handleSaveImage(
 	if err != nil {
 		return nil, nil, err
 	}
-	return textResult("saved " + in.Name), nil, nil
+	return textResult("saved " + in.Name + ". STOP: make no further tool calls — " +
+		"no queue_steps, get_session_status, wait_for_session, close_session or " +
+		"screenshot. Report the saved name to the user and finish."), nil, nil
 }
 
 func (s *Server) handleQueueSteps(
