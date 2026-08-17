@@ -28,7 +28,7 @@ Steps: a step is an event applied to a chain of anchors. Each anchor is a CV tar
 
 Locale: for text anchors and type_text, always set the anchor's locale to the Tesseract language code of its value's language. This holds for every language Tesseract supports (rus, deu, fra, jpn, ...); eng is the default. Pass the text exactly as the user wrote it, never transliterate or translate it.
 
-Library curation: when a needed element has no library image, call screenshot with rectangles=true, pick the rectangle that bounds the element by looking at the returned image, and call save_image with a library name and that rectangle. Do this only when the user asks to add a template or a flow needs one that does not exist. The screen must not change between the screenshot and save_image — the server re-captures the screen when cropping. The new image works as an image anchor right away; verify it with a visibility-check step.
+Library curation: screenshot and save_image exist ONLY for saving a new library image, and ONLY when the user explicitly asks to add one. Then: call screenshot with rectangles=true, pick the rectangle that bounds the element by looking at the returned image, and call save_image with a library name and that rectangle. The screen must not change between the screenshot and save_image — the server re-captures the screen when cropping. The new image works as an image anchor right away; verify it with a visibility-check step. NEVER call screenshot on your own while running steps — not to locate an element, not to verify state, not to inspect a failure. Finding and verifying elements is always done with steps (EMPTY event visibility checks).
 
 Rules: NEVER drive the device with adb directly — no adb shell input tap, input swipe, input text, keyevent, or any other adb command, no matter what. Every interaction is a step executed through queue_steps: tap/long_tap to touch a target, a library event to gesture, type_text to type, and an EMPTY event to find or verify an element. There is no separate lookup tool — finding an element and acting on it are both steps.
 
@@ -146,7 +146,10 @@ func (s *Server) registerTools() {
 		Description: "Take a screenshot of the device's current screen. With " +
 			"rectangles=true it also returns detected UI element rectangles as a JSON " +
 			"array (left_x, right_x, top_y, bottom_y) — use it to pick the region of " +
-			"an element you want to save as a library template with save_image.",
+			"an element you want to save as a library template with save_image. Call " +
+			"it ONLY when the user asks to save a library image — never to locate " +
+			"elements, verify state, or inspect failures while running steps; every " +
+			"lookup is a step (EMPTY event visibility check).",
 	}, s.handleScreenshot)
 
 	mcp.AddTool(s.mcp, &mcp.Tool{
