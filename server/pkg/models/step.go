@@ -50,10 +50,9 @@ func (a *Anchor) ToString() string {
 }
 
 type Step struct {
-	Event    string   `json:"event"`
-	Anchors  []Anchor `json:"anchors,omitempty"`
-	Timeout  int      `json:"timeout,omitempty"`
-	NextNode string   `json:"-"`
+	Event   string   `json:"event"`
+	Anchors []Anchor `json:"anchors,omitempty"`
+	Timeout int      `json:"timeout,omitempty"`
 }
 
 func (s *Step) GetTimeout() time.Duration {

@@ -59,38 +59,6 @@ func (c *apiClient) getLibrary() (string, error) {
 	return string(body), err
 }
 
-func (c *apiClient) getFlows() (string, error) {
-	body, err := c.request(http.MethodGet, "/flow", nil)
-	return string(body), err
-}
-
-func (c *apiClient) saveFlow(node string, nextNode string, steps []stepInput) error {
-	var payload = struct {
-		Node     string      `json:"node"`
-		NextNode string      `json:"next_node"`
-		Steps    []stepInput `json:"steps"`
-	}{
-		Node:     node,
-		NextNode: nextNode,
-		Steps:    steps,
-	}
-	body, err := json.Marshal(payload)
-	if err != nil {
-		return err
-	}
-	_, err = c.request(http.MethodPost, "/flow", bytes.NewReader(body))
-	return err
-}
-
-func (c *apiClient) runFlow(serial string, start string, end string) error {
-	var params = url.Values{}
-	params.Set("serial", serial)
-	params.Set("start", start)
-	params.Set("end", end)
-	_, err := c.request(http.MethodGet, "/run_flow?"+params.Encode(), nil)
-	return err
-}
-
 func (c *apiClient) queueSteps(serial string, steps []stepInput) error {
 	var payload = struct {
 		Serial string      `json:"serial"`
@@ -187,15 +155,15 @@ func (c *apiClient) closeSession(serial string) error {
 	return err
 }
 
-func (c *apiClient) getSessionStatus(serial string) (string, string, error) {
+func (c *apiClient) getSessionStatus(serial string) (string, error) {
 	body, err := c.request(http.MethodGet, "/devices/"+url.PathEscape(serial)+"/session", nil)
 	if err != nil {
-		return "", "", err
+		return "", err
 	}
 	var response map[string]string
 	err = json.Unmarshal(body, &response)
 	if err != nil {
-		return "", "", err
+		return "", err
 	}
-	return response["status"], response["node"], nil
+	return response["status"], nil
 }

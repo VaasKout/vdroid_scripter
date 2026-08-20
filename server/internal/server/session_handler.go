@@ -40,12 +40,8 @@ func (s *serverImpl) handleGetSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	status, node := s.interactor.GetSessionStatus(serial)
 	var response = map[string]string{
-		"status": status,
-	}
-	if node != "" {
-		response["node"] = node
+		"status": s.interactor.GetSessionStatus(serial),
 	}
 
 	s.setHeaders(w)
