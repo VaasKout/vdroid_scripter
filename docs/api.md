@@ -34,6 +34,11 @@ This document describes every HTTP endpoint exposed by the server, defined in
 | GET | `/devices` | List connected ADB devices |
 | GET | `/devices/{serial}/screenshot` | Take an ADB screenshot, optionally with detected UI rectangles |
 | POST | `/run_steps` | Queue one or more steps to run in order on a device |
+| GET | `/scripts` | List saved script names |
+| GET | `/scripts/{name}` | Read a script's steps |
+| POST | `/scripts` | Save (overwrite) a named script |
+| DELETE | `/scripts/{name}` | Delete a script |
+| GET | `/run_script` | Queue a saved script's steps on a device |
 | GET | `/devices/{serial}/find_text` | OCR: locate text on the current screen |
 | GET | `/library` | List image and action names in the library |
 | POST | `/save_image` | Crop and save a named template image into the library |
@@ -159,6 +164,79 @@ status and clears the remaining queue.
   execution via [`GET /devices/{serial}/session`](#get-devicesserialsession).
 - **Errors:** `400` on invalid JSON or an invalid step, `500` when a referenced
   library image/action does not exist or the session could not be started.
+
+## Scripts
+
+A **script** is a cached `/run_steps` body: a named, reusable step list stored
+as `scripts/<name>/run.json` (a JSON array of [`Step`](#step)s). Scripts are
+pure caching — saving one never executes anything, and running one queues its
+steps exactly as if they had been sent to `/run_steps`. Saving under an
+existing name overwrites the whole script.
+
+### `GET /scripts`
+
+Lists all saved script names (the folder names under the scripts dir).
+
+- **Response `200`:**
+  ```json
+  { "scripts": ["open_main_page", "x5_add_corn_to_cart"] }
+  ```
+  `scripts` is `[]` when none are saved.
+
+### `GET /scripts/{name}`
+
+Returns the script's steps (the content of its `run.json`).
+
+- **Path params:** `name` (required).
+- **Response `200`:** a JSON array of [`Step`](#step)s.
+  ```json
+  [
+    { "event": "tap", "anchors": [{ "type": "text", "value": "Pyaterochka", "locale": "eng" }] },
+    { "event": "swipe_x5_catalog_1" }
+  ]
+  ```
+- **Errors:** `404` when the script does not exist.
+
+### `POST /scripts`
+
+Saves a script. The body is the same as `/run_steps` with `name` instead of
+`serial`; steps are validated the same way (referenced library images and
+events must exist). Saving under an existing name **rewrites the whole
+script**.
+
+- **Request body:**
+  ```json
+  {
+    "name": "open_main_page",
+    "steps": [
+      { "event": "tap", "anchors": [{ "type": "text", "value": "Pyaterochka", "locale": "eng" }] },
+      { "event": "tap", "anchors": [{ "type": "yolo", "value": "home" }] }
+    ]
+  }
+  ```
+- **Response `200`:** `{ "status": "ok" }`
+- **Errors:** `400` on invalid JSON, a missing/invalid `name`, or invalid
+  steps; `500` when a referenced library image/action does not exist or the
+  file could not be written.
+
+### `DELETE /scripts/{name}`
+
+Deletes the script (its whole folder).
+
+- **Path params:** `name` (required).
+- **Response `200`:** `{ "status": "ok" }`
+- **Errors:** `404` when the script does not exist.
+
+### `GET /run_script`
+
+Loads a saved script and queues its steps, exactly like `/run_steps` (steps
+re-validated, session opened automatically when none exists).
+
+- **Query params:** `serial`, `name` (both required).
+- **Response `200`:** `{ "status": "ok" }` — the script's steps were queued.
+  Track execution via [`GET /devices/{serial}/session`](#get-devicesserialsession).
+- **Errors:** `400` on missing params, `500` when the script does not exist,
+  a referenced library asset is missing, or the session could not be started.
 
 ## Library
 
