@@ -11,7 +11,7 @@ type SessionUseCase interface {
 	StartSession(serial string, basePort int) bool
 	CloseSession(serial string)
 	GetPortsJSON(serial string) map[string]string
-	GetSessionStatus(serial string) string
+	GetSessionStatus(serial string) (string, string)
 }
 
 func (i *interactorImpl) StartSession(serial string, basePort int) bool {
@@ -99,19 +99,20 @@ func (i *interactorImpl) initPorts(basePort int) *models.Session {
 	}
 }
 
-func (i *interactorImpl) GetSessionStatus(serial string) string {
+func (i *interactorImpl) GetSessionStatus(serial string) (string, string) {
 	session, ok := i.sessionsCache.Get(serial)
 	if !ok {
-		return models.StatusClosed
+		return models.StatusClosed, ""
 	}
-	return session.Status
+	return session.Status, session.Node
 }
 
-func (i *interactorImpl) addStepsToQueue(serial string, steps []models.Step) {
+func (i *interactorImpl) addStepsToQueue(serial string, node string, steps []models.Step) {
 	session, ok := i.sessionsCache.Get(serial)
 	if !ok {
 		return
 	}
+	session.Node = node
 	session.Query = append(session.Query, steps...)
 	i.sessionsCache.Add(serial, session)
 }
@@ -145,10 +146,14 @@ func (i *interactorImpl) runSessionQueue(serial string) {
 			i.logger.Error(err.Error())
 			session.Status = err.Error()
 			session.Query = []models.Step{}
+			session.Node = ""
 			i.sessionsCache.Add(serial, session)
 			continue
 		}
 
+		if step.NextNode != "" {
+			session.Node = step.NextNode
+		}
 		if len(session.Query) == 0 {
 			session.Status = models.StatusIdle
 		}

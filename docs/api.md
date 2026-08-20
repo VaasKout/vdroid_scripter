@@ -34,6 +34,9 @@ This document describes every HTTP endpoint exposed by the server, defined in
 | GET | `/devices` | List connected ADB devices |
 | GET | `/devices/{serial}/screenshot` | Take an ADB screenshot, optionally with detected UI rectangles |
 | POST | `/run_steps` | Queue one or more steps to run in order on a device |
+| GET | `/flow` | List the flow map's nodes and where their edges lead |
+| POST | `/flow` | Save a flow edge: the steps leading from one node to another |
+| GET | `/run_flow` | BFS a path between two flow nodes and queue its steps |
 | GET | `/devices/{serial}/find_text` | OCR: locate text on the current screen |
 | GET | `/library` | List image and action names in the library |
 | POST | `/save_image` | Crop and save a named template image into the library |
@@ -159,6 +162,77 @@ status and clears the remaining queue.
   execution via [`GET /devices/{serial}/session`](#get-devicesserialsession).
 - **Errors:** `400` on invalid JSON or an invalid step, `500` when a referenced
   library image/action does not exist or the session could not be started.
+
+## Flows
+
+The **flow map** memoizes navigation as a directed graph of named screens.
+A **node** is named `application_name/node_name` (e.g. `x5/main`) and stored
+as `flows/<application_name>/<node_name>/run.json`; the file holds the node's
+outgoing **edges** — each edge is the exact steps that lead from this node to
+another (`{ "steps": [...], "next_node": "application_name/node_name" }`), so
+a node lists all possible saved actions on that screen. Saving an edge with an
+existing `next_node` overwrites it.
+
+`/run_flow` searches the graph with an **unweighted BFS** from `start` to
+`end` (when several equally short ways exist, one is chosen at random) and
+queues every step along the path into the device's session. The session's
+`node` tracks progress: it is set to `start` when the flow is queued, advances
+to each edge's `next_node` as the edge's last step completes, and is cleared
+when a step fails or when plain `/run_steps` steps are queued (the device may
+then be on any screen).
+
+### `GET /flow`
+
+Lists all nodes in the flow map and where their edges lead.
+
+- **Response `200`:**
+  ```json
+  {
+    "nodes": [
+      { "name": "x5/catalog", "next_nodes": ["x5/main"] },
+      { "name": "x5/main", "next_nodes": ["x5/catalog", "x5/profile"] }
+    ]
+  }
+  ```
+  `nodes` is `[]` when the flow map is empty.
+
+### `POST /flow`
+
+Saves one edge of the flow map. The node directories are created when missing;
+an edge with the same `next_node` is overwritten. Steps are validated like in
+`/run_steps` — referenced library images and events must exist.
+
+- **Request body:**
+  ```json
+  {
+    "node": "x5/main",
+    "next_node": "x5/catalog",
+    "steps": [
+      { "event": "tap", "anchors": [{ "type": "image", "value": "x5_main_catalog_icon" }] }
+    ]
+  }
+  ```
+  `node` and `next_node` must be `application_name/node_name`; `steps` must be
+  a non-empty array of valid [`Step`](#step)s.
+- **Response `200`:** `{ "status": "ok" }`
+- **Errors:** `400` on invalid JSON, node names, or steps; `500` when a
+  referenced library image/action does not exist or the file could not be
+  written.
+
+### `GET /run_flow`
+
+Finds a path from `start` to `end` across the flow map and queues all its
+steps in order. If the device has no open session, one is opened automatically
+(like `/run_steps`).
+
+- **Query params:** `serial`, `start`, `end` (all required; `start` and `end`
+  are node names, `application_name/node_name`).
+- **Response `200`:** `{ "status": "ok" }` — the path's steps were queued.
+  Track execution via [`GET /devices/{serial}/session`](#get-devicesserialsession);
+  its `node` field follows the run.
+- **Errors:** `400` on missing params or invalid node names, `500` when no
+  path exists between the nodes, a referenced library asset is missing, or the
+  session could not be started.
 
 ## Library
 
@@ -330,6 +404,10 @@ Returns the session's status.
   - an error text (e.g. `unable to find <target type> <value> on screen`) —
     the last queued step failed; the queue was cleared. The error stays until
     the next step is queued.
+
+  During and after a [flow](#flows) run the response also carries a `node`
+  field (`{ "status": "idle", "node": "x5/catalog" }`) naming the flow node
+  the device is currently on. It is absent while no node is known.
 
 ### `DELETE /devices/{serial}/session`
 

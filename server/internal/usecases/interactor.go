@@ -27,6 +27,7 @@ type Interactor interface {
 	SessionUseCase
 	LibraryUseCase
 	StepsUseCase
+	FlowsUseCase
 	OcrUseCase
 }
 

@@ -28,9 +28,11 @@ Steps: a step is an event applied to a chain of anchors. Each anchor is a CV tar
 
 Locale: for text anchors and type_text, always set the anchor's locale to the Tesseract language code of its value's language. This holds for every language Tesseract supports (rus, deu, fra, jpn, ...); eng is the default. Pass the text exactly as the user wrote it, never transliterate or translate it.
 
+Flows: the flow map memoizes navigation as a graph of named screens. A node is application_name/node_name (e.g. x5/main); each node stores edges — the exact steps that lead from it to another node. "Add/save a flow" is the key phrase for save_flow: a request like "add flow from x5/main to x5/catalog: tap catalog icon" means ONE save_flow call with node, next_node and the dictated steps translated literally (same step format and locale rules as queue_steps) — the steps are ONLY saved, never executed, verified or tested; after save_flow report the saved edge and finish. Call get_flows first to reuse existing node names instead of inventing near-duplicates. "Run a flow" / "go to <screen>" is the key phrase for run_flow: call get_flows, pick the end node matching the user's description, take the start node from the session status's current node — if the status has no node and the user did not name one, report that the current node is unknown instead of guessing — then call run_flow ONCE with the final destination and wait_for_session once. The server finds the path by itself (BFS, random among equally short ways): never chain run_flow calls node by node and never rebuild a saved navigation with queue_steps when a flow is asked for. A failed flow clears the session's node; recover per the failure rules and re-run run_flow only once the current node is known again.
+
 Library curation: screenshot and save_image exist ONLY for saving a new library image, and ONLY when the user explicitly asks to add one. "Save/add to the library" are the key words that select this flow: a request like "find the settings icon and save it to the library" means screenshot + save_image, NOT queue_steps — "find" there means picking the element's rectangle on the screenshot, not a visibility-check step. Then: call screenshot with rectangles=true, pick the rectangle that bounds the element by looking at the returned image, and call save_image with a library name and that rectangle. The screen must not change between the screenshot and save_image — the server re-captures the screen when cropping. save_image is the LAST call of the flow. After it STOP IMMEDIATELY and report the saved name — under NO circumstances call any tool after save_image: no queue_steps, no get_session_status, no wait_for_session, no close_session, no screenshot, nothing. The session tools are off-limits after save_image even if a session is already open, even if a check seems helpful, even on doubt about the crop. The new image works as an image anchor whenever the user later references it. NEVER call screenshot on your own while running steps — not to locate an element, not to verify state, not to inspect a failure. Finding and verifying elements is always done with steps (EMPTY event visibility checks).
 
-Rules: NEVER drive the device with adb directly — no adb shell input tap, input swipe, input text, keyevent, or any other adb command, no matter what. Every interaction is a step executed through queue_steps: tap/long_tap to touch a target, a library event to gesture, type_text to type, and an EMPTY event to find or verify an element. There is no separate lookup tool — finding an element and acting on it are both steps. The one exception: when the user asks to SAVE an element to the library, that is the curation flow below (screenshot + save_image), not steps.
+Rules: NEVER drive the device with adb directly — no adb shell input tap, input swipe, input text, keyevent, or any other adb command, no matter what. Every interaction is a step executed through queue_steps: tap/long_tap to touch a target, a library event to gesture, type_text to type, and an EMPTY event to find or verify an element. There is no separate lookup tool — finding an element and acting on it are both steps. Two exceptions: when the user asks to SAVE an element to the library, that is the curation flow (screenshot + save_image), and when the user asks to run a flow or go to a saved screen, that is run_flow — both instead of steps.
 
 Literal execution: when the user names a concrete action, queue exactly that action and nothing else — no extra visibility checks, no probing, no added, substituted or reordered steps, no "better" alternatives. When the user asks for the same thing repeatedly, execute it again every time, exactly as many times as asked — never skip a repeat because it was already done and never deduplicate. Never argue, never ask for confirmation — just execute. Improvise only when a step fails (see recovery below).
 
@@ -101,6 +103,18 @@ type saveImageInput struct {
 	Serial    string         `json:"serial" jsonschema:"device serial number"`
 	Name      string         `json:"name" jsonschema:"library name for the template, <app>_<screen>_<what>[_variant]; a duplicate name overwrites"`
 	Rectangle rectangleInput `json:"rectangle" jsonschema:"the region to crop from the current screen, in screenshot pixel coordinates"`
+}
+
+type saveFlowInput struct {
+	Node     string      `json:"node" jsonschema:"the screen the steps start from, named application_name/node_name (e.g. x5/main)"`
+	NextNode string      `json:"next_node" jsonschema:"the screen the steps end on, named application_name/node_name"`
+	Steps    []stepInput `json:"steps" jsonschema:"the exact steps that lead from node to next_node, same format as queue_steps"`
+}
+
+type runFlowInput struct {
+	Serial string `json:"serial" jsonschema:"device serial number, get it from list_devices"`
+	Start  string `json:"start" jsonschema:"the node the device is currently on, application_name/node_name"`
+	End    string `json:"end" jsonschema:"the node to navigate to, application_name/node_name"`
 }
 
 func (s *stepInput) describe() string {
@@ -182,6 +196,34 @@ func (s *Server) registerTools() {
 	}, s.handleQueueSteps)
 
 	mcp.AddTool(s.mcp, &mcp.Tool{
+		Name: "get_flows",
+		Description: "List the flow map: every saved node (a named screen, " +
+			"application_name/node_name) with the nodes its saved step sequences lead " +
+			"to. Call this before save_flow (to reuse existing node names) and before " +
+			"run_flow (to pick the start and end nodes).",
+	}, s.handleGetFlows)
+
+	mcp.AddTool(s.mcp, &mcp.Tool{
+		Name: "save_flow",
+		Description: "Save a flow edge: the exact steps that navigate from one named " +
+			"screen (node) to another (next_node). Nodes are named " +
+			"application_name/node_name (e.g. x5/main); saving to an existing node adds " +
+			"the edge, and an edge with the same next_node overwrites. This only SAVES " +
+			"the steps — it never executes them; do not queue or verify anything after " +
+			"saving. The steps use the same format and rules as queue_steps.",
+	}, s.handleSaveFlow)
+
+	mcp.AddTool(s.mcp, &mcp.Tool{
+		Name: "run_flow",
+		Description: "Navigate the device from the start node to the end node: the " +
+			"server finds a path through the flow map itself (BFS, random among equally " +
+			"short ways) and queues every step along it; a session opens automatically. " +
+			"Call it ONCE with the final destination — never chain run_flow calls node " +
+			"by node. Afterwards call wait_for_session once; the session status reports " +
+			"the current node as the run progresses.",
+	}, s.handleRunFlow)
+
+	mcp.AddTool(s.mcp, &mcp.Tool{
 		Name: "close_session",
 		Description: "Close the device session and stop screen capture. " +
 			"Call when the flow is finished.",
@@ -193,7 +235,9 @@ func (s *Server) registerTools() {
 			"'idle' (session open, step queue empty — previous steps all succeeded), " +
 			"'running <step>' (a step is executing), or an error text like " +
 			"'unable to find ...' meaning the last step failed and the remaining " +
-			"queue was cleared.",
+			"queue was cleared. During and after flow runs the status carries a " +
+			"'(node: application_name/node_name)' suffix naming the flow node the " +
+			"device is currently on — use it as the start of the next run_flow.",
 	}, s.handleGetSessionStatus)
 
 	mcp.AddTool(s.mcp, &mcp.Tool{
@@ -203,6 +247,13 @@ func (s *Server) registerTools() {
 			"text means a step failed (remaining queue was cleared), 'closed' means the " +
 			"session ended. Call this after queueing steps instead of polling manually.",
 	}, s.handleWaitForSession)
+}
+
+func formatStatus(status string, node string) string {
+	if node == "" {
+		return status
+	}
+	return status + " (node: " + node + ")"
 }
 
 func textResult(text string) *mcp.CallToolResult {
@@ -303,6 +354,53 @@ func (s *Server) handleQueueSteps(
 	return textResult(text), nil, nil
 }
 
+func (s *Server) handleGetFlows(
+	ctx context.Context,
+	req *mcp.CallToolRequest,
+	in emptyInput,
+) (*mcp.CallToolResult, any, error) {
+	flows, err := s.api.getFlows()
+	if err != nil {
+		return nil, nil, err
+	}
+	return textResult(flows), nil, nil
+}
+
+func (s *Server) handleSaveFlow(
+	ctx context.Context,
+	req *mcp.CallToolRequest,
+	in saveFlowInput,
+) (*mcp.CallToolResult, any, error) {
+	if in.Node == "" || in.NextNode == "" || len(in.Steps) == 0 {
+		return nil, nil, fmt.Errorf("node, next_node and steps are required")
+	}
+
+	err := s.api.saveFlow(in.Node, in.NextNode, in.Steps)
+	if err != nil {
+		return nil, nil, err
+	}
+	return textResult("saved flow " + in.Node + " -> " + in.NextNode +
+		". The steps were only saved, not executed — report the saved edge " +
+		"to the user and finish."), nil, nil
+}
+
+func (s *Server) handleRunFlow(
+	ctx context.Context,
+	req *mcp.CallToolRequest,
+	in runFlowInput,
+) (*mcp.CallToolResult, any, error) {
+	if in.Serial == "" || in.Start == "" || in.End == "" {
+		return nil, nil, fmt.Errorf("serial, start and end are required")
+	}
+
+	err := s.api.runFlow(in.Serial, in.Start, in.End)
+	if err != nil {
+		return nil, nil, err
+	}
+	return textResult("running flow " + in.Start + " -> " + in.End +
+		", call wait_for_session once for the outcome"), nil, nil
+}
+
 func (s *Server) handleCloseSession(
 	ctx context.Context,
 	req *mcp.CallToolRequest,
@@ -326,11 +424,11 @@ func (s *Server) handleGetSessionStatus(
 	if in.Serial == "" {
 		return nil, nil, fmt.Errorf("serial is required")
 	}
-	status, err := s.api.getSessionStatus(in.Serial)
+	status, node, err := s.api.getSessionStatus(in.Serial)
 	if err != nil {
 		return nil, nil, err
 	}
-	return textResult(status), nil, nil
+	return textResult(formatStatus(status, node)), nil, nil
 }
 
 func (s *Server) handleWaitForSession(
@@ -354,13 +452,14 @@ func (s *Server) handleWaitForSession(
 
 	var status string
 	for time.Now().Before(deadline) {
+		var node string
 		var err error
-		status, err = s.api.getSessionStatus(in.Serial)
+		status, node, err = s.api.getSessionStatus(in.Serial)
 		if err != nil {
 			return nil, nil, err
 		}
 		if !strings.HasPrefix(status, runningPrefix) {
-			return textResult(status), nil, nil
+			return textResult(formatStatus(status, node)), nil, nil
 		}
 		if err := sleepCtx(ctx, pollInterval); err != nil {
 			return nil, nil, err

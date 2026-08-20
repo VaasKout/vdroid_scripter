@@ -15,6 +15,7 @@ type Session struct {
 	CVPort      int
 	ControlPort int
 	Query       []Step
+	Node        string
 	Status      string
 	DoneCh      chan struct{}
 }
