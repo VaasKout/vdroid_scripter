@@ -14,7 +14,6 @@ type Create interface {
 	CreateOnnxDir(args ...string) string
 	CreateImagesDir(args ...string) string
 	CreateActionsDir(args ...string) string
-	CreateScriptsDir(args ...string) string
 }
 
 // CreateLogsDir ...
@@ -68,15 +67,6 @@ func (f *filesDBImpl) CreateImagesDir(args ...string) string {
 
 func (f *filesDBImpl) CreateActionsDir(args ...string) string {
 	var dirName = filepath.Join(f.filesProps.Actions, filepath.Join(args...))
-	if ok := file.CreateDirIfNotExist(dirName); !ok {
-		fmt.Printf("couldn't create dir %s\n", dirName)
-		return ""
-	}
-	return dirName
-}
-
-func (f *filesDBImpl) CreateScriptsDir(args ...string) string {
-	var dirName = filepath.Join(f.filesProps.Scripts, filepath.Join(args...))
 	if ok := file.CreateDirIfNotExist(dirName); !ok {
 		fmt.Printf("couldn't create dir %s\n", dirName)
 		return ""

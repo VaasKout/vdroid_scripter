@@ -59,45 +59,6 @@ func (c *apiClient) getLibrary() (string, error) {
 	return string(body), err
 }
 
-func (c *apiClient) getScripts() (string, error) {
-	body, err := c.request(http.MethodGet, "/scripts", nil)
-	return string(body), err
-}
-
-func (c *apiClient) getScript(name string) (string, error) {
-	body, err := c.request(http.MethodGet, "/scripts/"+url.PathEscape(name), nil)
-	return string(body), err
-}
-
-func (c *apiClient) saveScript(name string, steps []stepInput) error {
-	var payload = struct {
-		Name  string      `json:"name"`
-		Steps []stepInput `json:"steps"`
-	}{
-		Name:  name,
-		Steps: steps,
-	}
-	body, err := json.Marshal(payload)
-	if err != nil {
-		return err
-	}
-	_, err = c.request(http.MethodPost, "/scripts", bytes.NewReader(body))
-	return err
-}
-
-func (c *apiClient) deleteScript(name string) error {
-	_, err := c.request(http.MethodDelete, "/scripts/"+url.PathEscape(name), nil)
-	return err
-}
-
-func (c *apiClient) runScript(serial string, name string) error {
-	var params = url.Values{}
-	params.Set("serial", serial)
-	params.Set("name", name)
-	_, err := c.request(http.MethodGet, "/run_script?"+params.Encode(), nil)
-	return err
-}
-
 func (c *apiClient) queueSteps(serial string, steps []stepInput) error {
 	var payload = struct {
 		Serial string      `json:"serial"`
