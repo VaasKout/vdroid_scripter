@@ -28,9 +28,11 @@ Steps: a step is an event applied to a chain of anchors. Each anchor is a CV tar
 
 Locale: for text anchors and type_text, always set the anchor's locale to the Tesseract language code of its value's language. This holds for every language Tesseract supports (rus, deu, fra, jpn, ...); eng is the default. Pass the text exactly as the user wrote it, never transliterate or translate it.
 
+Scripts: a script is a saved queue_steps body — a named, reusable step list cached as scripts/<name>/run.json (get_scripts lists the names, get_script returns a script's steps). "Save it as/into the <name> script" after a dictated sequence means: run the sequence with ONE queue_steps call, wait_for_session once, and ONLY if the final status is idle save exactly those steps with save_script — after a failed run save nothing and report the failure. "Add <steps> to the <name> script" means: get_script, append the dictated steps at the END of the returned list, and save_script with the FULL updated list — save_script always rewrites the whole script, and appending executes nothing. "Run the <name> script" means ONE run_script call (the server queues the saved steps itself) followed by wait_for_session once — never re-send a saved script's steps through queue_steps. Steps inside scripts follow the same format, locale and literal-execution rules as queue_steps. Call delete_script only when the user explicitly asks to delete a script.
+
 Library curation: screenshot and save_image exist ONLY for saving a new library image, and ONLY when the user explicitly asks to add one. "Save/add to the library" are the key words that select this flow: a request like "find the settings icon and save it to the library" means screenshot + save_image, NOT queue_steps — "find" there means picking the element's rectangle on the screenshot, not a visibility-check step. Then: call screenshot with rectangles=true, pick the rectangle that bounds the element by looking at the returned image, and call save_image with a library name and that rectangle. The screen must not change between the screenshot and save_image — the server re-captures the screen when cropping. save_image is the LAST call of the flow. After it STOP IMMEDIATELY and report the saved name — under NO circumstances call any tool after save_image: no queue_steps, no get_session_status, no wait_for_session, no close_session, no screenshot, nothing. The session tools are off-limits after save_image even if a session is already open, even if a check seems helpful, even on doubt about the crop. The new image works as an image anchor whenever the user later references it. NEVER call screenshot on your own while running steps — not to locate an element, not to verify state, not to inspect a failure. Finding and verifying elements is always done with steps (EMPTY event visibility checks).
 
-Rules: NEVER drive the device with adb directly — no adb shell input tap, input swipe, input text, keyevent, or any other adb command, no matter what. Every interaction is a step executed through queue_steps: tap/long_tap to touch a target, a library event to gesture, type_text to type, and an EMPTY event to find or verify an element. There is no separate lookup tool — finding an element and acting on it are both steps. The one exception: when the user asks to SAVE an element to the library, that is the curation flow below (screenshot + save_image), not steps.
+Rules: NEVER drive the device with adb directly — no adb shell input tap, input swipe, input text, keyevent, or any other adb command, no matter what. Every interaction is a step executed through queue_steps (or run_script replaying a saved script): tap/long_tap to touch a target, a library event to gesture, type_text to type, and an EMPTY event to find or verify an element. There is no separate lookup tool — finding an element and acting on it are both steps. The one exception: when the user asks to SAVE an element to the library, that is the curation flow below (screenshot + save_image), not steps.
 
 Literal execution: when the user names a concrete action, queue exactly that action and nothing else — no extra visibility checks, no probing, no added, substituted or reordered steps, no "better" alternatives. When the user asks for the same thing repeatedly, execute it again every time, exactly as many times as asked — never skip a repeat because it was already done and never deduplicate. Never argue, never ask for confirmation — just execute. Improvise only when a step fails (see recovery below).
 
@@ -101,6 +103,20 @@ type saveImageInput struct {
 	Serial    string         `json:"serial" jsonschema:"device serial number"`
 	Name      string         `json:"name" jsonschema:"library name for the template, <app>_<screen>_<what>[_variant]; a duplicate name overwrites"`
 	Rectangle rectangleInput `json:"rectangle" jsonschema:"the region to crop from the current screen, in screenshot pixel coordinates"`
+}
+
+type scriptNameInput struct {
+	Name string `json:"name" jsonschema:"script name, get it from get_scripts"`
+}
+
+type saveScriptInput struct {
+	Name  string      `json:"name" jsonschema:"script name; saving under an existing name overwrites the WHOLE script"`
+	Steps []stepInput `json:"steps" jsonschema:"the script's complete step list, same format as queue_steps"`
+}
+
+type runScriptInput struct {
+	Serial string `json:"serial" jsonschema:"device serial number, get it from list_devices"`
+	Name   string `json:"name" jsonschema:"script name, get it from get_scripts"`
 }
 
 func (s *stepInput) describe() string {
@@ -180,6 +196,46 @@ func (s *Server) registerTools() {
 			"event without anchors to scroll). A step failure clears the remaining queue " +
 			"and sets the error status.",
 	}, s.handleQueueSteps)
+
+	mcp.AddTool(s.mcp, &mcp.Tool{
+		Name: "get_scripts",
+		Description: "List the names of all saved scripts. A script is a named, " +
+			"cached queue of steps (scripts/<name>/run.json) that run_script replays " +
+			"as-is. Call this before run_script, save_script or get_script to use " +
+			"the exact saved name.",
+	}, s.handleGetScripts)
+
+	mcp.AddTool(s.mcp, &mcp.Tool{
+		Name: "get_script",
+		Description: "Read a saved script: returns its full step list as JSON. Call " +
+			"this when the user asks to add steps to an existing script — append the " +
+			"new steps to the returned list and save the whole thing with save_script.",
+	}, s.handleGetScript)
+
+	mcp.AddTool(s.mcp, &mcp.Tool{
+		Name: "save_script",
+		Description: "Save a script: the COMPLETE step list under a name. Saving " +
+			"under an existing name overwrites the whole script, so when extending a " +
+			"script always send the full updated list (get_script first). Saving " +
+			"never executes anything. When the user dictates a sequence and asks to " +
+			"save it as a script, run it first with queue_steps + wait_for_session " +
+			"and save only if the run ended idle.",
+	}, s.handleSaveScript)
+
+	mcp.AddTool(s.mcp, &mcp.Tool{
+		Name: "delete_script",
+		Description: "Delete a saved script by name. Only when the user explicitly " +
+			"asks to delete it.",
+	}, s.handleDeleteScript)
+
+	mcp.AddTool(s.mcp, &mcp.Tool{
+		Name: "run_script",
+		Description: "Run a saved script on the device: the server loads the " +
+			"script's steps and queues them exactly like queue_steps (a session opens " +
+			"automatically). ONE call runs the whole script — never re-send a saved " +
+			"script's steps through queue_steps. Afterwards call wait_for_session " +
+			"once: 'idle' means the whole script succeeded.",
+	}, s.handleRunScript)
 
 	mcp.AddTool(s.mcp, &mcp.Tool{
 		Name: "close_session",
@@ -301,6 +357,83 @@ func (s *Server) handleQueueSteps(
 	}
 	var text = "queued " + strings.Join(names, ", ")
 	return textResult(text), nil, nil
+}
+
+func (s *Server) handleGetScripts(
+	ctx context.Context,
+	req *mcp.CallToolRequest,
+	in emptyInput,
+) (*mcp.CallToolResult, any, error) {
+	scripts, err := s.api.getScripts()
+	if err != nil {
+		return nil, nil, err
+	}
+	return textResult(scripts), nil, nil
+}
+
+func (s *Server) handleGetScript(
+	ctx context.Context,
+	req *mcp.CallToolRequest,
+	in scriptNameInput,
+) (*mcp.CallToolResult, any, error) {
+	if in.Name == "" {
+		return nil, nil, fmt.Errorf("name is required")
+	}
+	script, err := s.api.getScript(in.Name)
+	if err != nil {
+		return nil, nil, err
+	}
+	return textResult(script), nil, nil
+}
+
+func (s *Server) handleSaveScript(
+	ctx context.Context,
+	req *mcp.CallToolRequest,
+	in saveScriptInput,
+) (*mcp.CallToolResult, any, error) {
+	if in.Name == "" || len(in.Steps) == 0 {
+		return nil, nil, fmt.Errorf("name and steps are required")
+	}
+
+	err := s.api.saveScript(in.Name, in.Steps)
+	if err != nil {
+		return nil, nil, err
+	}
+	return textResult("saved script " + in.Name + " with " +
+		fmt.Sprintf("%d", len(in.Steps)) + " steps. Nothing was executed — " +
+		"report the saved script to the user."), nil, nil
+}
+
+func (s *Server) handleDeleteScript(
+	ctx context.Context,
+	req *mcp.CallToolRequest,
+	in scriptNameInput,
+) (*mcp.CallToolResult, any, error) {
+	if in.Name == "" {
+		return nil, nil, fmt.Errorf("name is required")
+	}
+	err := s.api.deleteScript(in.Name)
+	if err != nil {
+		return nil, nil, err
+	}
+	return textResult("deleted script " + in.Name), nil, nil
+}
+
+func (s *Server) handleRunScript(
+	ctx context.Context,
+	req *mcp.CallToolRequest,
+	in runScriptInput,
+) (*mcp.CallToolResult, any, error) {
+	if in.Serial == "" || in.Name == "" {
+		return nil, nil, fmt.Errorf("serial and name are required")
+	}
+
+	err := s.api.runScript(in.Serial, in.Name)
+	if err != nil {
+		return nil, nil, err
+	}
+	return textResult("running script " + in.Name +
+		", call wait_for_session once for the outcome"), nil, nil
 }
 
 func (s *Server) handleCloseSession(
