@@ -16,6 +16,7 @@ const (
 	YoloDir        = "yolo"
 	ImagesDir      = "images"
 	ActionsDir     = "actions"
+	MapDir         = "map"
 	ScrcpyVersion  = "3.3.4"
 	ServerPort     = ":8080"
 	BaseSocketPort = 3001
@@ -42,6 +43,7 @@ type FilesProps struct {
 	Yolo      string
 	Images    string
 	Actions   string
+	Map       string
 }
 
 // ScrcpyProps ...
@@ -110,6 +112,11 @@ func New() *Config {
 		scrcpyVersion = ScrcpyVersion
 	}
 
+	mapDir := os.Getenv("MAP_DIR")
+	if mapDir == "" {
+		mapDir = MapDir
+	}
+
 	return &Config{
 		ServerProps: &ServerProps{
 			Port:       port,
@@ -122,6 +129,7 @@ func New() *Config {
 			Yolo:      filepath.Join(cachePath, yoloDir),
 			Images:    filepath.Join(cachePath, imagesDir),
 			Actions:   filepath.Join(cachePath, actionsDir),
+			Map:       filepath.Join(cachePath, mapDir),
 		},
 		ScrcpyProps: &ScrcpyProps{
 			ScrcpyVersion: scrcpyVersion,

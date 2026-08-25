@@ -2,6 +2,7 @@ package usecases
 
 import (
 	"android_vision_scripter/pkg/models"
+	"errors"
 	"fmt"
 	"time"
 )
@@ -28,7 +29,7 @@ func (i *interactorImpl) StartSession(serial string, basePort int) bool {
 		return false
 	}
 
-    i.sessionsCache.Add(serial, *session)
+	i.sessionsCache.Add(serial, *session)
 	i.setScrcpyState(serial, true)
 	go i.runSessionQueue(serial)
 	return true
@@ -107,13 +108,73 @@ func (i *interactorImpl) GetSessionStatus(serial string) string {
 	return session.Status
 }
 
-func (i *interactorImpl) addStepsToQueue(serial string, steps []models.Step) {
-	session, ok := i.sessionsCache.Get(serial)
-	if !ok {
-		return
+func (i *interactorImpl) addStepsToQueue(serial string, steps []models.Step) bool {
+	return i.sessionsCache.Update(serial, func(session models.Session) models.Session {
+		for _, step := range steps {
+			session.Query = append(session.Query, models.QueueItem{Step: &step})
+		}
+		return session
+	})
+}
+
+func (i *interactorImpl) addRouteToQueue(serial string, route *models.Route) bool {
+	return i.sessionsCache.Update(serial, func(session models.Session) models.Session {
+		session.Query = append(session.Query, models.QueueItem{Route: route})
+		return session
+	})
+}
+
+func (i *interactorImpl) popNextQueueItem(serial string) (models.QueueItem, bool) {
+	var item models.QueueItem
+	var found bool
+	i.sessionsCache.Update(serial, func(session models.Session) models.Session {
+		if len(session.Query) == 0 {
+			return session
+		}
+		item = session.Query[0]
+		session.Query = session.Query[1:]
+		if item.Step != nil {
+			session.Status = fmt.Sprintf(models.StatusRunningStep, item.Step.ToString())
+		}
+		if item.Route != nil {
+			session.Status = fmt.Sprintf(
+				models.StatusRunningRoute,
+				item.Route.From,
+				item.Route.To,
+				"planning",
+			)
+		}
+		found = true
+		return session
+	})
+	return item, found
+}
+
+func (i *interactorImpl) executeQueueItem(serial string, item *models.QueueItem) error {
+	if item.Route != nil {
+		return i.executeRoute(serial, item.Route)
 	}
-	session.Query = append(session.Query, steps...)
-	i.sessionsCache.Add(serial, session)
+	if item.Step != nil {
+		return i.executeStep(serial, item.Step)
+	}
+	return errors.New("empty queue item")
+}
+
+func (i *interactorImpl) failSessionQueue(serial string, err error) {
+	i.sessionsCache.Update(serial, func(session models.Session) models.Session {
+		session.Status = err.Error()
+		session.Query = nil
+		return session
+	})
+}
+
+func (i *interactorImpl) finishSessionStep(serial string) {
+	i.sessionsCache.Update(serial, func(session models.Session) models.Session {
+		if len(session.Query) == 0 {
+			session.Status = models.StatusIdle
+		}
+		return session
+	})
 }
 
 func (i *interactorImpl) runSessionQueue(serial string) {
@@ -130,29 +191,20 @@ func (i *interactorImpl) runSessionQueue(serial string) {
 		default:
 		}
 
-		if len(session.Query) == 0 {
+		item, found := i.popNextQueueItem(serial)
+		if !found {
 			time.Sleep(300 * time.Millisecond)
 			continue
 		}
 
-		var step = session.Query[0]
-		session.Query = session.Query[1:]
-		session.Status = fmt.Sprintf(models.StatusRunningStep, step.ToString())
-		i.sessionsCache.Add(serial, session)
-
-		err := i.executeStep(serial, &step)
+		err := i.executeQueueItem(serial, &item)
 		if err != nil {
 			i.logger.Error(err.Error())
-			session.Status = err.Error()
-			session.Query = []models.Step{}
-			i.sessionsCache.Add(serial, session)
+			i.failSessionQueue(serial, err)
 			continue
 		}
 
-		if len(session.Query) == 0 {
-			session.Status = models.StatusIdle
-		}
-		i.sessionsCache.Add(serial, session)
-		time.Sleep(300 * time.Millisecond) // animation delay
+		i.finishSessionStep(serial)
+		time.Sleep(300 * time.Millisecond)
 	}
 }

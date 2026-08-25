@@ -40,6 +40,11 @@ This document describes every HTTP endpoint exposed by the server, defined in
 | POST | `/save_action` | Save a named recorded gesture into the library |
 | DELETE | `/images/{name}` | Delete a library image |
 | DELETE | `/actions/{name}` | Delete a library action |
+| GET | `/map` | List map node names |
+| GET | `/map/{name}` | Get one map node |
+| POST | `/map` | Create or merge-update a map node |
+| DELETE | `/map/{name}` | Delete a map node |
+| POST | `/follow_route` | Navigate from one node to another via BFS over edges |
 | GET | `/devices/{serial}/keyboard` | Detect on-screen keyboard keys |
 | POST | `/devices/{serial}/edit_keyboard` | Override a keyboard key's rectangle |
 | GET | `/devices/{serial}/reset_keyboard` | Reset keyboard keys to defaults |
@@ -110,25 +115,28 @@ Takes a screenshot and runs OCR to locate matching text on the current screen.
 ## Steps
 
 A **step** is the unit of execution: an **event** applied to a chain of
-CV-located **anchors**. Steps compose the [library](#library) at runtime —
-each anchor (`type` + `value`) locates a region on the live screen (a library
-image, OCR text, or a YOLO class) and the event acts on the **last** anchor's
+CV-located **landmarks**. Steps compose the [library](#library) at runtime —
+each landmark (`type` + `value`) locates a region on the live screen (a library
+image, OCR text, or a YOLO class) and the event acts on the **last** landmark's
 region (generated taps, CV keyboard typing, or a recorded gesture from the
 library).
 
-The chain resolves on a single video frame: the first anchor picks its best
-match on screen, every following anchor picks the candidate of its value
-**nearest** (by center distance) to the previous anchor, and the event applies
-to the last anchor. One anchor is the normal case; a preceding unique anchor
-disambiguates duplicates — "the toggle next to *Show refresh rate*" is
-`anchors: [{text "Show refresh rate"}, {image "toggle"}]`.
+The chain resolves on a single video frame: the first landmark picks its best
+match on screen, every following landmark picks the candidate of its value
+**nearest** (by center distance) to the previous landmark, and the event applies
+to the last landmark. One landmark is the normal case; a preceding unique
+landmark disambiguates duplicates — "the toggle next to *Show refresh rate*"
+is `landmarks: [{text "Show refresh rate"}, {image "toggle"}]`. Candidate
+lists are ordered top-to-bottom, left-to-right (reading order), so when a
+value matches several places and no disambiguating landmark precedes it, a
+bare landmark deterministically takes the first candidate on screen.
 
 | `event` | Behavior |
 | ------- | -------- |
-| *(empty)* | Visibility check of the anchor chain — no touch. Anchors required. |
-| `tap` / `long_tap` | Generated tap pair placed at a random point inside the last anchor's region. Anchors required. |
-| `type_text` | The **last anchor's `value` is the text to type**, typed via the CV keyboard (its `locale` = keyboard locale). Nothing is located on screen. |
-| any other name | The library event with that name is replayed: **anchored** when anchors are given (first touch moved into the last anchor's region, relative shape preserved), **verbatim** without them. |
+| *(empty)* | Visibility check of the landmark chain — no touch. Landmarks required. |
+| `tap` / `long_tap` | Generated tap pair placed at a random point inside the last landmark's region. Landmarks required. |
+| `type_text` | The **last landmark's `value` is the text to type**, typed via the CV keyboard (its `locale` = keyboard locale). Nothing is located on screen. |
+| any other name | The library event with that name is replayed: **offset into the found region** when landmarks are given (first touch moved into the last landmark's region, relative shape preserved), **verbatim** without them. |
 
 ### `POST /run_steps`
 
@@ -144,12 +152,12 @@ status and clears the remaining queue.
   {
     "serial": "ABCD1234",
     "steps": [
-      { "anchors": [{ "type": "yolo", "value": "home" }] },
-      { "event": "tap", "anchors": [{ "type": "image", "value": "catalog_cart_icon" }] },
+      { "landmarks": [{ "type": "yolo", "value": "home" }] },
+      { "event": "tap", "landmarks": [{ "type": "image", "value": "catalog_cart_icon" }] },
       { "event": "swipe_catalog_1" },
-      { "event": "tap", "anchors": [{ "type": "text", "value": "Corn", "locale": "eng" }], "timeout": 10 },
-      { "event": "tap", "anchors": [{ "type": "text", "value": "Show refresh rate" }, { "type": "image", "value": "toggle" }] },
-      { "event": "type_text", "anchors": [{ "type": "text", "value": "hello", "locale": "eng" }] }
+      { "event": "tap", "landmarks": [{ "type": "text", "value": "Corn", "locale": "eng" }], "timeout": 10 },
+      { "event": "tap", "landmarks": [{ "type": "text", "value": "Show refresh rate" }, { "type": "image", "value": "toggle" }] },
+      { "event": "type_text", "landmarks": [{ "type": "text", "value": "hello", "locale": "eng" }] }
     ]
   }
   ```
@@ -235,6 +243,101 @@ Deletes `actions/<name>.json`.
 
 - **Response `200`:** `{ "status": "ok" }`
 - **Errors:** `404` if no action with that name exists.
+
+## Map
+
+The **map** is a graph of curated screens stored as `map/<name>/node.json`.
+A **node** describes one screen: its identifying `landmarks`, its `edges`
+(actions with the nodes they can lead to), and an `occupancy_grid` — a
+content-blind structural fingerprint the server captures on its own during
+route execution. The map is purely declarative: creating and updating nodes
+never touches a device, and `POST /run_steps` never reads or writes the map.
+
+### `GET /map`
+
+Lists all node names.
+
+- **Response `200`:** `{ "nodes": ["main_screen", "x5_catalog"] }` — sorted,
+  `[]` when the map is empty.
+
+### `GET /map/{name}`
+
+Returns one node.
+
+- **Response `200`:** the [`Node`](#node) JSON.
+- **Errors:** `404` if no node with that name exists.
+
+### `POST /map`
+
+Creates a node, or **merge-updates** an existing one (matched by `name`).
+
+- **Request body:** a [`Node`](#node):
+  ```json
+  {
+    "name": "main_screen",
+    "landmarks": [{ "type": "image", "value": "catalog_icon" }],
+    "edges": [
+      {
+        "action": { "event": "tap", "landmarks": [{ "type": "text", "value": "catalog" }] },
+        "next_nodes": ["x5_catalog"]
+      },
+      { "action": { "event": "buy_button_tap" }, "next_nodes": [] }
+    ],
+    "occupancy_grid": { "cols": 18, "rows": 32, "cells": ["001100...", "..."] }
+  }
+  ```
+  `name` is required (library naming rules). An edge's `action` is a full
+  [`Step`](#step); `next_nodes` may be **empty** (a terminal action on a
+  final page) and may reference nodes that don't exist yet (dangling names
+  are legal and simply unroutable until created). `occupancy_grid` is
+  optional.
+- **Merge semantics** when the name exists: landmarks are appended with
+  dedup by `type`+`value`+`locale`; an edge whose `action` equals an existing
+  edge's action (same `event` and landmark sequence, `timeout` ignored)
+  unions its `next_nodes`, otherwise the edge is appended; a **non-empty**
+  `occupancy_grid` in the body replaces the stored one, an absent or empty
+  grid keeps it. Nothing is ever auto-deleted.
+- **Validation:** image landmarks and library events referenced by edge
+  actions must exist (same rule as `/run_steps`).
+- **Response `200`:** `{ "status": "ok" }`
+- **Errors:** `400` on invalid JSON, an invalid node, or a missing asset.
+
+### `DELETE /map/{name}`
+
+Deletes the node's folder. References to the deleted name in other nodes'
+`next_nodes` become dangling.
+
+- **Response `200`:** `{ "status": "ok" }`
+- **Errors:** `404` if no node with that name exists.
+
+### `POST /follow_route`
+
+Navigates the device from one node to another. The server plans the shortest
+path over edges (unweighted BFS, edges in stored order → deterministic),
+queues one **route job** through the session queue (a session opens
+automatically, like `/run_steps`), and executes it hop by hop: verify the
+current node, run the edge's action, verify the expected next node.
+
+Verification per node: all `landmarks` found on one video frame; on landmark
+success with an unset grid the server captures the occupancy grid from that
+same frame and saves it into `node.json`; when landmarks fail, the grid is
+the fallback (Jaccard similarity over occupied cells, match at `>= 0.8`);
+a node with neither landmarks nor grid is executed on trust. If an edge
+declared several `next_nodes` and the expected one fails, the other declared
+outcomes are checked (short probe) and the route re-plans from wherever it
+actually landed (bounded — persistent no-progress ends the route). When
+nothing confirms, the session status becomes
+`lost on route <from> -> <to>: node <name> not confirmed` and the remaining
+queue is cleared.
+
+- **Request body:** `{ "serial": "ABCD1234", "from": "main_screen", "to": "x5_catalog" }`
+  — all required; both nodes must exist; `from == to` is legal and means
+  "verify I'm on this node".
+- **Response `200`:** `{ "status": "ok" }` — the route was queued. Track the
+  outcome via [`GET /devices/{serial}/session`](#get-devicesserialsession):
+  `idle` = arrived, `lost ...` = localization lost.
+- **Errors:** `400` on invalid JSON or a missing field, `500` when a node
+  doesn't exist, no route exists, or the session couldn't be started.
 
 ## Keyboard
 
@@ -327,6 +430,11 @@ Returns the session's status.
   - `idle` — session is open, step queue is empty;
   - `running <step>` (e.g. `running tap on image catalog_cart_icon`) — a
     queued step is executing;
+  - `running route <from> -> <to>: <phase>` — a queued route is executing;
+    the phase names the current hop or verification;
+  - `lost on route <from> -> <to>: node <name> not confirmed` — a route lost
+    localization at that node (neither landmarks nor occupancy grid matched);
+    the queue was cleared;
   - an error text (e.g. `unable to find <target type> <value> on screen`) —
     the last queued step failed; the queue was cleared. The error stays until
     the next step is queued.
@@ -378,7 +486,7 @@ Closes the session: stops the scrcpy server and tears down the sockets.
 ```json
 {
   "event": "tap",
-  "anchors": [
+  "landmarks": [
     { "type": "text", "value": "Show refresh rate", "locale": "eng" },
     { "type": "image", "value": "toggle" }
   ],
@@ -389,16 +497,16 @@ Closes the session: stops the scrcpy server and tears down the sockets.
 | Field | JSON | Type | Notes |
 | ----- | ---- | ---- | ----- |
 | Event | `event` | string | `tap`, `long_tap`, `type_text`, the name of a library event, or **empty for a visibility check** |
-| Anchors | `anchors` | []Anchor | omitempty; the target chain — resolved in order on one frame, each anchor found nearest to the previous one, the event applies to the **last** one. Empty only for a target-less library event replay. |
-| Timeout | `timeout` | int | omitempty; seconds to locate the anchors before failing (default `15` when omitted or `<= 0`). The runner grabs the latest video frame and retries roughly once per second until the deadline. |
+| Landmarks | `landmarks` | []Landmark | omitempty; the target chain — resolved in order on one frame, each landmark found nearest to the previous one, the event applies to the **last** one. Empty only for a target-less library event replay. |
+| Timeout | `timeout` | int | omitempty; seconds to locate the landmarks before failing (default `15` when omitted or `<= 0`). The runner grabs the latest video frame and retries roughly once per second until the deadline. |
 
-### Anchor
+### Landmark
 
 | Field | JSON | Type | Notes |
 | ----- | ---- | ---- | ----- |
 | Type | `type` | string | `image` (template match against `images/<value>.png`), `text` (OCR), or `yolo` (detection class) |
-| Value | `value` | string | Library image name, OCR text, or YOLO class name — for `type_text`'s last anchor, the text to type |
-| Locale | `locale` | string | omitempty; OCR language for `text` anchors, keyboard locale for `type_text` |
+| Value | `value` | string | Library image name, OCR text, or YOLO class name — for `type_text`'s last landmark, the text to type |
+| Locale | `locale` | string | omitempty; OCR language for `text` landmarks, keyboard locale for `type_text` |
 
 ### Event
 
@@ -426,6 +534,37 @@ Closes the session: stops the scrcpy server and tears down the sockets.
 | ScreenWidth | `screen_width` | int | Screen width of the recording device |
 | ScreenHeight | `screen_height` | int | Screen height of the recording device |
 | Events | `events` | [Event](#event) array | The recorded gesture |
+
+### Node
+
+`server/pkg/models/node.go`
+
+| Field | JSON | Type | Notes |
+| ----- | ---- | ---- | ----- |
+| Name | `name` | string | Unique node name (library naming rules) |
+| Landmarks | `landmarks` | [][Landmark](#landmark) | The screen's identity check — **all** must be found on one frame for a landmark verification to pass; may be empty |
+| Edges | `edges` | [][Edge](#edge) | Actions available on this screen |
+| OccupancyGrid | `occupancy_grid` | [OccupancyGrid](#occupancygrid) | omitempty; unset until captured or posted |
+
+### Edge
+
+| Field | JSON | Type | Notes |
+| ----- | ---- | ---- | ----- |
+| Action | `action` | [Step](#step) | A full step (generated tap, `type_text`, or library event); check events (empty `event`) are not valid edge actions |
+| NextNodes | `next_nodes` | []string | Nodes this action can lead to; empty = terminal action; names may dangle |
+
+### OccupancyGrid
+
+A fixed 18×32 grid normalized over the video frame; each cell is `'1'` when a
+structural rectangle covers it. Compared with Jaccard similarity
+(intersection ÷ union of occupied cells), match threshold `0.8`. A grid with
+no `'1'` cells counts as unset.
+
+| Field | JSON | Type | Notes |
+| ----- | ---- | ---- | ----- |
+| Cols | `cols` | int | 18 |
+| Rows | `rows` | int | 32 |
+| Cells | `cells` | []string | One string per row, `'0'`/`'1'` per cell, each exactly `cols` long |
 
 ### OCRResult
 

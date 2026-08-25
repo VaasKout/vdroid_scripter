@@ -167,3 +167,45 @@ func (c *apiClient) getSessionStatus(serial string) (string, error) {
 	}
 	return response["status"], nil
 }
+
+func (c *apiClient) getMap() (string, error) {
+	body, err := c.request(http.MethodGet, "/map", nil)
+	return string(body), err
+}
+
+func (c *apiClient) getMapNode(name string) (string, error) {
+	body, err := c.request(http.MethodGet, "/map/"+url.PathEscape(name), nil)
+	return string(body), err
+}
+
+func (c *apiClient) saveMapNode(node *saveMapNodeInput) error {
+	body, err := json.Marshal(node)
+	if err != nil {
+		return err
+	}
+	_, err = c.request(http.MethodPost, "/map", bytes.NewReader(body))
+	return err
+}
+
+func (c *apiClient) deleteMapNode(name string) error {
+	_, err := c.request(http.MethodDelete, "/map/"+url.PathEscape(name), nil)
+	return err
+}
+
+func (c *apiClient) followRoute(serial string, from string, to string) error {
+	var payload = struct {
+		Serial string `json:"serial"`
+		From   string `json:"from"`
+		To     string `json:"to"`
+	}{
+		Serial: serial,
+		From:   from,
+		To:     to,
+	}
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return err
+	}
+	_, err = c.request(http.MethodPost, "/follow_route", bytes.NewReader(body))
+	return err
+}

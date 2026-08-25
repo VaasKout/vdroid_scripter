@@ -4,6 +4,7 @@ import (
 	"android_vision_scripter/pkg/core/numutils"
 	"image"
 	"math"
+	"sort"
 )
 
 // Offset from rectangle borders
@@ -141,4 +142,13 @@ func centerDistance(a image.Rectangle, b image.Rectangle) float64 {
 	bx := float64(b.Min.X+b.Max.X) / 2
 	by := float64(b.Min.Y+b.Max.Y) / 2
 	return math.Hypot(ax-bx, ay-by)
+}
+
+func SortRectsReadingOrder(rects []image.Rectangle) {
+	sort.SliceStable(rects, func(a, b int) bool {
+		if rects[a].Min.Y != rects[b].Min.Y {
+			return rects[a].Min.Y < rects[b].Min.Y
+		}
+		return rects[a].Min.X < rects[b].Min.X
+	})
 }

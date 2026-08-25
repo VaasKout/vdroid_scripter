@@ -21,38 +21,38 @@ const (
 	Yolo  = "yolo"
 )
 
-type Anchor struct {
+type Landmark struct {
 	Type   string `json:"type"`
 	Value  string `json:"value"`
 	Locale string `json:"locale,omitempty"`
 }
 
-func (a *Anchor) Valid() bool {
-	if a == nil {
+func (l *Landmark) Valid() bool {
+	if l == nil {
 		return false
 	}
-	if a.Type == Image && !file.ValidName(a.Value) {
+	if l.Type == Image && !file.ValidName(l.Value) {
 		return false
 	}
 
-	switch a.Type {
+	switch l.Type {
 	case Image, Text, Yolo:
-		return strings.TrimSpace(a.Value) != ""
+		return strings.TrimSpace(l.Value) != ""
 	}
 	return false
 }
 
-func (a *Anchor) ToString() string {
-	if a == nil {
+func (l *Landmark) ToString() string {
+	if l == nil {
 		return ""
 	}
-	return fmt.Sprintf("%s %s", a.Type, a.Value)
+	return fmt.Sprintf("%s %s", l.Type, l.Value)
 }
 
 type Step struct {
-	Event   string   `json:"event"`
-	Anchors []Anchor `json:"anchors,omitempty"`
-	Timeout int      `json:"timeout,omitempty"`
+	Event     string     `json:"event"`
+	Landmarks []Landmark `json:"landmarks,omitempty"`
+	Timeout   int        `json:"timeout,omitempty"`
 }
 
 func (s *Step) GetTimeout() time.Duration {
@@ -84,15 +84,15 @@ func (s *Step) Valid() bool {
 
 	switch s.Event {
 	case TapEvent, LongTapEvent:
-		return s.ValidAnchors()
+		return s.ValidLandmarks()
 	case TypeTextEvent:
-		last := s.LastAnchor()
+		last := s.LastLandmark()
 		return last != nil && strings.TrimSpace(last.Value) != ""
 	}
 	if s.IsCheckEvent() {
-		return s.ValidAnchors()
+		return s.ValidLandmarks()
 	}
-	return len(s.Anchors) == 0 || s.ValidAnchors()
+	return len(s.Landmarks) == 0 || s.ValidLandmarks()
 }
 
 func (s *Step) IsCheckEvent() bool {
@@ -111,32 +111,32 @@ func (s *Step) IsCustomEvent() bool {
 	return true
 }
 
-func (s *Step) ValidAnchors() bool {
-	if s == nil || len(s.Anchors) == 0 {
+func (s *Step) ValidLandmarks() bool {
+	if s == nil || len(s.Landmarks) == 0 {
 		return false
 	}
-	for _, anchor := range s.Anchors {
-		if !anchor.Valid() {
+	for _, landmark := range s.Landmarks {
+		if !landmark.Valid() {
 			return false
 		}
 	}
 	return true
 }
 
-func (s *Step) LastAnchor() *Anchor {
-	if s == nil || len(s.Anchors) == 0 {
+func (s *Step) LastLandmark() *Landmark {
+	if s == nil || len(s.Landmarks) == 0 {
 		return nil
 	}
-	return &s.Anchors[len(s.Anchors)-1]
+	return &s.Landmarks[len(s.Landmarks)-1]
 }
 
-func (s *Step) AnchorsToString() string {
+func (s *Step) LandmarksToString() string {
 	if s == nil {
 		return ""
 	}
-	parts := make([]string, 0, len(s.Anchors))
-	for _, anchor := range s.Anchors {
-		parts = append(parts, anchor.ToString())
+	parts := make([]string, 0, len(s.Landmarks))
+	for _, landmark := range s.Landmarks {
+		parts = append(parts, landmark.ToString())
 	}
 	return strings.Join(parts, " -> ")
 }
@@ -146,17 +146,35 @@ func (s *Step) ToString() string {
 		return ""
 	}
 	if s.IsCheckEvent() {
-		return fmt.Sprintf("check on %s", s.AnchorsToString())
+		return fmt.Sprintf("check on %s", s.LandmarksToString())
 	}
 	if s.Event == TypeTextEvent {
-		last := s.LastAnchor()
+		last := s.LastLandmark()
 		if last == nil {
 			return s.Event
 		}
 		return fmt.Sprintf("%s %q", s.Event, last.Value)
 	}
-	if s.ValidAnchors() {
-		return fmt.Sprintf("%s on %s", s.Event, s.AnchorsToString())
+	if s.ValidLandmarks() {
+		return fmt.Sprintf("%s on %s", s.Event, s.LandmarksToString())
 	}
 	return s.Event
+}
+
+func (s *Step) SameAction(other *Step) bool {
+	if s == nil || other == nil || s.Event != other.Event {
+		return false
+	}
+	if len(s.Landmarks) != len(other.Landmarks) {
+		return false
+	}
+	for index, landmark := range s.Landmarks {
+		otherLandmark := other.Landmarks[index]
+		if landmark.Type != otherLandmark.Type ||
+			landmark.Value != otherLandmark.Value ||
+			landmark.Locale != otherLandmark.Locale {
+			return false
+		}
+	}
+	return true
 }

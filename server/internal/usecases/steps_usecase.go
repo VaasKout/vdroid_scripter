@@ -47,7 +47,10 @@ func (i *interactorImpl) RunSteps(
 		go i.scrcpy.ReadVideoStream(serial, nil)
 	}
 
-	i.addStepsToQueue(serial, steps)
+	added := i.addStepsToQueue(serial, steps)
+	if !added {
+		return fmt.Errorf("no active session for %s", serial)
+	}
 	return nil
 }
 
@@ -67,17 +70,17 @@ func (i *interactorImpl) checkStepAssets(steps []models.Step) error {
 			continue
 		}
 
-		for _, anchor := range step.Anchors {
-			if anchor.Type != models.Image {
+		for _, landmark := range step.Landmarks {
+			if landmark.Type != models.Image {
 				continue
 			}
 
 			imagePath := filepath.Join(
 				i.filesDB.CreateImagesDir(),
-				strings.TrimSpace(anchor.Value)+file.PngExt,
+				strings.TrimSpace(landmark.Value)+file.PngExt,
 			)
 			if !file.Exists(imagePath) {
-				return fmt.Errorf("image not found in library: %s", anchor.Value)
+				return fmt.Errorf("image not found in library: %s", landmark.Value)
 			}
 		}
 	}
@@ -148,7 +151,7 @@ func (i *interactorImpl) playGeneratedTap(
 }
 
 func (i *interactorImpl) typeTextStep(serial string, step *models.Step) error {
-	last := step.LastAnchor()
+	last := step.LastLandmark()
 	if last == nil {
 		return fmt.Errorf("nothing to type")
 	}
@@ -169,7 +172,7 @@ func (i *interactorImpl) playCustomEvent(serial string, step *models.Step) error
 	}
 
 	var foundRect *image.Rectangle
-	if step.ValidAnchors() {
+	if step.ValidLandmarks() {
 		foundRect, err = i.findRect(serial, step)
 		if err != nil {
 			return err
@@ -185,7 +188,7 @@ func (i *interactorImpl) findRect(
 	serial string,
 	step *models.Step,
 ) (*image.Rectangle, error) {
-	if !step.ValidAnchors() {
+	if !step.ValidLandmarks() {
 		return nil, errors.New("step target is empty")
 	}
 
@@ -202,7 +205,7 @@ func (i *interactorImpl) findRect(
 			continue
 		}
 
-		foundRect, err := i.findAnchorChain(serial, mat, step)
+		foundRect, err := i.findLandmarkChain(serial, mat, step)
 		mat.Close()
 
 		if err != nil {
@@ -213,56 +216,61 @@ func (i *interactorImpl) findRect(
 		return foundRect, nil
 	}
 
-	last := step.LastAnchor()
+	last := step.LastLandmark()
 	return nil, fmt.Errorf(models.StatusError, last.Type, last.Value)
 }
 
-func (i *interactorImpl) findAnchorChain(
+func (i *interactorImpl) findLandmarkChain(
 	serial string,
 	mat *gocv.Mat,
 	step *models.Step,
 ) (*image.Rectangle, error) {
 	var prevRect *image.Rectangle
-	for _, anchor := range step.Anchors {
-		candidates, err := i.findAnchorCandidates(serial, mat, &anchor)
+	for _, landmark := range step.Landmarks {
+		candidates, err := i.findLandmarkCandidates(serial, mat, &landmark)
 		if err != nil {
 			return nil, err
 		}
 
 		foundRect := models.ClosestRect(candidates, prevRect)
 		if models.ImageRectIsEmpty(foundRect) {
-			return nil, fmt.Errorf(models.StatusError, anchor.Type, anchor.Value)
+			return nil, fmt.Errorf(models.StatusError, landmark.Type, landmark.Value)
 		}
 		prevRect = foundRect
 	}
 	return prevRect, nil
 }
 
-func (i *interactorImpl) findAnchorCandidates(
+func (i *interactorImpl) findLandmarkCandidates(
 	serial string,
 	mat *gocv.Mat,
-	anchor *models.Anchor,
+	landmark *models.Landmark,
 ) ([]image.Rectangle, error) {
-	if anchor.Type == models.Image {
+	if landmark.Type == models.Image {
 		imagesDir := i.filesDB.CreateImagesDir()
 		if imagesDir == "" {
 			return nil, errors.New("images dir not found")
 		}
-		tmpImage := filepath.Join(imagesDir, strings.TrimSpace(anchor.Value)+file.PngExt)
+		tmpImage := filepath.Join(imagesDir, strings.TrimSpace(landmark.Value)+file.PngExt)
 		if !file.Exists(tmpImage) {
-			return nil, fmt.Errorf("image not found in library: %s", anchor.Value)
+			return nil, fmt.Errorf("image not found in library: %s", landmark.Value)
 		}
-		return i.cv.FindImages(mat, tmpImage)
+		rectangles, err := i.cv.FindImages(mat, tmpImage)
+		if err != nil {
+			return nil, err
+		}
+		models.SortRectsReadingOrder(rectangles)
+		return rectangles, nil
 	}
 
-	if anchor.Type == models.Text {
+	if landmark.Type == models.Text {
 		tesseractDir := i.filesDB.CreateLogsDir(serial, filesdb.TesseractDir)
 		if tesseractDir == "" {
 			return nil, fmt.Errorf("tesseract dir was not found")
 		}
 		var ocrParams = cv.InitOcrParams(
-			anchor.Value,
-			anchor.Locale,
+			landmark.Value,
+			landmark.Locale,
 			cv.PsmText,
 			cv.OemText,
 		)
@@ -278,20 +286,22 @@ func (i *interactorImpl) findAnchorCandidates(
 			}
 			rectangles = append(rectangles, *result.Rectangle.ToImageRectangle())
 		}
+		models.SortRectsReadingOrder(rectangles)
 		return rectangles, nil
 	}
 
-	if anchor.Type == models.Yolo {
+	if landmark.Type == models.Yolo {
 		rectangles := []image.Rectangle{}
 		for _, detection := range i.yolo.DetectLabels(*mat) {
-			if strings.EqualFold(detection.Label, anchor.Value) {
+			if strings.EqualFold(detection.Label, landmark.Value) {
 				rectangles = append(rectangles, *detection.ToImageRectangle())
 			}
 		}
+		models.SortRectsReadingOrder(rectangles)
 		return rectangles, nil
 	}
 
-	return nil, fmt.Errorf("unknown target type %s", anchor.Type)
+	return nil, fmt.Errorf("unknown target type %s", landmark.Type)
 }
 
 func (i *interactorImpl) typeText(
