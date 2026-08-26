@@ -5,10 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"mime"
-	"mime/multipart"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 )
 
@@ -59,6 +58,20 @@ func (c *apiClient) getLibrary() (string, error) {
 	return string(body), err
 }
 
+func (c *apiClient) scan(serial string, images []string, locale string) (string, error) {
+	var query = url.Values{}
+	query.Set("serial", serial)
+	if len(images) > 0 {
+		query.Set("images", strings.Join(images, ","))
+	}
+	if locale != "" {
+		query.Set("locale", locale)
+	}
+
+	body, err := c.request(http.MethodGet, "/scan?"+query.Encode(), nil)
+	return string(body), err
+}
+
 func (c *apiClient) queueSteps(serial string, steps []stepInput) error {
 	var payload = struct {
 		Serial string      `json:"serial"`
@@ -72,81 +85,6 @@ func (c *apiClient) queueSteps(serial string, steps []stepInput) error {
 		return err
 	}
 	_, err = c.request(http.MethodPost, "/run_steps", bytes.NewReader(body))
-	return err
-}
-
-func (c *apiClient) getScreenshot(
-	serial string,
-	withRectangles bool,
-) ([]byte, string, error) {
-	var path = "/devices/" + url.PathEscape(serial) + "/screenshot"
-	if withRectangles {
-		path += "?rectangles=true"
-	}
-
-	resp, err := c.client.Get(c.baseURL + path)
-	if err != nil {
-		return nil, "", err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode >= http.StatusBadRequest {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, "", fmt.Errorf("GET %s failed (%d): %s", path, resp.StatusCode, string(body))
-	}
-
-	_, params, err := mime.ParseMediaType(resp.Header.Get("Content-Type"))
-	if err != nil {
-		return nil, "", err
-	}
-
-	var image []byte
-	var rectangles string
-	reader := multipart.NewReader(resp.Body, params["boundary"])
-	for {
-		part, err := reader.NextPart()
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			return nil, "", err
-		}
-
-		data, err := io.ReadAll(part)
-		if err != nil {
-			return nil, "", err
-		}
-		if part.FormName() == "image" {
-			image = data
-		}
-		if part.FormName() == "rectangles" {
-			rectangles = string(data)
-		}
-	}
-
-	if len(image) == 0 {
-		return nil, "", fmt.Errorf("screenshot response has no image")
-	}
-	return image, rectangles, nil
-}
-
-func (c *apiClient) saveImage(serial string, name string, rect rectangleInput) error {
-	var payload = struct {
-		Serial    string `json:"serial"`
-		Rectangle struct {
-			rectangleInput
-			Label string `json:"label"`
-		} `json:"rectangle"`
-	}{}
-	payload.Serial = serial
-	payload.Rectangle.rectangleInput = rect
-	payload.Rectangle.Label = name
-
-	body, err := json.Marshal(payload)
-	if err != nil {
-		return err
-	}
-	_, err = c.request(http.MethodPost, "/save_image", bytes.NewReader(body))
 	return err
 }
 
@@ -168,44 +106,35 @@ func (c *apiClient) getSessionStatus(serial string) (string, error) {
 	return response["status"], nil
 }
 
-func (c *apiClient) getMap() (string, error) {
-	body, err := c.request(http.MethodGet, "/map", nil)
+func (c *apiClient) getRoutes() (string, error) {
+	body, err := c.request(http.MethodGet, "/routes", nil)
 	return string(body), err
 }
 
-func (c *apiClient) getMapNode(name string) (string, error) {
-	body, err := c.request(http.MethodGet, "/map/"+url.PathEscape(name), nil)
+func (c *apiClient) getRoute(name string) (string, error) {
+	body, err := c.request(http.MethodGet, "/routes/"+url.PathEscape(name), nil)
 	return string(body), err
 }
 
-func (c *apiClient) saveMapNode(node *saveMapNodeInput) error {
-	body, err := json.Marshal(node)
+func (c *apiClient) saveRoute(route *saveRouteInput) error {
+	body, err := json.Marshal(route)
 	if err != nil {
 		return err
 	}
-	_, err = c.request(http.MethodPost, "/map", bytes.NewReader(body))
+	_, err = c.request(http.MethodPost, "/routes", bytes.NewReader(body))
 	return err
 }
 
-func (c *apiClient) deleteMapNode(name string) error {
-	_, err := c.request(http.MethodDelete, "/map/"+url.PathEscape(name), nil)
+func (c *apiClient) deleteRoute(name string) error {
+	_, err := c.request(http.MethodDelete, "/routes/"+url.PathEscape(name), nil)
 	return err
 }
 
-func (c *apiClient) followRoute(serial string, from string, to string) error {
-	var payload = struct {
-		Serial string `json:"serial"`
-		From   string `json:"from"`
-		To     string `json:"to"`
-	}{
-		Serial: serial,
-		From:   from,
-		To:     to,
-	}
-	body, err := json.Marshal(payload)
-	if err != nil {
-		return err
-	}
-	_, err = c.request(http.MethodPost, "/follow_route", bytes.NewReader(body))
+func (c *apiClient) runRoute(serial string, name string) error {
+	var query = url.Values{}
+	query.Set("serial", serial)
+	query.Set("name", name)
+
+	_, err := c.request(http.MethodGet, "/run_route?"+query.Encode(), nil)
 	return err
 }

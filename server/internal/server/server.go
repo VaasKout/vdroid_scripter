@@ -65,7 +65,8 @@ func (s *serverImpl) ListenAndServe() {
 	s.handleKeyboardFunctions()
 	s.handleSessionFunctions()
 	s.handleLibraryFunctions()
-	s.handleMapFunctions()
+	s.handleScanFunctions()
+	s.handleRouteFunctions()
 
 	s.logger.Info(
 		fmt.Sprintf("START LISTENING AT PORT %s", s.serverProps.Port),

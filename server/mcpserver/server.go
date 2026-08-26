@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"net/http"
 	"strings"
 	"time"
 
@@ -20,7 +19,7 @@ const (
 
 const serverInstructions = `vdroid-scripter drives Android devices with CV-located steps composed from a human-curated library.
 
-Workflow: list_devices for a serial, get_library for the available images (template crops) and actions (recorded gestures), then queue steps and wait for the outcome. Library names carry their context as <app>_<screen>_<what>[_variant] — e.g. swipe_x5_catalog_1 is a swipe recorded on the Pyaterochka catalog screen, first variant.
+Workflow: list_devices for a serial, get_library for the available images (template crops) and actions (recorded gestures), get_routes for saved flows, then queue steps and wait for the outcome. Library names carry their context as <app>_<screen>_<what>[_variant] — e.g. swipe_x5_catalog_1 is a swipe recorded on the Pyaterochka catalog screen, first variant.
 
 Batching: when given a sequence of steps ("tap text1, tap yolo class home, swipe, type hi..."), translate the WHOLE sequence into ONE queue_steps call with the steps in the given order. Never queue one step at a time and never poll get_session_status between steps — the server executes the queue sequentially on its own. After the single call, call wait_for_session once: 'idle' means every step succeeded.
 
@@ -28,19 +27,19 @@ Steps: a step is an event applied to a chain of landmarks. Each landmark is a CV
 
 Locale: for text landmarks and type_text, always set the landmark's locale to the Tesseract language code of its value's language. This holds for every language Tesseract supports (rus, deu, fra, jpn, ...); eng is the default. Pass the text exactly as the user wrote it, never transliterate or translate it.
 
-Library curation: screenshot and save_image exist ONLY for saving a new library image, and ONLY when the user explicitly asks to add one. "Save/add to the library" are the key words that select this flow: a request like "find the settings icon and save it to the library" means screenshot + save_image, NOT queue_steps — "find" there means picking the element's rectangle on the screenshot, not a visibility-check step. Then: call screenshot with rectangles=true, pick the rectangle that bounds the element by looking at the returned image, and call save_image with a library name and that rectangle. The screen must not change between the screenshot and save_image — the server re-captures the screen when cropping. save_image is the LAST call of the flow. After it STOP IMMEDIATELY and report the saved name — under NO circumstances call any tool after save_image: no queue_steps, no get_session_status, no wait_for_session, no close_session, no screenshot, nothing. The session tools are off-limits after save_image even if a session is already open, even if a check seems helpful, even on doubt about the crop. The new image works as an image landmark whenever the user later references it. NEVER call screenshot on your own while running steps — not to locate an element, not to verify state, not to inspect a failure. Finding and verifying elements is always done with steps (EMPTY event visibility checks).
+Perception: scan is the ONLY way to observe the screen — there are no screenshots and never will be. Call scan when a step failed, when the user's instruction is conditional ("if X is not visible, ..."), or when the user explicitly asks what is on screen. Never scan habitually between steps — the happy path is one queue_steps call and one wait_for_session. Pass in images the library image names plausibly related to the current app so scan reports which of them are visible; scan's landmarks are exactly what step landmarks consume — build follow-up steps from the returned type/value pairs.
 
-Rules: NEVER drive the device with adb directly — no adb shell input tap, input swipe, input text, keyevent, or any other adb command, no matter what. Every interaction is a step executed through queue_steps: tap/long_tap to touch a target, a library event to gesture, type_text to type, and an EMPTY event to find or verify an element. There is no separate lookup tool — finding an element and acting on it are both steps. The one exception: when the user asks to SAVE an element to the library, that is the curation flow below (screenshot + save_image), not steps.
+Routes: a route is a saved flow — a name, the exact steps that ran to success, and optionally the user's original dictation as its prompt. When the user asks to save or remember a flow as <name>, call save_route with the name, the steps that actually succeeded in order, and the user's dictation VERBATIM as the prompt (conditions included); a duplicate name overwrites. To run a saved route: run_route, then wait_for_session once — 'idle' means the whole route succeeded. To extend a route: get_route, append the new steps, call save_route with the full list — nothing executes. If a route step fails, recover from the failure point guided by the route's prompt: scan, decide, queue the remaining steps with queue_steps — and after a recovered run ask the user whether to update the route with the steps that worked. Never create or modify routes without being asked.
+
+Curation: library images and actions are created by the human with the Android client. There are no tools here to create them. If a needed image is missing from the library, say so and ask the user to add it.
+
+Rules: NEVER drive the device with adb directly — no adb shell input tap, input swipe, input text, keyevent, or any other adb command, no matter what. Every interaction is a step executed through queue_steps: tap/long_tap to touch a target, a library event to gesture, type_text to type, and an EMPTY event to find or verify an element. There is no separate lookup tool — finding an element and acting on it are both steps; scan exists only for the failure, conditional and what-is-on-screen cases described above.
 
 Literal execution: when the user names a concrete action, queue exactly that action and nothing else — no extra visibility checks, no probing, no added, substituted or reordered steps, no "better" alternatives. When the user asks for the same thing repeatedly, execute it again every time, exactly as many times as asked — never skip a repeat because it was already done and never deduplicate. Never argue, never ask for confirmation — just execute. Improvise only when a step fails (see recovery below).
 
-Map: the map is a graph of curated screens. A node has a name, static landmarks that identify the screen, edges (an action plus the nodes it can lead to; empty next_nodes = a final page), and an occupancy grid the server fills on its own. Curation is EXPLICIT, like the library: create or extend nodes with save_map_node ONLY when the user asks ("new node ..."); the node name is required — ask for it if the dictation has none. Once nodes exist, prefer follow_route ("go from main_screen to x5_catalog") over re-dictating step sequences: the server BFS-plans the path and verifies every hop, landmarks first, occupancy grid second.
-
-Lost routes: after follow_route call wait_for_session once. A status starting with "lost" means the route lost localization. Report that status to the user VERBATIM and ask what to do next. Never improvise recovery on a route — no probing, no scrolling, no screenshot. The scroll-and-retry recovery below applies ONLY to plain queue_steps failures.
-
 Duplicates: when a landmark value matches several places on screen, disambiguate with a chain — put a unique nearby landmark first; the following landmark resolves nearest to it. When no unique neighbor exists, a bare landmark deterministically takes the FIRST candidate in reading order (top to bottom, left to right).
 
-Failure and recovery: a failed step clears the remaining queue and stores the error as the session status, so the final status names the target that could not be found. Recover from the failure point: scroll with the screen's swipe action (try variants _1, _2, ...) or probe an unknown screen with visibility-check steps (EMPTY event, text targets), then re-queue the remaining steps from the failed one onward — again in one call.`
+Failure and recovery: a failed step clears the remaining queue and stores the error as the session status, so the final status names the target that could not be found. Recover from the failure point: scan the screen (with the relevant library images in the images param), apply the user's instruction or the route's prompt to what the scan shows — tap the alternative the user named, scroll with the screen's swipe action (variants _1, _2, ...) when the target should be below, or report honestly when the scan shows an unexpected screen — then re-queue the remaining steps from the failed one onward, again in one call. Conditional dictations split at the condition: queue the unconditional prefix, give the probe step its own short timeout, and resolve the condition with a scan after the wait.`
 
 type Server struct {
 	api *apiClient
@@ -91,50 +90,25 @@ type queueStepsInput struct {
 	Steps  []stepInput `json:"steps" jsonschema:"steps to queue, executed in the given order"`
 }
 
-type screenshotInput struct {
-	Serial     string `json:"serial" jsonschema:"device serial number, get it from list_devices"`
-	Rectangles bool   `json:"rectangles,omitempty" jsonschema:"true to also return detected UI element rectangles as JSON, for picking a crop region"`
+type scanInput struct {
+	Serial string   `json:"serial" jsonschema:"device serial number, get it from list_devices"`
+	Images []string `json:"images,omitempty" jsonschema:"library image names to search for on the screen; pass the images plausibly related to the current app; omit for text+yolo only"`
+	Locale string   `json:"locale,omitempty" jsonschema:"Tesseract lang code for the OCR pass (rus, deu, jpn, ...), default eng"`
 }
 
-type rectangleInput struct {
-	LeftX   int `json:"left_x" jsonschema:"left edge X in screenshot pixels"`
-	RightX  int `json:"right_x" jsonschema:"right edge X in screenshot pixels"`
-	TopY    int `json:"top_y" jsonschema:"top edge Y in screenshot pixels"`
-	BottomY int `json:"bottom_y" jsonschema:"bottom edge Y in screenshot pixels"`
+type saveRouteInput struct {
+	Name   string      `json:"name" jsonschema:"route name, <app>_<flow> convention; a duplicate name overwrites"`
+	Prompt string      `json:"prompt,omitempty" jsonschema:"the user's original dictation of the flow, VERBATIM, conditions included"`
+	Steps  []stepInput `json:"steps" jsonschema:"the steps that actually ran to success, in order"`
 }
 
-type saveImageInput struct {
-	Serial    string         `json:"serial" jsonschema:"device serial number"`
-	Name      string         `json:"name" jsonschema:"library name for the template, <app>_<screen>_<what>[_variant]; a duplicate name overwrites"`
-	Rectangle rectangleInput `json:"rectangle" jsonschema:"the region to crop from the current screen, in screenshot pixel coordinates"`
+type routeNameInput struct {
+	Name string `json:"name" jsonschema:"route name from get_routes"`
 }
 
-type edgeInput struct {
-	Action    stepInput `json:"action" jsonschema:"the step this edge performs: an event applied to a landmark chain, or a library event"`
-	NextNodes []string  `json:"next_nodes,omitempty" jsonschema:"node names this action can lead to; empty for a terminal action on a final page; names may reference nodes that don't exist yet"`
-}
-
-type gridInput struct {
-	Cols  int      `json:"cols" jsonschema:"grid width in cells, 18"`
-	Rows  int      `json:"rows" jsonschema:"grid height in cells, 32"`
-	Cells []string `json:"cells" jsonschema:"rows of '0'/'1' characters, one string per row"`
-}
-
-type saveMapNodeInput struct {
-	Name          string          `json:"name" jsonschema:"node name, REQUIRED, <app>_<screen> convention; posting an existing name merges into it"`
-	Landmarks     []landmarkInput `json:"landmarks,omitempty" jsonschema:"static landmarks identifying this screen; ALL must be visible for a landmark verification to pass"`
-	Edges         []edgeInput     `json:"edges,omitempty" jsonschema:"actions available on this screen with the nodes they lead to"`
-	OccupancyGrid *gridInput      `json:"occupancy_grid,omitempty" jsonschema:"optional structural fingerprint; non-empty replaces the stored grid, omitted keeps it"`
-}
-
-type mapNodeNameInput struct {
-	Name string `json:"name" jsonschema:"node name from get_map"`
-}
-
-type followRouteInput struct {
+type runRouteInput struct {
 	Serial string `json:"serial" jsonschema:"device serial number, get it from list_devices"`
-	From   string `json:"from" jsonschema:"node the device is currently on"`
-	To     string `json:"to" jsonschema:"destination node"`
+	Name   string `json:"name" jsonschema:"route name from get_routes"`
 }
 
 func (s *stepInput) describe() string {
@@ -176,27 +150,16 @@ func (s *Server) registerTools() {
 	}, s.handleGetLibrary)
 
 	mcp.AddTool(s.mcp, &mcp.Tool{
-		Name: "screenshot",
-		Description: "Take a screenshot of the device's current screen. With " +
-			"rectangles=true it also returns detected UI element rectangles as a JSON " +
-			"array (left_x, right_x, top_y, bottom_y) — use it to pick the region of " +
-			"an element you want to save as a library template with save_image. Call " +
-			"it ONLY when the user asks to save a library image — never to locate " +
-			"elements, verify state, or inspect failures while running steps; every " +
-			"lookup is a step (EMPTY event visibility check).",
-	}, s.handleScreenshot)
-
-	mcp.AddTool(s.mcp, &mcp.Tool{
-		Name: "save_image",
-		Description: "Crop a region of the device's CURRENT screen into the library " +
-			"as a named template image, immediately usable as an image landmark in " +
-			"steps. The server re-captures the screen when cropping, so the screen " +
-			"must still show what the screenshot showed. Name it " +
-			"<app>_<screen>_<what>[_variant]; a duplicate name overwrites. This is " +
-			"the LAST call of the flow: after it make NO further tool calls under any " +
-			"circumstances — no queue_steps, get_session_status, wait_for_session, " +
-			"close_session or screenshot. Report the saved name and finish.",
-	}, s.handleSaveImage)
+		Name: "scan",
+		Description: "Scan the device's current screen and return the landmarks found: " +
+			"every text with its rectangle (OCR, using locale), every yolo detection, " +
+			"and matches for the library images passed in images. This is the ONLY way " +
+			"to observe the screen — there are no screenshots. Call it when a step " +
+			"failed, when the user's instruction is conditional, or when the user asks " +
+			"what is on screen — never habitually between steps. What it returns is " +
+			"exactly what step landmarks consume. Opens a session automatically if " +
+			"none exists.",
+	}, s.handleScan)
 
 	mcp.AddTool(s.mcp, &mcp.Tool{
 		Name: "queue_steps",
@@ -239,43 +202,39 @@ func (s *Server) registerTools() {
 	}, s.handleWaitForSession)
 
 	mcp.AddTool(s.mcp, &mcp.Tool{
-		Name: "get_map",
-		Description: "List the names of all map nodes (curated screens). " +
-			"Call this before planning routes or saving nodes.",
-	}, s.handleGetMap)
+		Name: "get_routes",
+		Description: "List saved route names. A route is a remembered flow: the exact " +
+			"steps that succeeded, optionally with the user's original dictation as " +
+			"its prompt.",
+	}, s.handleGetRoutes)
 
 	mcp.AddTool(s.mcp, &mcp.Tool{
-		Name: "get_map_node",
-		Description: "Get one map node: its landmarks, edges (actions with the " +
-			"nodes they lead to), and occupancy grid.",
-	}, s.handleGetMapNode)
+		Name: "get_route",
+		Description: "Get one saved route: its steps and, when present, its prompt " +
+			"(the flow's intent, conditions included). Use it to extend a route or " +
+			"to recover a failed run guided by the prompt.",
+	}, s.handleGetRoute)
 
 	mcp.AddTool(s.mcp, &mcp.Tool{
-		Name: "save_map_node",
-		Description: "Create or update a map node. Use ONLY when the user " +
-			"explicitly curates the map (\"new node ...\"). Name is REQUIRED — " +
-			"if the user's dictation doesn't name the node, ask for the name. " +
-			"Posting an existing name merges: landmarks and edges are appended, " +
-			"a repeated action unions its next_nodes, a non-empty occupancy_grid " +
-			"replaces the stored one.",
-	}, s.handleSaveMapNode)
+		Name: "save_route",
+		Description: "Save or overwrite a route. Call ONLY when the user asks to " +
+			"save or remember a flow. steps = the steps that actually ran to " +
+			"success, in order; prompt = the user's dictation VERBATIM. Saving " +
+			"executes nothing.",
+	}, s.handleSaveRoute)
 
 	mcp.AddTool(s.mcp, &mcp.Tool{
-		Name: "delete_map_node",
-		Description: "Delete a map node by name. References to it in other " +
-			"nodes' next_nodes become dangling and are simply unroutable.",
-	}, s.handleDeleteMapNode)
+		Name:        "delete_route",
+		Description: "Delete a saved route by name.",
+	}, s.handleDeleteRoute)
 
 	mcp.AddTool(s.mcp, &mcp.Tool{
-		Name: "follow_route",
-		Description: "Navigate the device from one map node to another. The " +
-			"server plans the shortest path over edges (BFS) and executes it, " +
-			"verifying position at every hop: landmarks first, occupancy grid " +
-			"as fallback. Call wait_for_session afterwards; 'idle' means " +
-			"arrived, a status starting with 'lost' means the route lost " +
-			"localization — report it to the user verbatim and ASK what to do; " +
-			"never improvise recovery on routes.",
-	}, s.handleFollowRoute)
+		Name: "run_route",
+		Description: "Queue a saved route's steps on the device; a session opens " +
+			"automatically if none exists. Call wait_for_session once afterwards: " +
+			"'idle' means the whole route succeeded; an error status names the step " +
+			"that failed — recover from that point guided by the route's prompt.",
+	}, s.handleRunRoute)
 }
 
 func textResult(text string) *mcp.CallToolResult {
@@ -308,45 +267,19 @@ func (s *Server) handleGetLibrary(
 	return textResult(library), nil, nil
 }
 
-func (s *Server) handleScreenshot(
+func (s *Server) handleScan(
 	ctx context.Context,
 	req *mcp.CallToolRequest,
-	in screenshotInput,
+	in scanInput,
 ) (*mcp.CallToolResult, any, error) {
 	if in.Serial == "" {
 		return nil, nil, fmt.Errorf("serial is required")
 	}
-
-	image, rectangles, err := s.api.getScreenshot(in.Serial, in.Rectangles)
+	landmarks, err := s.api.scan(in.Serial, in.Images, in.Locale)
 	if err != nil {
 		return nil, nil, err
 	}
-
-	content := []mcp.Content{
-		&mcp.ImageContent{Data: image, MIMEType: http.DetectContentType(image)},
-	}
-	if rectangles != "" {
-		content = append(content, &mcp.TextContent{Text: rectangles})
-	}
-	return &mcp.CallToolResult{Content: content}, nil, nil
-}
-
-func (s *Server) handleSaveImage(
-	ctx context.Context,
-	req *mcp.CallToolRequest,
-	in saveImageInput,
-) (*mcp.CallToolResult, any, error) {
-	if in.Serial == "" || in.Name == "" {
-		return nil, nil, fmt.Errorf("serial and name are required")
-	}
-
-	err := s.api.saveImage(in.Serial, in.Name, in.Rectangle)
-	if err != nil {
-		return nil, nil, err
-	}
-	return textResult("saved " + in.Name + ". STOP: make no further tool calls — " +
-		"no queue_steps, get_session_status, wait_for_session, close_session or " +
-		"screenshot. Report the saved name to the user and finish."), nil, nil
+	return textResult(landmarks), nil, nil
 }
 
 func (s *Server) handleQueueSteps(
@@ -444,79 +377,78 @@ func (s *Server) handleWaitForSession(
 	return textResult(text), nil, nil
 }
 
-func (s *Server) handleGetMap(
+func (s *Server) handleGetRoutes(
 	ctx context.Context,
 	req *mcp.CallToolRequest,
 	in emptyInput,
 ) (*mcp.CallToolResult, any, error) {
-	nodes, err := s.api.getMap()
+	routes, err := s.api.getRoutes()
 	if err != nil {
 		return nil, nil, err
 	}
-	return textResult(nodes), nil, nil
+	return textResult(routes), nil, nil
 }
 
-func (s *Server) handleGetMapNode(
+func (s *Server) handleGetRoute(
 	ctx context.Context,
 	req *mcp.CallToolRequest,
-	in mapNodeNameInput,
+	in routeNameInput,
 ) (*mcp.CallToolResult, any, error) {
 	if in.Name == "" {
 		return nil, nil, fmt.Errorf("name is required")
 	}
-	node, err := s.api.getMapNode(in.Name)
+	route, err := s.api.getRoute(in.Name)
 	if err != nil {
 		return nil, nil, err
 	}
-	return textResult(node), nil, nil
+	return textResult(route), nil, nil
 }
 
-func (s *Server) handleSaveMapNode(
+func (s *Server) handleSaveRoute(
 	ctx context.Context,
 	req *mcp.CallToolRequest,
-	in saveMapNodeInput,
+	in saveRouteInput,
+) (*mcp.CallToolResult, any, error) {
+	if in.Name == "" || len(in.Steps) == 0 {
+		return nil, nil, fmt.Errorf("name and steps are required")
+	}
+	err := s.api.saveRoute(&in)
+	if err != nil {
+		return nil, nil, err
+	}
+	return textResult("saved route " + in.Name), nil, nil
+}
+
+func (s *Server) handleDeleteRoute(
+	ctx context.Context,
+	req *mcp.CallToolRequest,
+	in routeNameInput,
 ) (*mcp.CallToolResult, any, error) {
 	if in.Name == "" {
 		return nil, nil, fmt.Errorf("name is required")
 	}
-	err := s.api.saveMapNode(&in)
+	err := s.api.deleteRoute(in.Name)
 	if err != nil {
 		return nil, nil, err
 	}
-	return textResult("saved node " + in.Name), nil, nil
+	return textResult("deleted route " + in.Name), nil, nil
 }
 
-func (s *Server) handleDeleteMapNode(
+func (s *Server) handleRunRoute(
 	ctx context.Context,
 	req *mcp.CallToolRequest,
-	in mapNodeNameInput,
+	in runRouteInput,
 ) (*mcp.CallToolResult, any, error) {
-	if in.Name == "" {
-		return nil, nil, fmt.Errorf("name is required")
+	if in.Serial == "" || in.Name == "" {
+		return nil, nil, fmt.Errorf("serial and name are required")
 	}
-	err := s.api.deleteMapNode(in.Name)
-	if err != nil {
-		return nil, nil, err
-	}
-	return textResult("deleted node " + in.Name), nil, nil
-}
-
-func (s *Server) handleFollowRoute(
-	ctx context.Context,
-	req *mcp.CallToolRequest,
-	in followRouteInput,
-) (*mcp.CallToolResult, any, error) {
-	if in.Serial == "" || in.From == "" || in.To == "" {
-		return nil, nil, fmt.Errorf("serial, from and to are required")
-	}
-	err := s.api.followRoute(in.Serial, in.From, in.To)
+	err := s.api.runRoute(in.Serial, in.Name)
 	if err != nil {
 		return nil, nil, err
 	}
 	var text = fmt.Sprintf(
-		"route %s -> %s queued, call wait_for_session for the outcome",
-		in.From,
-		in.To,
+		"route %s queued, call wait_for_session for the outcome",
+		in.Name,
 	)
 	return textResult(text), nil, nil
 }

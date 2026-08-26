@@ -26,7 +26,7 @@ type Interactor interface {
 	KeyboardUseCase
 	SessionUseCase
 	LibraryUseCase
-	MapUseCase
+	ScanUseCase
 	RouteUseCase
 	StepsUseCase
 	OcrUseCase

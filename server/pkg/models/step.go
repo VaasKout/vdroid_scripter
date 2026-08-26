@@ -160,21 +160,3 @@ func (s *Step) ToString() string {
 	}
 	return s.Event
 }
-
-func (s *Step) SameAction(other *Step) bool {
-	if s == nil || other == nil || s.Event != other.Event {
-		return false
-	}
-	if len(s.Landmarks) != len(other.Landmarks) {
-		return false
-	}
-	for index, landmark := range s.Landmarks {
-		otherLandmark := other.Landmarks[index]
-		if landmark.Type != otherLandmark.Type ||
-			landmark.Value != otherLandmark.Value ||
-			landmark.Locale != otherLandmark.Locale {
-			return false
-		}
-	}
-	return true
-}

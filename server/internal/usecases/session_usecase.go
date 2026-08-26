@@ -2,7 +2,6 @@ package usecases
 
 import (
 	"android_vision_scripter/pkg/models"
-	"errors"
 	"fmt"
 	"time"
 )
@@ -110,54 +109,25 @@ func (i *interactorImpl) GetSessionStatus(serial string) string {
 
 func (i *interactorImpl) addStepsToQueue(serial string, steps []models.Step) bool {
 	return i.sessionsCache.Update(serial, func(session models.Session) models.Session {
-		for _, step := range steps {
-			session.Query = append(session.Query, models.QueueItem{Step: &step})
-		}
+		session.Query = append(session.Query, steps...)
 		return session
 	})
 }
 
-func (i *interactorImpl) addRouteToQueue(serial string, route *models.Route) bool {
-	return i.sessionsCache.Update(serial, func(session models.Session) models.Session {
-		session.Query = append(session.Query, models.QueueItem{Route: route})
-		return session
-	})
-}
-
-func (i *interactorImpl) popNextQueueItem(serial string) (models.QueueItem, bool) {
-	var item models.QueueItem
+func (i *interactorImpl) popNextStep(serial string) (models.Step, bool) {
+	var step models.Step
 	var found bool
 	i.sessionsCache.Update(serial, func(session models.Session) models.Session {
 		if len(session.Query) == 0 {
 			return session
 		}
-		item = session.Query[0]
+		step = session.Query[0]
 		session.Query = session.Query[1:]
-		if item.Step != nil {
-			session.Status = fmt.Sprintf(models.StatusRunningStep, item.Step.ToString())
-		}
-		if item.Route != nil {
-			session.Status = fmt.Sprintf(
-				models.StatusRunningRoute,
-				item.Route.From,
-				item.Route.To,
-				"planning",
-			)
-		}
+		session.Status = fmt.Sprintf(models.StatusRunningStep, step.ToString())
 		found = true
 		return session
 	})
-	return item, found
-}
-
-func (i *interactorImpl) executeQueueItem(serial string, item *models.QueueItem) error {
-	if item.Route != nil {
-		return i.executeRoute(serial, item.Route)
-	}
-	if item.Step != nil {
-		return i.executeStep(serial, item.Step)
-	}
-	return errors.New("empty queue item")
+	return step, found
 }
 
 func (i *interactorImpl) failSessionQueue(serial string, err error) {
@@ -191,13 +161,13 @@ func (i *interactorImpl) runSessionQueue(serial string) {
 		default:
 		}
 
-		item, found := i.popNextQueueItem(serial)
+		step, found := i.popNextStep(serial)
 		if !found {
 			time.Sleep(300 * time.Millisecond)
 			continue
 		}
 
-		err := i.executeQueueItem(serial, &item)
+		err := i.executeStep(serial, &step)
 		if err != nil {
 			i.logger.Error(err.Error())
 			i.failSessionQueue(serial, err)

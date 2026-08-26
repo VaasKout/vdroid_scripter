@@ -10,16 +10,9 @@ import (
 	"gocv.io/x/gocv"
 )
 
-const (
-	StructuralMinAreaRatio = 0.01
-	StructuralMaxAreaRatio = 0.9
-	MaxStructuralRects     = 40
-)
-
 // ImageHandler ...
 type ImageHandler interface {
 	FindAllRectangles(img *gocv.Mat) ([]image.Rectangle, error)
-	FindStructuralRectangles(img *gocv.Mat) ([]image.Rectangle, error)
 	FindImages(img *gocv.Mat, template string) ([]image.Rectangle, error)
 	DrawRectangles(
 		img gocv.Mat,
@@ -40,61 +33,6 @@ func (c *cvImpl) FindAllRectangles(img *gocv.Mat) ([]image.Rectangle, error) {
 
 	imgRectangles = c.filterRectangles(imgRectangles, img)
 	return imgRectangles, nil
-}
-
-func (c *cvImpl) FindStructuralRectangles(img *gocv.Mat) ([]image.Rectangle, error) {
-	if img == nil || img.Empty() {
-		return []image.Rectangle{}, errors.New("img empty")
-	}
-
-	gray := gocv.NewMat()
-	defer gray.Close()
-	if img.Channels() == 1 {
-		img.CopyTo(&gray)
-	} else {
-		gocv.CvtColor(*img, &gray, gocv.ColorBGRToGray)
-	}
-
-	rects, err := c.createRectangles(&gray)
-	if err != nil {
-		return []image.Rectangle{}, err
-	}
-
-	frameArea := float64(gray.Cols() * gray.Rows())
-	minArea := frameArea * StructuralMinAreaRatio
-	maxArea := frameArea * StructuralMaxAreaRatio
-
-	sort.Slice(rects, func(a, b int) bool {
-		return rects[a].Dx()*rects[a].Dy() > rects[b].Dx()*rects[b].Dy()
-	})
-
-	filtered := []image.Rectangle{}
-	for _, rect := range rects {
-		area := float64(rect.Dx() * rect.Dy())
-		if area < minArea || area > maxArea {
-			continue
-		}
-		if rect.Dx() >= gray.Cols() || rect.Dy() >= gray.Rows() {
-			continue
-		}
-
-		nested := false
-		for _, larger := range filtered {
-			if isCloseToBorder(rect, larger) {
-				nested = true
-				break
-			}
-		}
-		if nested {
-			continue
-		}
-
-		filtered = append(filtered, rect)
-		if len(filtered) == MaxStructuralRects {
-			break
-		}
-	}
-	return filtered, nil
 }
 
 func (c *cvImpl) FindImages(

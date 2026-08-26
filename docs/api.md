@@ -40,11 +40,12 @@ This document describes every HTTP endpoint exposed by the server, defined in
 | POST | `/save_action` | Save a named recorded gesture into the library |
 | DELETE | `/images/{name}` | Delete a library image |
 | DELETE | `/actions/{name}` | Delete a library action |
-| GET | `/map` | List map node names |
-| GET | `/map/{name}` | Get one map node |
-| POST | `/map` | Create or merge-update a map node |
-| DELETE | `/map/{name}` | Delete a map node |
-| POST | `/follow_route` | Navigate from one node to another via BFS over edges |
+| GET | `/scan` | Scan the current screen and return the landmarks found |
+| GET | `/routes` | List saved route names |
+| GET | `/routes/{name}` | Get one saved route |
+| POST | `/routes` | Save or overwrite a route |
+| DELETE | `/routes/{name}` | Delete a route |
+| GET | `/run_route` | Queue a saved route's steps on a device |
 | GET | `/devices/{serial}/keyboard` | Detect on-screen keyboard keys |
 | POST | `/devices/{serial}/edit_keyboard` | Override a keyboard key's rectangle |
 | GET | `/devices/{serial}/reset_keyboard` | Reset keyboard keys to defaults |
@@ -244,100 +245,97 @@ Deletes `actions/<name>.json`.
 - **Response `200`:** `{ "status": "ok" }`
 - **Errors:** `404` if no action with that name exists.
 
-## Map
+## Scan
 
-The **map** is a graph of curated screens stored as `map/<name>/node.json`.
-A **node** describes one screen: its identifying `landmarks`, its `edges`
-(actions with the nodes they can lead to), and an `occupancy_grid` — a
-content-blind structural fingerprint the server captures on its own during
-route execution. The map is purely declarative: creating and updating nodes
-never touches a device, and `POST /run_steps` never reads or writes the map.
+### `GET /scan`
 
-### `GET /map`
+Scans the device's current screen and returns everything the CV pipeline can
+name — the machine-readable structure of the screen, in the same landmark
+vocabulary that steps consume and in video-frame coordinates. If the device
+has no open session, one is opened automatically (scrcpy is started headless,
+like `/run_steps`); the server waits up to ~15s for the first video frame.
 
-Lists all node names.
+One frame, three passes: every YOLO detection, every OCR-readable text
+(word/phrase level), and a template match for **exactly the library images
+listed in `images`** — omitted `images` means YOLO + text only. Results are
+sorted in reading order (top-to-bottom, left-to-right).
 
-- **Response `200`:** `{ "nodes": ["main_screen", "x5_catalog"] }` — sorted,
-  `[]` when the map is empty.
-
-### `GET /map/{name}`
-
-Returns one node.
-
-- **Response `200`:** the [`Node`](#node) JSON.
-- **Errors:** `404` if no node with that name exists.
-
-### `POST /map`
-
-Creates a node, or **merge-updates** an existing one (matched by `name`).
-
-- **Request body:** a [`Node`](#node):
+- **Query params:**
+  - `serial` (required)
+  - `images` — comma-separated library image names to search for; every name
+    must exist in the library
+  - `locale` — Tesseract language code for the OCR pass (default `eng`)
+- **Response `200`:**
   ```json
   {
-    "name": "main_screen",
-    "landmarks": [{ "type": "image", "value": "catalog_icon" }],
-    "edges": [
-      {
-        "action": { "event": "tap", "landmarks": [{ "type": "text", "value": "catalog" }] },
-        "next_nodes": ["x5_catalog"]
-      },
-      { "action": { "event": "buy_button_tap" }, "next_nodes": [] }
-    ],
-    "occupancy_grid": { "cols": 18, "rows": 32, "cells": ["001100...", "..."] }
+    "landmarks": [
+      { "type": "image", "value": "catalog_cart_icon", "rectangle": { "left_x": 40, "right_x": 120, "top_y": 60, "bottom_y": 140 } },
+      { "type": "text", "value": "Каталог", "locale": "rus", "rectangle": { "left_x": 30, "right_x": 220, "top_y": 300, "bottom_y": 350 } },
+      { "type": "yolo", "value": "button", "rectangle": { "left_x": 800, "right_x": 1040, "top_y": 2200, "bottom_y": 2320 } }
+    ]
   }
   ```
-  `name` is required (library naming rules). An edge's `action` is a full
-  [`Step`](#step); `next_nodes` may be **empty** (a terminal action on a
-  final page) and may reference nodes that don't exist yet (dangling names
-  are legal and simply unroutable until created). `occupancy_grid` is
-  optional.
-- **Merge semantics** when the name exists: landmarks are appended with
-  dedup by `type`+`value`+`locale`; an edge whose `action` equals an existing
-  edge's action (same `event` and landmark sequence, `timeout` ignored)
-  unions its `next_nodes`, otherwise the edge is appended; a **non-empty**
-  `occupancy_grid` in the body replaces the stored one, an absent or empty
-  grid keeps it. Nothing is ever auto-deleted.
-- **Validation:** image landmarks and library events referenced by edge
-  actions must exist (same rule as `/run_steps`).
+  `landmarks` is `[]` when nothing is found. A library image visible several
+  times produces one entry per match. Text entries carry the resolved
+  Tesseract code in `locale`.
+- **Errors:** `400` if `serial` is missing, `500` when a listed image is not
+  in the library, the session couldn't be started, or no frame arrived.
+
+## Routes
+
+A **route** is a saved flow: the exact `steps` that ran to success, plus
+optionally the user's original dictation as its `prompt` (the flow's intent,
+conditions included — used by the AI layer to recover when a replay fails).
+Routes are dumb storage under `routes/<name>.json`: saving executes nothing,
+the server never interprets the prompt, and library conventions apply (flat
+names, `ValidName` rules, overwrite on the same name).
+
+### `GET /routes`
+
+- **Response `200`:** `{ "routes": ["x5_buy_corn", "x5_enter"] }` — sorted,
+  `[]` when none are saved.
+
+### `GET /routes/{name}`
+
+- **Response `200`:** the [`Route`](#route) JSON.
+- **Errors:** `404` if no route with that name exists.
+
+### `POST /routes`
+
+Saves a route, overwriting an existing one with the same name.
+
+- **Request body:** a [`Route`](#route):
+  ```json
+  {
+    "name": "x5_buy_corn",
+    "prompt": "open the app, if 'login' is visible log in first, then open catalog and ...",
+    "steps": [
+      { "event": "tap", "landmarks": [{ "type": "image", "value": "x5_app_icon" }] },
+      { "event": "tap", "landmarks": [{ "type": "text", "value": "Каталог", "locale": "rus" }] }
+    ]
+  }
+  ```
+  `name` and a non-empty valid `steps` array are required; `prompt` is
+  optional. Steps validate like `/run_steps`: referenced library images and
+  events must exist.
 - **Response `200`:** `{ "status": "ok" }`
-- **Errors:** `400` on invalid JSON, an invalid node, or a missing asset.
+- **Errors:** `400` on invalid JSON, an invalid route, or a missing asset.
 
-### `DELETE /map/{name}`
-
-Deletes the node's folder. References to the deleted name in other nodes'
-`next_nodes` become dangling.
+### `DELETE /routes/{name}`
 
 - **Response `200`:** `{ "status": "ok" }`
-- **Errors:** `404` if no node with that name exists.
+- **Errors:** `404` if no route with that name exists.
 
-### `POST /follow_route`
+### `GET /run_route`
 
-Navigates the device from one node to another. The server plans the shortest
-path over edges (unweighted BFS, edges in stored order → deterministic),
-queues one **route job** through the session queue (a session opens
-automatically, like `/run_steps`), and executes it hop by hop: verify the
-current node, run the edge's action, verify the expected next node.
+Loads a saved route and queues its steps on the device — exactly equivalent
+to `GET /routes/{name}` followed by `POST /run_steps` with the route's steps.
 
-Verification per node: all `landmarks` found on one video frame; on landmark
-success with an unset grid the server captures the occupancy grid from that
-same frame and saves it into `node.json`; when landmarks fail, the grid is
-the fallback (Jaccard similarity over occupied cells, match at `>= 0.8`);
-a node with neither landmarks nor grid is executed on trust. If an edge
-declared several `next_nodes` and the expected one fails, the other declared
-outcomes are checked (short probe) and the route re-plans from wherever it
-actually landed (bounded — persistent no-progress ends the route). When
-nothing confirms, the session status becomes
-`lost on route <from> -> <to>: node <name> not confirmed` and the remaining
-queue is cleared.
-
-- **Request body:** `{ "serial": "ABCD1234", "from": "main_screen", "to": "x5_catalog" }`
-  — all required; both nodes must exist; `from == to` is legal and means
-  "verify I'm on this node".
-- **Response `200`:** `{ "status": "ok" }` — the route was queued. Track the
-  outcome via [`GET /devices/{serial}/session`](#get-devicesserialsession):
-  `idle` = arrived, `lost ...` = localization lost.
-- **Errors:** `400` on invalid JSON or a missing field, `500` when a node
-  doesn't exist, no route exists, or the session couldn't be started.
+- **Query params:** `serial` and `name` (both required).
+- **Response `200`:** `{ "status": "ok" }` — the steps were queued. Track the
+  outcome via [`GET /devices/{serial}/session`](#get-devicesserialsession).
+- **Errors:** `400` if a query is missing, `500` when the route doesn't
+  exist, a referenced asset is gone, or the session couldn't be started.
 
 ## Keyboard
 
@@ -430,11 +428,6 @@ Returns the session's status.
   - `idle` — session is open, step queue is empty;
   - `running <step>` (e.g. `running tap on image catalog_cart_icon`) — a
     queued step is executing;
-  - `running route <from> -> <to>: <phase>` — a queued route is executing;
-    the phase names the current hop or verification;
-  - `lost on route <from> -> <to>: node <name> not confirmed` — a route lost
-    localization at that node (neither landmarks nor occupancy grid matched);
-    the queue was cleared;
   - an error text (e.g. `unable to find <target type> <value> on screen`) —
     the last queued step failed; the queue was cleared. The error stays until
     the next step is queued.
@@ -535,36 +528,28 @@ Closes the session: stops the scrcpy server and tears down the sockets.
 | ScreenHeight | `screen_height` | int | Screen height of the recording device |
 | Events | `events` | [Event](#event) array | The recorded gesture |
 
-### Node
+### Route
 
-`server/pkg/models/node.go`
-
-| Field | JSON | Type | Notes |
-| ----- | ---- | ---- | ----- |
-| Name | `name` | string | Unique node name (library naming rules) |
-| Landmarks | `landmarks` | [][Landmark](#landmark) | The screen's identity check — **all** must be found on one frame for a landmark verification to pass; may be empty |
-| Edges | `edges` | [][Edge](#edge) | Actions available on this screen |
-| OccupancyGrid | `occupancy_grid` | [OccupancyGrid](#occupancygrid) | omitempty; unset until captured or posted |
-
-### Edge
+`server/pkg/models/route.go`
 
 | Field | JSON | Type | Notes |
 | ----- | ---- | ---- | ----- |
-| Action | `action` | [Step](#step) | A full step (generated tap, `type_text`, or library event); check events (empty `event`) are not valid edge actions |
-| NextNodes | `next_nodes` | []string | Nodes this action can lead to; empty = terminal action; names may dangle |
+| Name | `name` | string | Unique route name (library naming rules) |
+| Prompt | `prompt` | string | omitempty; the user's original dictation of the flow, verbatim |
+| Steps | `steps` | [][Step](#step) | Required, non-empty; the steps that ran to success, in order |
 
-### OccupancyGrid
+### Scan landmark
 
-A fixed 18×32 grid normalized over the video frame; each cell is `'1'` when a
-structural rectangle covers it. Compared with Jaccard similarity
-(intersection ÷ union of occupied cells), match threshold `0.8`. A grid with
-no `'1'` cells counts as unset.
+Returned by [`GET /scan`](#get-scan) (`FoundLandmark` in
+`server/internal/usecases/scan_usecase.go`) — a [Landmark](#landmark) plus
+the rectangle where it was found, in video-frame coordinates.
 
 | Field | JSON | Type | Notes |
 | ----- | ---- | ---- | ----- |
-| Cols | `cols` | int | 18 |
-| Rows | `rows` | int | 32 |
-| Cells | `cells` | []string | One string per row, `'0'`/`'1'` per cell, each exactly `cols` long |
+| Type | `type` | string | `image`, `text`, or `yolo` |
+| Value | `value` | string | Library image name, recognized text, or YOLO class |
+| Locale | `locale` | string | omitempty; resolved Tesseract code on `text` entries |
+| Rectangle | `rectangle` | [Rectangle](#rectangle) | Where it was found |
 
 ### OCRResult
 
