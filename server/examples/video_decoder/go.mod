@@ -1,6 +1,6 @@
 module android_vision_scripter/examples/video_decoder
 
-go 1.26.2
+go 1.27.0
 
 require (
 	android_vision_scripter v0.0.0
