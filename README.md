@@ -30,7 +30,6 @@ If you have any problems, feel free to open an [issue](https://github.com/VaasKo
 This project builds upon and would not be possible without the following open-source projects:
 
 * [scrcpy](https://github.com/Genymobile/scrcpy) — for Android screen streaming and control
-* [go-astiav](https://github.com/asticode/go-astiav) — for FFmpeg bindings in Go
 * [gocv](https://github.com/hybridgroup/gocv) — for OpenCV integration in Go
 
 Huge thanks to the authors and contributors of these projects.

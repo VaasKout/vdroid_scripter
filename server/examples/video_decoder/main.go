@@ -2,6 +2,7 @@
 package main
 
 import (
+	"android_vision_scripter/internal/h264"
 	"context"
 	"encoding/binary"
 	"errors"
@@ -18,10 +19,8 @@ import (
 	"runtime"
 	"sort"
 	"strings"
-	"sync"
 	"time"
 
-	"github.com/asticode/go-astiav"
 	"gocv.io/x/gocv"
 )
 
@@ -60,50 +59,38 @@ const (
 )
 
 type DecoderData struct {
-	CodecContext   *astiav.CodecContext
-	Decoder        *astiav.Codec
-	Pkt            *astiav.Packet
-	Frame          *astiav.Frame
-	DrawFrame      *astiav.Frame
+	Decoder        *h264.Decoder
 	Buf            []byte
 	HeaderBuf      []byte
 	ConfigFrameBuf []byte
-	Img            *image.YCbCr
-	mu             sync.Mutex
 }
 
 func (d *DecoderData) Free() {
 	if d == nil {
 		return
 	}
-	d.DrawFrame.Free()
-	d.Frame.Free()
-	d.Pkt.Free()
-	d.CodecContext.Free()
+	if d.Decoder != nil {
+		d.Decoder.Close()
+	}
 	d.Buf = []byte{}
 	d.HeaderBuf = []byte{}
 	d.ConfigFrameBuf = []byte{}
 }
 
-func (d *DecoderData) Allocate(width, height int) {
+func (d *DecoderData) Allocate(width, height int) error {
 	if d == nil {
-		return
+		return errors.New("data is nil")
 	}
-	codecID := astiav.CodecIDH264
-	d.Decoder = astiav.FindDecoder(codecID)
-	d.CodecContext = astiav.AllocCodecContext(d.Decoder)
 
-	var newFlags = d.CodecContext.Flags().Add(astiav.CodecContextFlagLowDelay)
-	d.CodecContext.SetFlags(newFlags)
-	d.CodecContext.SetWidth(width)
-	d.CodecContext.SetHeight(height)
-	d.CodecContext.SetPixelFormat(astiav.PixelFormatYuv420P)
-	d.Pkt = astiav.AllocPacket()
-	d.Frame = astiav.AllocFrame()
-	d.DrawFrame = astiav.AllocFrame()
-	d.Img = &image.YCbCr{}
+	decoder, err := h264.NewDecoder(width, height)
+	if err != nil {
+		return err
+	}
+
+	d.Decoder = decoder
 	d.HeaderBuf = make([]byte, HeaderSize)
 	d.Buf = make([]byte, BufSize)
+	return nil
 }
 
 func main() {
@@ -120,17 +107,6 @@ func main() {
 	}
 	time.Sleep(1 * time.Second)
 
-	astiav.SetLogLevel(astiav.LogLevelDebug)
-	astiav.SetLogCallback(func(c astiav.Classer, l astiav.LogLevel, _, msg string) {
-		var cs string
-		if c != nil {
-			if cl := c.Class(); cl != nil {
-				cs = " - class: " + cl.String()
-			}
-		}
-		log.Printf("ffmpeg log: %s%s - level: %d\n", strings.TrimSpace(msg), cs, l)
-	})
-
 	conn, err := net.Dial("tcp", "127.0.0.1:1234")
 	if err != nil {
 		log.Fatalf("Failed to connect to scrcpy socket: %v", err)
@@ -143,14 +119,12 @@ func main() {
 	fmt.Printf("Height: %d\n", height)
 
 	var data = &DecoderData{}
-	data.Allocate(width, height)
-	defer data.Free()
-
-	// Open codec context
-	if err := data.CodecContext.Open(data.Decoder, nil); err != nil {
-		log.Println(fmt.Errorf("main: opening codec context failed: %w", err))
+	if err := data.Allocate(width, height); err != nil {
+		log.Println(fmt.Errorf("main: allocating decoder failed: %w", err))
 		return
 	}
+	defer data.Free()
+
 	ctx, cancel := context.WithCancel(context.Background())
 
 	go func() {
@@ -267,68 +241,30 @@ func handlePackets(
 		data.ConfigFrameBuf = []byte{}
 	}
 
-	err = data.Pkt.FromData(data.Buf[:neededSpace])
-	if err != nil {
-		log.Println(fmt.Errorf("data set failed: %w", err))
-		return err
-	}
-	defer data.Pkt.Unref()
-
-	if pts&SCPacketFlagKeyFrame != 0 {
-		var updatedFlags = data.Pkt.Flags().Add(astiav.PacketFlagKey)
-		data.Pkt.SetFlags(updatedFlags)
-	}
-
-	var initConfigBuf = false
 	if pts&SCPacketFlagConfig != 0 {
-		data.Pkt.SetPts(astiav.NoPtsValue)
-		initConfigBuf = true
-	} else {
-		data.Pkt.SetPts(int64(pts & SCPacketPtsMask))
-	}
-
-	data.Pkt.SetDts(data.Pkt.Pts())
-
-	if initConfigBuf {
-		data.ConfigFrameBuf = data.Pkt.Data()
+		data.ConfigFrameBuf = append([]byte{}, data.Buf[:neededSpace]...)
 		return nil
 	}
 
-	if err := data.CodecContext.SendPacket(data.Pkt); err != nil {
-		log.Println(fmt.Errorf("sending packet failed: %w", err))
-		return err
+	keyFrame := pts&SCPacketFlagKeyFrame != 0
+	err = data.Decoder.Decode(
+		data.Buf[:neededSpace],
+		keyFrame,
+		int64(pts&SCPacketPtsMask),
+	)
+	if err != nil {
+		log.Println(fmt.Errorf("decoding packet failed: %w", err))
 	}
-
-	receiveFrames(data)
 	return nil
 }
 
-func receiveFrames(data *DecoderData) {
-	for {
-		if err := data.CodecContext.ReceiveFrame(data.Frame); err != nil {
-			data.Frame.Unref()
-			if err == astiav.ErrEagain || err == astiav.ErrEof {
-				return
-			}
-		}
-
-		data.mu.Lock()
-		data.DrawFrame.Unref()
-		data.DrawFrame.MoveRef(data.Frame)
-		data.mu.Unlock()
-	}
-}
-
 func frameToMat(data *DecoderData) (gocv.Mat, error) {
-	data.mu.Lock()
-	if err := data.DrawFrame.Data().ToImage(data.Img); err != nil {
-		data.mu.Unlock()
-		return gocv.NewMat(), fmt.Errorf("failed to convert frame to image: %w", err)
+	img := data.Decoder.LatestYCbCr()
+	if img == nil {
+		return gocv.NewMat(), errors.New("no decoded frame available")
 	}
-	data.mu.Unlock()
 
-	// Convert the Go image to a gocv.Mat
-	mat, err := gocv.ImageToMatRGB(data.Img)
+	mat, err := gocv.ImageToMatRGB(img)
 	if err != nil {
 		mat.Close()
 		return gocv.NewMat(), fmt.Errorf("failed to convert image to Mat: %w", err)

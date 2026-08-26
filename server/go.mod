@@ -3,7 +3,6 @@ module android_vision_scripter
 go 1.26
 
 require (
-	github.com/asticode/go-astiav v0.39.0
 	github.com/joho/godotenv v1.5.1
 	github.com/lmittmann/tint v1.2.0
 	github.com/modelcontextprotocol/go-sdk v1.7.0
@@ -11,7 +10,6 @@ require (
 )
 
 require (
-	github.com/asticode/go-astikit v0.59.0 // indirect
 	github.com/google/jsonschema-go v0.4.3 // indirect
 	github.com/segmentio/asm v1.1.3 // indirect
 	github.com/segmentio/encoding v0.5.4 // indirect

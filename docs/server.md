@@ -54,12 +54,13 @@ For development, you can run from source instead:
 cd server && go run cmd/main.go
 ```
 
-On macOS, building or running from source needs the Homebrew `ffmpeg@7` and
-`opencv@4` kegs on the pkg-config path first (`install.sh` does this internally
-when building):
+On macOS, building or running from source needs the Homebrew `opencv@4` and
+`ffmpeg` formulas on the pkg-config path first (`install.sh` does this
+internally when building). Any recent FFmpeg major works — the server binds
+only libavcodec's stable decode core:
 
 ```bash
-export PKG_CONFIG_PATH="$(brew --prefix opencv@4)/lib/pkgconfig:$(brew --prefix ffmpeg@7)/lib/pkgconfig:$PKG_CONFIG_PATH"
+export PKG_CONFIG_PATH="$(brew --prefix opencv@4)/lib/pkgconfig:$(brew --prefix ffmpeg)/lib/pkgconfig:$PKG_CONFIG_PATH"
 ```
 
 ### Building the MCP Server
