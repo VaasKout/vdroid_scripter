@@ -88,8 +88,28 @@ install_linux_by_family() {
 }
 
 install_arch() {
-  sudo pacman -S --needed --noconfirm go android-tools ffmpeg opencv tesseract
+  sudo pacman -S --needed --noconfirm go android-tools ffmpeg tesseract
   sudo pacman -S --needed --noconfirm $(pacman -Sl extra | grep tesseract-data | awk '{print $2}')
+  install_arch_opencv4
+}
+
+install_arch_opencv4() {
+  if pacman -Qi opencv4 >/dev/null 2>&1; then
+    return
+  fi
+  if pacman -Si opencv4 >/dev/null 2>&1; then
+    sudo pacman -S --needed --noconfirm opencv4
+    return
+  fi
+  if command -v paru >/dev/null 2>&1; then
+    paru -S --needed --noconfirm opencv4
+    return
+  fi
+  if command -v yay >/dev/null 2>&1; then
+    yay -S --needed --noconfirm opencv4
+    return
+  fi
+  die "Arch's official 'opencv' package is now OpenCV 5, but gocv needs OpenCV 4 (pkg-config opencv4). Install 'opencv4' from the AUR (with paru or yay; the chaotic-aur repo carries it prebuilt), then re-run this script."
 }
 
 install_apt() {

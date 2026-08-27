@@ -11,6 +11,14 @@ Tesseract OCR), builds the server, and installs the `vdroid-scripter` binary to
 `/usr/local/bin`. Supported out of the box: macOS (Homebrew), Arch,
 Debian/Ubuntu, and Fedora.
 
+The server needs **OpenCV 4** (gocv does not support OpenCV 5 yet). On macOS
+that is the `opencv@4` formula. On Arch, whose official `opencv` package is
+now version 5, the script installs the AUR `opencv4` package instead: through
+plain `pacman` when a configured repo carries it (e.g. chaotic-aur, prebuilt),
+otherwise through `paru` or `yay`; with no AUR helper available it stops and
+asks you to install `opencv4` manually before re-running. Debian/Ubuntu and
+Fedora still ship OpenCV 4 as their default packages.
+
 By default the binary goes to `/usr/local/bin` (the script uses `sudo` only if
 that directory is not writable). Set `PREFIX` to install into a custom directory
 instead — the binary is placed in `$PREFIX/bin`. For example,
