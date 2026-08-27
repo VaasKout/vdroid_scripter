@@ -3,8 +3,6 @@ set -euo pipefail
 
 BIN_NAME="vdroid-scripter"
 PREFIX="${PREFIX:-/usr/local}"
-OPENCV4_VERSION="4.14.0"
-OPENCV4_SHA256="ee8fb9b30eb60850431b4656447080e3737b56e45719c92b67f245950609f86e"
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SERVER_DIR="$REPO_ROOT/server"
 BUILD_OUTPUT=""
@@ -92,45 +90,26 @@ install_linux_by_family() {
 install_arch() {
   sudo pacman -S --needed --noconfirm go android-tools ffmpeg tesseract
   sudo pacman -S --needed --noconfirm $(pacman -Sl extra | grep tesseract-data | awk '{print $2}')
-  install_opencv4_from_source
+  install_arch_opencv4
 }
 
-install_opencv4_from_source() {
+install_arch_opencv4() {
   if pacman -Qi opencv4 >/dev/null 2>&1; then
-    log "Using the installed opencv4 package"
     return
   fi
-  if PKG_CONFIG_PATH="/usr/local/lib/pkgconfig:${PKG_CONFIG_PATH:-}" pkg-config --exists opencv4; then
-    log "OpenCV 4 already present, skipping the source build"
+  if pacman -Si opencv4 >/dev/null 2>&1; then
+    sudo pacman -S --needed --noconfirm opencv4
     return
   fi
-
-  log "Building OpenCV $OPENCV4_VERSION from the official source tarball (checksum-verified)"
-  sudo pacman -S --needed --noconfirm base-devel cmake
-
-  local workdir tarball
-  workdir="$(mktemp -d)"
-  tarball="$workdir/opencv-$OPENCV4_VERSION.tar.gz"
-  curl -fL "https://github.com/opencv/opencv/archive/refs/tags/$OPENCV4_VERSION.tar.gz" \
-    -o "$tarball"
-  echo "$OPENCV4_SHA256  $tarball" | sha256sum -c - \
-    || die "OpenCV source tarball checksum mismatch, refusing to build"
-
-  tar -xzf "$tarball" -C "$workdir"
-  cmake -S "$workdir/opencv-$OPENCV4_VERSION" -B "$workdir/build" \
-    -DCMAKE_BUILD_TYPE=Release \
-    -DCMAKE_INSTALL_PREFIX=/usr/local \
-    -DOPENCV_GENERATE_PKGCONFIG=ON \
-    -DBUILD_TESTS=OFF \
-    -DBUILD_PERF_TESTS=OFF \
-    -DBUILD_EXAMPLES=OFF \
-    -DBUILD_opencv_apps=OFF
-  cmake --build "$workdir/build" -j"$(nproc)"
-  sudo cmake --install "$workdir/build"
-
-  echo "/usr/local/lib" | sudo tee /etc/ld.so.conf.d/opencv4-local.conf >/dev/null
-  sudo ldconfig
-  rm -rf "$workdir"
+  if command -v paru >/dev/null 2>&1; then
+    paru -S --needed --noconfirm opencv4
+    return
+  fi
+  if command -v yay >/dev/null 2>&1; then
+    yay -S --needed --noconfirm opencv4
+    return
+  fi
+  die "Arch's official 'opencv' package is now OpenCV 5, but gocv needs OpenCV 4 (pkg-config opencv4). Install 'opencv4' from the AUR (with paru or yay; the chaotic-aur repo carries it prebuilt), then re-run this script."
 }
 
 install_apt() {
@@ -168,9 +147,6 @@ build_server() {
   BUILD_OUTPUT="$tmpdir/$BIN_NAME"
   if [ "$PLATFORM" = "macos" ]; then
     export PKG_CONFIG_PATH="$(brew --prefix opencv@4)/lib/pkgconfig:$(brew --prefix ffmpeg)/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
-  fi
-  if [ "$PLATFORM" = "linux" ] && [ -d /usr/local/lib/pkgconfig ]; then
-    export PKG_CONFIG_PATH="/usr/local/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
   fi
   (cd "$SERVER_DIR" && go mod download && CGO_ENABLED=1 go build -o "$BUILD_OUTPUT" ./cmd)
 }

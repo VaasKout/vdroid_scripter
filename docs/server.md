@@ -13,13 +13,10 @@ Debian/Ubuntu, and Fedora.
 
 The server needs **OpenCV 4** (gocv does not support OpenCV 5 yet). On macOS
 that is the `opencv@4` formula. On Arch, whose official `opencv` package is
-now version 5, the script **builds OpenCV 4 from source**: it downloads the
-official GitHub release tarball (version and sha256 pinned in the script and
-verified before building — no AUR involvement), compiles it with tests,
-examples and apps off, and installs it under `/usr/local` (plus an
-`ld.so.conf.d` entry so the libraries resolve at runtime). The build takes a
-while on first run; re-runs skip it once `pkg-config opencv4` resolves, and
-an already-installed AUR `opencv4` package is respected. Debian/Ubuntu and
+now version 5, the script installs the AUR `opencv4` package instead: through
+plain `pacman` when a configured repo carries it (e.g. chaotic-aur, prebuilt),
+otherwise through `paru` or `yay`; with no AUR helper available it stops and
+asks you to install `opencv4` manually before re-running. Debian/Ubuntu and
 Fedora still ship OpenCV 4 as their default packages.
 
 By default the binary goes to `/usr/local/bin` (the script uses `sudo` only if
