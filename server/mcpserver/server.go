@@ -23,7 +23,7 @@ Workflow: list_devices for a serial, get_library for the available images (templ
 
 Batching: when given a sequence of steps ("tap text1, tap yolo class home, swipe, type hi..."), translate the WHOLE sequence into ONE queue_steps call with the steps in the given order. Never queue one step at a time and never poll get_session_status between steps — the server executes the queue sequentially on its own. After the single call, call wait_for_session once: 'idle' means every step succeeded.
 
-Steps: a step is an event applied to a chain of landmarks. Each landmark is a CV target (type = image | text | yolo, value = library image name / text to find / yolo class; text landmarks also carry locale). The chain resolves on ONE video frame: the first landmark picks its best match on screen, every following landmark picks the candidate of its value NEAREST to the previous landmark, and the event applies to the LAST landmark. One landmark is the normal case ("tap the cart icon" = one image landmark). Put a nearby unique element first to disambiguate duplicates: "tap the toggle next to 'Show refresh rate'" = landmarks [{type text, value Show refresh rate}, {type image, value toggle}]. Events tap and long_tap touch the last landmark's region. type_text types the LAST landmark's value on the CV-detected keyboard (that landmark's locale = keyboard locale; nothing is located on screen). An EMPTY event is a pure visibility check of the landmark chain. Any other event name replays that recorded library event: offset into the last landmark's region when landmarks are given (e.g. a drag starting from an icon), verbatim without landmarks (e.g. a scroll swipe).
+Steps: a step is an event applied to a chain of landmarks. Each landmark is a CV target (type = image | text | yolo, value = library image name / text to find / yolo class; text landmarks also carry locale). The chain resolves on ONE video frame: the first landmark picks its best match on screen, every following landmark picks the candidate of its value NEAREST to the previous landmark, and the event applies to the LAST landmark. One landmark is the normal case ("tap the cart icon" = one image landmark). Put a nearby unique element first to disambiguate duplicates: "tap the toggle next to 'Show refresh rate'" = landmarks [{type text, value Show refresh rate}, {type image, value toggle}]. Events tap and long_tap touch the last landmark's region. swipe_up, swipe_down, swipe_left and swipe_right generate a human-like fixed-length swipe (direction = the finger's movement, so swipe_up reveals content below): without landmarks it starts at a random point on screen, with landmarks it starts inside the last landmark's region — use these for plain scrolling; recorded library swipes remain for app-specific gestures. type_text types the LAST landmark's value on the CV-detected keyboard (that landmark's locale = keyboard locale; nothing is located on screen). An EMPTY event is a pure visibility check of the landmark chain. Any other event name replays that recorded library event: offset into the last landmark's region when landmarks are given (e.g. a drag starting from an icon), verbatim without landmarks.
 
 Locale: for text landmarks and type_text, always set the landmark's locale to the Tesseract language code of its value's language. This holds for every language Tesseract supports (rus, deu, fra, jpn, ...); eng is the default. Pass the text exactly as the user wrote it, never transliterate or translate it.
 
@@ -39,7 +39,7 @@ Literal execution: when the user names a concrete action, queue exactly that act
 
 Duplicates: when a landmark value matches several places on screen, disambiguate with a chain — put a unique nearby landmark first; the following landmark resolves nearest to it. When no unique neighbor exists, a bare landmark deterministically takes the FIRST candidate in reading order (top to bottom, left to right).
 
-Failure and recovery: a failed step clears the remaining queue and stores the error as the session status, so the final status names the target that could not be found. Recover from the failure point: scan the screen (with the relevant library images in the images param), apply the user's instruction or the route's prompt to what the scan shows — tap the alternative the user named, scroll with the screen's swipe action (variants _1, _2, ...) when the target should be below, or report honestly when the scan shows an unexpected screen — then re-queue the remaining steps from the failed one onward, again in one call. Conditional dictations split at the condition: queue the unconditional prefix, give the probe step its own short timeout, and resolve the condition with a scan after the wait.`
+Failure and recovery: a failed step clears the remaining queue and stores the error as the session status, so the final status names the target that could not be found. Recover from the failure point: scan the screen (with the relevant library images in the images param), apply the user's instruction or the route's prompt to what the scan shows — tap the alternative the user named, scroll with a generated swipe (swipe_up to reveal content below) or the screen's recorded swipe action (variants _1, _2, ...) when the target should be below, or report honestly when the scan shows an unexpected screen — then re-queue the remaining steps from the failed one onward, again in one call. Conditional dictations split at the condition: queue the unconditional prefix, give the probe step its own short timeout, and resolve the condition with a scan after the wait.`
 
 type Server struct {
 	api *apiClient
@@ -80,7 +80,7 @@ type landmarkInput struct {
 }
 
 type stepInput struct {
-	Event     string          `json:"event,omitempty" jsonschema:"tap, long_tap, type_text, the name of a library event to replay, or EMPTY for a pure visibility check of the target"`
+	Event     string          `json:"event,omitempty" jsonschema:"tap, long_tap, type_text, a generated swipe (swipe_up, swipe_down, swipe_left, swipe_right), the name of a library event to replay, or EMPTY for a pure visibility check of the target"`
 	Landmarks []landmarkInput `json:"landmarks,omitempty" jsonschema:"target chain resolved on one video frame: each landmark is located NEAREST to the previous one and the event applies to the LAST landmark; one landmark for a plain target, a preceding unique landmark to disambiguate duplicates; leave empty to replay a library event verbatim"`
 	Timeout   int             `json:"timeout,omitempty" jsonschema:"seconds to keep locating the target before failing, default 15"`
 }
@@ -170,11 +170,15 @@ func (s *Server) registerTools() {
 			"Each step applies an event to the LAST landmark of its chain; landmarks resolve " +
 			"on one frame, each located nearest to the previous one. Events: " +
 			"'tap'/'long_tap' (landmarks required; the generated touch lands at a random " +
-			"point inside the found region), 'type_text' (types the last landmark's value " +
+			"point inside the found region), 'swipe_up'/'swipe_down'/'swipe_left'/" +
+			"'swipe_right' (generated human-like fixed-length swipe, named by the " +
+			"finger's direction; random start point on screen, or inside the last " +
+			"landmark's region when landmarks are given — the default way to scroll), " +
+			"'type_text' (types the last landmark's value " +
 			"on the CV keyboard), an EMPTY event (visibility check of the chain, no " +
 			"touch), or a library event name (replays the gesture offset into the found " +
-			"region when landmarks are given, verbatim otherwise — queue a screen's swipe " +
-			"event without landmarks to scroll). A step failure clears the remaining queue " +
+			"region when landmarks are given, verbatim otherwise). " +
+			"A step failure clears the remaining queue " +
 			"and sets the error status.",
 	}, s.handleQueueSteps)
 

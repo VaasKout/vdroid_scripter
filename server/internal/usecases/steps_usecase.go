@@ -124,7 +124,31 @@ func (i *interactorImpl) runStepAction(serial string, step *models.Step) error {
 	case models.TypeTextEvent:
 		return i.typeTextStep(serial, step)
 	}
+	if step.IsSwipeEvent() {
+		return i.playGeneratedSwipe(serial, step)
+	}
 	return i.playCustomEvent(serial, step)
+}
+
+func (i *interactorImpl) playGeneratedSwipe(serial string, step *models.Step) error {
+	var foundRect *image.Rectangle
+	if step.ValidLandmarks() {
+		var err error
+		foundRect, err = i.findRect(serial, step)
+		if err != nil {
+			return err
+		}
+	}
+
+	width, height, err := i.scrcpy.GetScreenSize(serial)
+	if err != nil {
+		return err
+	}
+
+	events := models.GenerateSwipeEvents(step.Event, width, height)
+	i.playEvent(serial, foundRect, events)
+	time.Sleep(300 * time.Millisecond)
+	return nil
 }
 
 func (i *interactorImpl) playGeneratedTap(

@@ -13,6 +13,11 @@ const (
 	TapEvent      = "tap"
 	LongTapEvent  = "long_tap"
 	TypeTextEvent = "type_text"
+
+	SwipeUpEvent    = "swipe_up"
+	SwipeDownEvent  = "swipe_down"
+	SwipeLeftEvent  = "swipe_left"
+	SwipeRightEvent = "swipe_right"
 )
 
 const (
@@ -100,7 +105,7 @@ func (s *Step) IsCheckEvent() bool {
 }
 
 func (s *Step) IsCustomEvent() bool {
-	if s == nil || s.IsCheckEvent() {
+	if s == nil || s.IsCheckEvent() || s.IsSwipeEvent() {
 		return false
 	}
 
@@ -109,6 +114,18 @@ func (s *Step) IsCustomEvent() bool {
 		return false
 	}
 	return true
+}
+
+func (s *Step) IsSwipeEvent() bool {
+	if s == nil {
+		return false
+	}
+
+	switch s.Event {
+	case SwipeUpEvent, SwipeDownEvent, SwipeLeftEvent, SwipeRightEvent:
+		return true
+	}
+	return false
 }
 
 func (s *Step) ValidLandmarks() bool {
