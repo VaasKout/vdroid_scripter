@@ -283,9 +283,11 @@ sorted in reading order (top-to-bottom, left-to-right).
 
 ## Routes
 
-A **route** is a saved flow: the exact `steps` that ran to success, plus
-optionally the user's original dictation as its `prompt` (the flow's intent,
-conditions included — used by the AI layer to recover when a replay fails).
+A **route** is a saved flow: a `name`, the user's original dictation as its
+`prompt` (the flow's intent, conditions included — used by the AI layer to
+recover when a replay fails), and the exact `steps` that ran to success. The
+prompt may be empty: routes saved manually (e.g. from the Android client)
+have no dictation and replay as plain scripts.
 Routes are dumb storage under `routes/<name>.json`: saving executes nothing,
 the server never interprets the prompt, and library conventions apply (flat
 names, `ValidName` rules, overwrite on the same name).
@@ -535,7 +537,7 @@ Closes the session: stops the scrcpy server and tears down the sockets.
 | Field | JSON | Type | Notes |
 | ----- | ---- | ---- | ----- |
 | Name | `name` | string | Unique route name (library naming rules) |
-| Prompt | `prompt` | string | omitempty; the user's original dictation of the flow, verbatim |
+| Prompt | `prompt` | string | omitempty; the user's original dictation of the flow, verbatim; empty for manually saved routes |
 | Steps | `steps` | [][Step](#step) | Required, non-empty; the steps that ran to success, in order |
 
 ### Scan landmark

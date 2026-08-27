@@ -29,7 +29,7 @@ Locale: for text landmarks and type_text, always set the landmark's locale to th
 
 Perception: scan is the ONLY way to observe the screen — there are no screenshots and never will be. Call scan when a step failed, when the user's instruction is conditional ("if X is not visible, ..."), or when the user explicitly asks what is on screen. Never scan habitually between steps — the happy path is one queue_steps call and one wait_for_session. Pass in images the library image names plausibly related to the current app so scan reports which of them are visible; scan's landmarks are exactly what step landmarks consume — build follow-up steps from the returned type/value pairs.
 
-Routes: a route is a saved flow — a name, the exact steps that ran to success, and optionally the user's original dictation as its prompt. When the user asks to save or remember a flow as <name>, call save_route with the name, the steps that actually succeeded in order, and the user's dictation VERBATIM as the prompt (conditions included); a duplicate name overwrites. To run a saved route: run_route, then wait_for_session once — 'idle' means the whole route succeeded. To extend a route: get_route, append the new steps, call save_route with the full list — nothing executes. If a route step fails, recover from the failure point guided by the route's prompt: scan, decide, queue the remaining steps with queue_steps — and after a recovered run ask the user whether to update the route with the steps that worked. Never create or modify routes without being asked.
+Routes: a route is a saved flow — a name, the user's dictation as its prompt, and the exact steps that ran to success. When the user asks to save or remember a flow as <name>, call save_route with the name, the user's dictation VERBATIM as the prompt (conditions included), and the steps that actually succeeded in order; a duplicate name overwrites. The prompt may be absent on routes saved elsewhere (the Android client saves routes without one) — treat such a route as a plain script with no recorded intent. To run a saved route: run_route, then wait_for_session once — 'idle' means the whole route succeeded. To extend a route: get_route, append the new steps, call save_route with the full list — nothing executes. If a route step fails, recover from the failure point guided by the route's prompt: scan, decide, queue the remaining steps with queue_steps — and after a recovered run ask the user whether to update the route with the steps that worked. Never create or modify routes without being asked.
 
 Curation: library images and actions are created by the human with the Android client. There are no tools here to create them. If a needed image is missing from the library, say so and ask the user to add it.
 
@@ -98,7 +98,7 @@ type scanInput struct {
 
 type saveRouteInput struct {
 	Name   string      `json:"name" jsonschema:"route name, <app>_<flow> convention; a duplicate name overwrites"`
-	Prompt string      `json:"prompt,omitempty" jsonschema:"the user's original dictation of the flow, VERBATIM, conditions included"`
+	Prompt string      `json:"prompt,omitempty" jsonschema:"the user's original dictation of the flow, VERBATIM, conditions included; empty only when there was no dictation"`
 	Steps  []stepInput `json:"steps" jsonschema:"the steps that actually ran to success, in order"`
 }
 
@@ -204,8 +204,8 @@ func (s *Server) registerTools() {
 	mcp.AddTool(s.mcp, &mcp.Tool{
 		Name: "get_routes",
 		Description: "List saved route names. A route is a remembered flow: the exact " +
-			"steps that succeeded, optionally with the user's original dictation as " +
-			"its prompt.",
+			"steps that succeeded, with the user's original dictation as its prompt " +
+			"when it was saved from one.",
 	}, s.handleGetRoutes)
 
 	mcp.AddTool(s.mcp, &mcp.Tool{
