@@ -19,7 +19,9 @@ const (
 
 const serverInstructions = `vdroid-scripter drives Android devices with CV-located steps composed from a human-curated library.
 
-Workflow: list_devices for a serial, get_library for the available images (template crops) and actions (recorded gestures), get_routes for saved flows, then queue steps and wait for the outcome. Library names carry their context as <app>_<screen>_<what>[_variant] — e.g. swipe_x5_catalog_1 is a swipe recorded on the Pyaterochka catalog screen, first variant.
+Workflow: list_devices for a serial, get_routes for saved flows, then queue steps and wait for the outcome. Call get_library only when image targets or recorded gestures might be needed — it lists the available images (template crops) and actions (recorded gestures); library names carry their context as <app>_<screen>_<what>[_variant] — e.g. swipe_x5_catalog_1 is a swipe recorded on the Pyaterochka catalog screen, first variant.
+
+Text is free: text landmarks and the generated events (tap, long_tap, the swipes, type_text) need NOTHING from the library. An instruction phrased in words visible on screen ("open Settings", "enter wifi connections") is just tap steps with text landmarks — tap the matching words, drilling through the obvious screens (e.g. Settings -> Network & internet -> Wi-Fi). Only reach for the library when the target has no readable text (an icon = image landmark) or needs a recorded gesture.
 
 Batching: when given a sequence of steps ("tap text1, tap yolo class home, swipe, type hi..."), translate the WHOLE sequence into ONE queue_steps call with the steps in the given order. Never queue one step at a time and never poll get_session_status between steps — the server executes the queue sequentially on its own. After the single call, call wait_for_session once: 'idle' means every step succeeded.
 
@@ -33,7 +35,7 @@ Perception: scan is the ONLY way to observe the screen — there are no screensh
 
 Routes: a route is a saved flow — a name, the user's dictation as its prompt, and the exact steps that ran to success. When the user asks to save or remember a flow as <name>, call save_route with the name, the user's dictation VERBATIM as the prompt (conditions included), and the steps that actually succeeded in order; a duplicate name overwrites. The prompt may be absent on routes saved elsewhere (the Android client saves routes without one) — treat such a route as a plain script with no recorded intent. To run a saved route: run_route, then wait_for_session once — 'idle' means the whole route succeeded. To extend a route: get_route, append the new steps, call save_route with the full list — nothing executes. If a route step fails, recover from the failure point guided by the route's prompt: scan, decide, queue the remaining steps with queue_steps — and after a recovered run ask the user whether to update the route with the steps that worked. Never create or modify routes without being asked.
 
-Curation: library images and actions are created by the human with the Android client. There are no tools here to create them. If a needed image is missing from the library, say so and ask the user to add it.
+Curation: library images and actions are created by the human with the Android client. There are no tools here to create them. Ask the user to add a library item ONLY when the target truly cannot be reached any other way — no readable text for a text landmark, no yolo class, no generated swipe that gets there. Never request curation for something written on the screen.
 
 Rules: NEVER drive the device with adb directly — no adb shell input tap, input swipe, input text, keyevent, or any other adb command, no matter what. Every interaction is a step executed through queue_steps: tap/long_tap to touch a target, a library event to gesture, type_text to type, and an EMPTY event to find or verify an element. There is no separate lookup tool — finding an element and acting on it are both steps; scan exists only for the failure, conditional and what-is-on-screen cases described above.
 
@@ -146,9 +148,11 @@ func (s *Server) registerTools() {
 		Name: "get_library",
 		Description: "List the automation library: 'images' are template crops the human " +
 			"saved from device screens (usable as image targets), 'actions' are recorded " +
-			"gestures like swipes that cannot be generated (usable as a step's action). " +
+			"gestures (usable as a step's event). " +
 			"Names encode their context as <app>_<screen>_<what>[_variant]. " +
-			"Call this before planning steps.",
+			"Call this only when an image target or a recorded gesture might be needed — " +
+			"text landmarks and the generated tap/long_tap/swipe/type_text events use " +
+			"nothing from the library.",
 	}, s.handleGetLibrary)
 
 	mcp.AddTool(s.mcp, &mcp.Tool{
