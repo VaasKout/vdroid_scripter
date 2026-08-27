@@ -7,7 +7,10 @@ import (
 	"time"
 )
 
-const DefaultTimeout int = 15
+const (
+	DefaultTimeout    int = 3
+	FirstFrameTimeout int = 15
+)
 
 const (
 	TapEvent      = "tap"

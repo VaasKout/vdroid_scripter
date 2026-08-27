@@ -143,7 +143,8 @@ bare landmark deterministically takes the first candidate on screen.
 ### `POST /run_steps`
 
 Queues one or more steps to run in order on a device. If the device has no open
-session, one is opened automatically (scrcpy is started). All steps are
+session, one is opened automatically (scrcpy is started and the call waits up
+to ~15s for the first video frame before queueing). All steps are
 validated up front — library images and events referenced by the steps must
 exist — then appended to the session's queue. A per-session worker executes
 steps sequentially, updating the session status; a step failure sets the error
@@ -157,7 +158,7 @@ status and clears the remaining queue.
       { "landmarks": [{ "type": "yolo", "value": "home" }] },
       { "event": "tap", "landmarks": [{ "type": "image", "value": "catalog_cart_icon" }] },
       { "event": "swipe_catalog_1" },
-      { "event": "tap", "landmarks": [{ "type": "text", "value": "Corn", "locale": "eng" }], "timeout": 10 },
+      { "event": "tap", "landmarks": [{ "type": "text", "value": "Potato", "locale": "eng" }], "timeout": 10 },
       { "event": "tap", "landmarks": [{ "type": "text", "value": "Show refresh rate" }, { "type": "image", "value": "toggle" }] },
       { "event": "type_text", "landmarks": [{ "type": "text", "value": "hello", "locale": "eng" }] }
     ]
@@ -494,7 +495,7 @@ Closes the session: stops the scrcpy server and tears down the sockets.
 | ----- | ---- | ---- | ----- |
 | Event | `event` | string | `tap`, `long_tap`, `type_text`, a generated swipe (`swipe_up`, `swipe_down`, `swipe_left`, `swipe_right`), the name of a library event, or **empty for a visibility check** |
 | Landmarks | `landmarks` | []Landmark | omitempty; the target chain — resolved in order on one frame, each landmark found nearest to the previous one, the event applies to the **last** one. Empty only for a target-less library event replay. |
-| Timeout | `timeout` | int | omitempty; seconds to locate the landmarks before failing (default `15` when omitted or `<= 0`). The runner grabs the latest video frame and retries roughly once per second until the deadline. |
+| Timeout | `timeout` | int | omitempty; seconds to locate the landmarks before failing (default `3` when omitted or `<= 0`). The runner grabs the latest video frame and retries roughly once per second until the deadline. Session auto-open waits for the first video frame (up to ~15s) before any step runs, so startup never counts against it. |
 
 ### Landmark
 

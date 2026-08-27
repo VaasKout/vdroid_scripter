@@ -34,6 +34,29 @@ func (i *interactorImpl) StartSession(serial string, basePort int) bool {
 	return true
 }
 
+func (i *interactorImpl) ensureHeadlessSession(serial string, basePort int) error {
+	if _, ok := i.sessionsCache.Get(serial); ok {
+		return nil
+	}
+
+	if !i.StartSession(serial, basePort) {
+		return fmt.Errorf("couldn't start scrcpy server for %s", serial)
+	}
+	go i.scrcpy.ReadVideoStream(serial, nil)
+
+	deadline := time.Now().Add(time.Duration(models.FirstFrameTimeout) * time.Second)
+	for time.Now().Before(deadline) {
+		mat, err := i.scrcpy.GetMatFromLastFrame(serial, true)
+		if err != nil || mat == nil {
+			time.Sleep(100 * time.Millisecond)
+			continue
+		}
+		mat.Close()
+		return nil
+	}
+	return fmt.Errorf("no video frame received from %s", serial)
+}
+
 func (i *interactorImpl) CloseSession(serial string) {
 	i.logger.Info(
 		fmt.Sprintf(

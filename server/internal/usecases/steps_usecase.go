@@ -39,12 +39,8 @@ func (i *interactorImpl) RunSteps(
 		return err
 	}
 
-	if _, ok := i.sessionsCache.Get(serial); !ok {
-		started := i.StartSession(serial, basePort)
-		if !started {
-			return fmt.Errorf("couldn't start scrcpy server for %s", serial)
-		}
-		go i.scrcpy.ReadVideoStream(serial, nil)
+	if err := i.ensureHeadlessSession(serial, basePort); err != nil {
+		return err
 	}
 
 	added := i.addStepsToQueue(serial, steps)

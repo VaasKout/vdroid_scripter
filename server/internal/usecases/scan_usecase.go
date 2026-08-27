@@ -10,7 +10,6 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
-	"time"
 
 	"gocv.io/x/gocv"
 )
@@ -42,17 +41,16 @@ func (i *interactorImpl) Scan(
 		return nil, err
 	}
 
-	if _, ok := i.sessionsCache.Get(serial); !ok {
-		started := i.StartSession(serial, basePort)
-		if !started {
-			return nil, fmt.Errorf("couldn't start scrcpy server for %s", serial)
-		}
-		go i.scrcpy.ReadVideoStream(serial, nil)
+	if err := i.ensureHeadlessSession(serial, basePort); err != nil {
+		return nil, err
 	}
 
-	mat, err := i.waitForFrame(serial)
+	mat, err := i.scrcpy.GetMatFromLastFrame(serial, true)
 	if err != nil {
 		return nil, err
+	}
+	if mat == nil {
+		return nil, fmt.Errorf("no video frame received from %s", serial)
 	}
 	defer mat.Close()
 
@@ -98,24 +96,6 @@ func (i *interactorImpl) libraryImagePaths(images []string) (map[string]string, 
 		paths[name] = imagePath
 	}
 	return paths, nil
-}
-
-func (i *interactorImpl) waitForFrame(serial string) (*gocv.Mat, error) {
-	deadline := time.Now().Add(time.Duration(models.DefaultTimeout) * time.Second)
-	for time.Now().Before(deadline) {
-		mat, err := i.scrcpy.GetMatFromLastFrame(serial, true)
-		if err != nil {
-			i.logger.Error(err.Error())
-			sleepUntilNextSecond()
-			continue
-		}
-		if mat == nil {
-			sleepUntilNextSecond()
-			continue
-		}
-		return mat, nil
-	}
-	return nil, fmt.Errorf("no video frame received from %s", serial)
 }
 
 func (i *interactorImpl) scanYolo(mat *gocv.Mat) []FoundLandmark {
