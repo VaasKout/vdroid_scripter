@@ -154,8 +154,10 @@ func (d *Decoder) takeDrawFrame() *C.AVFrame {
 		return nil
 	}
 
-	C.av_frame_unref(d.draw)
-	C.av_frame_move_ref(d.draw, d.pending)
+	if d.pending.width > 0 && d.pending.data[0] != nil {
+		C.av_frame_unref(d.draw)
+		C.av_frame_move_ref(d.draw, d.pending)
+	}
 
 	if d.draw.width == 0 || d.draw.height == 0 {
 		return nil
