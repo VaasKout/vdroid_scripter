@@ -2,7 +2,7 @@
 package main
 
 import (
-	"android_vision_scripter/internal/h264"
+	"android_vision_scripter/pkg/h264"
 	"context"
 	"encoding/binary"
 	"errors"
