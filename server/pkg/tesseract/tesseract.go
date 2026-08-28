@@ -15,6 +15,8 @@ import (
 	"unsafe"
 )
 
+const sourcePPI = 300
+
 // Word ...
 type Word struct {
 	Text       string
@@ -103,6 +105,7 @@ func Recognize(
 		(*C.uchar)(cPixels),
 		C.int(width), C.int(height), 1, C.int(stride),
 	)
+	C.TessBaseAPISetSourceResolution(eng.api, sourcePPI)
 	if C.TessBaseAPIRecognize(eng.api, nil) != 0 {
 		return nil, fmt.Errorf("tesseract recognize failed for language %q", lang)
 	}
