@@ -32,7 +32,7 @@ This document describes every HTTP endpoint exposed by the server, defined in
 | ------ | ---- | ----------- |
 | GET | `/ping` | Health check |
 | GET | `/devices` | List connected ADB devices |
-| POST | `/run_steps` | Queue one or more steps to run in order on a device |
+| POST | `/devices/{serial}/run_steps` | Queue one or more steps to run in order on a device |
 | GET | `/library` | List image and action names in the library |
 | POST | `/save_image` | Crop and save a named template image into the library |
 | POST | `/save_action` | Save a named recorded gesture into the library |
@@ -111,7 +111,7 @@ bare landmark deterministically takes the first candidate on screen.
 | `type_text` | The **last landmark's `value` is the text to type**, typed via the CV keyboard (its `locale` = keyboard locale). Nothing is located on screen. |
 | any other name | The library event with that name is replayed: **offset into the found region** when landmarks are given (first touch moved into the last landmark's region, relative shape preserved), **verbatim** without them. |
 
-### `POST /run_steps`
+### `POST /devices/{serial}/run_steps`
 
 Queues one or more steps to run in order on a device. If the device has no open
 session, one is opened automatically (scrcpy is started and the call waits up
@@ -121,22 +121,20 @@ exist — then appended to the session's queue. A per-session worker executes
 steps sequentially, updating the session status; a step failure sets the error
 status and clears the remaining queue.
 
-- **Request body:**
+- **Path params:** `serial` (required).
+- **Request body:** a JSON array of steps.
   ```json
-  {
-    "serial": "ABCD1234",
-    "steps": [
-      { "landmarks": [{ "type": "yolo", "value": "home" }] },
-      { "event": "tap", "landmarks": [{ "type": "image", "value": "catalog_cart_icon" }] },
-      { "event": "swipe_catalog_1" },
-      { "event": "tap", "landmarks": [{ "type": "text", "value": "Potato", "locale": "eng" }], "timeout": 10 },
-      { "event": "tap", "landmarks": [{ "type": "text", "value": "Show refresh rate" }, { "type": "image", "value": "toggle" }] },
-      { "event": "type_text", "landmarks": [{ "type": "text", "value": "hello", "locale": "eng" }] }
-    ]
-  }
+  [
+    { "landmarks": [{ "type": "yolo", "value": "home" }] },
+    { "event": "tap", "landmarks": [{ "type": "image", "value": "catalog_cart_icon" }] },
+    { "event": "swipe_catalog_1" },
+    { "event": "tap", "landmarks": [{ "type": "text", "value": "Potato", "locale": "eng" }], "timeout": 10 },
+    { "event": "tap", "landmarks": [{ "type": "text", "value": "Show refresh rate" }, { "type": "image", "value": "toggle" }] },
+    { "event": "type_text", "landmarks": [{ "type": "text", "value": "hello", "locale": "eng" }] }
+  ]
   ```
-  `serial` and a non-empty `steps` array are required; every entry must be a
-  valid [`Step`](#step).
+  The array must be non-empty and every entry must be a valid
+  [`Step`](#step).
 - **Response `200`:** `{ "status": "ok" }` — the steps were queued. Track
   execution via [`GET /devices/{serial}/session`](#get-devicesserialsession).
 - **Errors:** `400` on invalid JSON or an invalid step, `500` when a referenced
@@ -226,7 +224,8 @@ Scans the device's current screen and returns everything the CV pipeline can
 name — the machine-readable structure of the screen, in the same landmark
 vocabulary that steps consume and in video-frame coordinates. If the device
 has no open session, one is opened automatically (scrcpy is started headless,
-like `/run_steps`); the server waits up to ~15s for the first video frame.
+like `/devices/{serial}/run_steps`); the server waits up to ~15s for the first
+video frame.
 
 One frame, three passes: every YOLO detection, every OCR-readable text
 (word/phrase level), and a template match for **exactly the library images
@@ -291,8 +290,8 @@ Saves a route, overwriting an existing one with the same name.
   }
   ```
   `name` and a non-empty valid `steps` array are required; `prompt` is
-  optional. Steps validate like `/run_steps`: referenced library images and
-  events must exist.
+  optional. Steps validate like `/devices/{serial}/run_steps`: referenced
+  library images and events must exist.
 - **Response `200`:** `{ "status": "ok" }`
 - **Errors:** `400` on invalid JSON, an invalid route, or a missing asset.
 
@@ -304,7 +303,8 @@ Saves a route, overwriting an existing one with the same name.
 ### `GET /run_route`
 
 Loads a saved route and queues its steps on the device — exactly equivalent
-to `GET /routes/{name}` followed by `POST /run_steps` with the route's steps.
+to `GET /routes/{name}` followed by `POST /devices/{serial}/run_steps` with
+the route's steps.
 
 - **Query params:** `serial` and `name` (both required).
 - **Response `200`:** `{ "status": "ok" }` — the steps were queued. Track the

@@ -73,18 +73,15 @@ func (c *apiClient) scan(serial string, images []string, locale string) (string,
 }
 
 func (c *apiClient) queueSteps(serial string, steps []stepInput) error {
-	var payload = struct {
-		Serial string      `json:"serial"`
-		Steps  []stepInput `json:"steps"`
-	}{
-		Serial: serial,
-		Steps:  steps,
-	}
-	body, err := json.Marshal(payload)
+	body, err := json.Marshal(steps)
 	if err != nil {
 		return err
 	}
-	_, err = c.request(http.MethodPost, "/run_steps", bytes.NewReader(body))
+	_, err = c.request(
+		http.MethodPost,
+		"/devices/"+url.PathEscape(serial)+"/run_steps",
+		bytes.NewReader(body),
+	)
 	return err
 }
 
