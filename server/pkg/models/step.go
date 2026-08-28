@@ -7,11 +7,13 @@ import (
 	"time"
 )
 
+// Timeouts in seconds
 const (
 	DefaultTimeout    int = 3
 	FirstFrameTimeout int = 15
 )
 
+// Generated event names
 const (
 	TapEvent      = "tap"
 	LongTapEvent  = "long_tap"
@@ -23,18 +25,21 @@ const (
 	SwipeRightEvent = "swipe_right"
 )
 
+// Landmark types
 const (
 	Image = "image"
 	Text  = "text"
 	Yolo  = "yolo"
 )
 
+// Landmark ...
 type Landmark struct {
 	Type   string `json:"type"`
 	Value  string `json:"value"`
 	Locale string `json:"locale,omitempty"`
 }
 
+// Valid ...
 func (l *Landmark) Valid() bool {
 	if l == nil {
 		return false
@@ -50,6 +55,7 @@ func (l *Landmark) Valid() bool {
 	return false
 }
 
+// ToString ...
 func (l *Landmark) ToString() string {
 	if l == nil {
 		return ""
@@ -57,12 +63,14 @@ func (l *Landmark) ToString() string {
 	return fmt.Sprintf("%s %s", l.Type, l.Value)
 }
 
+// Step ...
 type Step struct {
 	Event     string     `json:"event"`
 	Landmarks []Landmark `json:"landmarks,omitempty"`
 	Timeout   int        `json:"timeout,omitempty"`
 }
 
+// GetTimeout ...
 func (s *Step) GetTimeout() time.Duration {
 	if s == nil || s.Timeout <= 0 {
 		return time.Duration(DefaultTimeout) * time.Second
@@ -70,6 +78,7 @@ func (s *Step) GetTimeout() time.Duration {
 	return time.Duration(s.Timeout) * time.Second
 }
 
+// ValidQueue ...
 func ValidQueue(steps []Step) bool {
 	if len(steps) == 0 {
 		return false
@@ -82,6 +91,7 @@ func ValidQueue(steps []Step) bool {
 	return true
 }
 
+// Valid ...
 func (s *Step) Valid() bool {
 	if s == nil {
 		return false
@@ -103,10 +113,12 @@ func (s *Step) Valid() bool {
 	return len(s.Landmarks) == 0 || s.ValidLandmarks()
 }
 
+// IsCheckEvent ...
 func (s *Step) IsCheckEvent() bool {
 	return s != nil && strings.TrimSpace(s.Event) == ""
 }
 
+// IsCustomEvent ...
 func (s *Step) IsCustomEvent() bool {
 	if s == nil || s.IsCheckEvent() || s.IsSwipeEvent() {
 		return false
@@ -119,6 +131,7 @@ func (s *Step) IsCustomEvent() bool {
 	return true
 }
 
+// IsSwipeEvent ...
 func (s *Step) IsSwipeEvent() bool {
 	if s == nil {
 		return false
@@ -131,6 +144,7 @@ func (s *Step) IsSwipeEvent() bool {
 	return false
 }
 
+// ValidLandmarks ...
 func (s *Step) ValidLandmarks() bool {
 	if s == nil || len(s.Landmarks) == 0 {
 		return false
@@ -143,6 +157,7 @@ func (s *Step) ValidLandmarks() bool {
 	return true
 }
 
+// LastLandmark ...
 func (s *Step) LastLandmark() *Landmark {
 	if s == nil || len(s.Landmarks) == 0 {
 		return nil
@@ -150,6 +165,7 @@ func (s *Step) LastLandmark() *Landmark {
 	return &s.Landmarks[len(s.Landmarks)-1]
 }
 
+// LandmarksToString ...
 func (s *Step) LandmarksToString() string {
 	if s == nil {
 		return ""
@@ -161,6 +177,7 @@ func (s *Step) LandmarksToString() string {
 	return strings.Join(parts, " -> ")
 }
 
+// ToString ...
 func (s *Step) ToString() string {
 	if s == nil {
 		return ""

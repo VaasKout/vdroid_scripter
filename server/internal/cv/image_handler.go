@@ -130,7 +130,7 @@ func (c *cvImpl) createRectangles(img *gocv.Mat) ([]image.Rectangle, error) {
 	defer contours.Close()
 
 	var rectangles = make([]image.Rectangle, contours.Size())
-	for i := 0; i < contours.Size(); i++ {
+	for i := range contours.Size() {
 		pvs := contours.At(i)
 		rect := gocv.BoundingRect(pvs)
 		rectangles[i] = rect

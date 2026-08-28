@@ -1,6 +1,7 @@
 // Package strutils ...
 package strutils
 
+// GetUniqueChars ...
 func GetUniqueChars(text string) []rune {
 	if text == "" {
 		return []rune{}

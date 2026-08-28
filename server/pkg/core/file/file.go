@@ -144,7 +144,7 @@ func GetFileName(path string) string {
 // Common file extensions
 const (
 	PngExt  = ".png"
-	JsonExt = ".json"
+	JSONExt = ".json"
 )
 
 // ValidName ...

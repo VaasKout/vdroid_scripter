@@ -1,3 +1,4 @@
+// Package h264 ...
 package h264
 
 /*
@@ -15,6 +16,7 @@ import (
 	"unsafe"
 )
 
+// Decoder ...
 type Decoder struct {
 	mu      sync.Mutex
 	frameMu sync.Mutex
@@ -26,6 +28,7 @@ type Decoder struct {
 	closed  bool
 }
 
+// NewDecoder ...
 func NewDecoder(width int, height int) (*Decoder, error) {
 	codec := C.avcodec_find_decoder(C.enum_AVCodecID(C.AV_CODEC_ID_H264))
 	if codec == nil {
@@ -61,6 +64,7 @@ func NewDecoder(width int, height int) (*Decoder, error) {
 	return decoder, nil
 }
 
+// Decode ...
 func (d *Decoder) Decode(packet []byte, keyFrame bool, pts int64) error {
 	if len(packet) == 0 {
 		return errors.New("packet is empty")
@@ -105,6 +109,7 @@ func (d *Decoder) receiveFrames() {
 	}
 }
 
+// LatestGray ...
 func (d *Decoder) LatestGray() *image.Gray {
 	d.frameMu.Lock()
 	defer d.frameMu.Unlock()
@@ -121,6 +126,7 @@ func (d *Decoder) LatestGray() *image.Gray {
 	return img
 }
 
+// LatestYCbCr ...
 func (d *Decoder) LatestYCbCr() *image.YCbCr {
 	d.frameMu.Lock()
 	defer d.frameMu.Unlock()
@@ -168,6 +174,7 @@ func (d *Decoder) takeDrawFrame() *C.AVFrame {
 	return d.draw
 }
 
+// Size ...
 func (d *Decoder) Size() (int, int) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
@@ -177,6 +184,7 @@ func (d *Decoder) Size() (int, int) {
 	return int(d.ctx.width), int(d.ctx.height)
 }
 
+// Close ...
 func (d *Decoder) Close() {
 	d.mu.Lock()
 	d.frameMu.Lock()
@@ -217,7 +225,7 @@ func copyPlane(
 		return
 	}
 	source := unsafe.Slice((*byte)(unsafe.Pointer(src)), srcStride*height)
-	for row := 0; row < height; row++ {
+	for row := range height {
 		copy(dst[row*dstStride:row*dstStride+width], source[row*srcStride:row*srcStride+width])
 	}
 }

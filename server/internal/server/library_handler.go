@@ -7,6 +7,7 @@ import (
 	"net/http"
 )
 
+// Library paths
 const (
 	Library       = "/library"
 	SaveImage     = "/save_image"

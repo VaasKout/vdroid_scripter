@@ -281,7 +281,7 @@ func invertDarkRegions(edges *gocv.Mat) error {
 	minArea := max(float64(edges.Rows()*edges.Cols())*darkRegionMinAreaRatio, darkRegionMinAreaPx)
 	white := color.RGBA{R: 255, G: 255, B: 255, A: 255}
 	found := false
-	for i := 0; i < contours.Size(); i++ {
+	for i := range contours.Size() {
 		rect := gocv.BoundingRect(contours.At(i))
 		bboxArea := float64(rect.Dx() * rect.Dy())
 		if bboxArea < minArea {
@@ -392,10 +392,13 @@ func matchPhrase(ocrArray []OCRResult, start int, words []string) (OCRResult, bo
 		return OCRResult{}, false
 	}
 
-	for i := 1; i < len(words); i++ {
+	for i, word := range words {
+		if i == 0 {
+			continue
+		}
 		prev := ocrArray[start+i-1]
 		next := ocrArray[start+i]
-		if !strings.EqualFold(next.Text, words[i]) {
+		if !strings.EqualFold(next.Text, word) {
 			return OCRResult{}, false
 		}
 		if !isNextWordInLine(prev, next) {

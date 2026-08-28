@@ -14,6 +14,7 @@ const (
 	FindText         = Devices + "/{" + SerialKey + "}/find_text"
 )
 
+// Devices query keys
 const (
 	TextKey = "text"
 )

@@ -6,6 +6,7 @@ import (
 	"net/http"
 )
 
+// Steps paths
 const (
 	RunSteps = "/run_steps"
 )

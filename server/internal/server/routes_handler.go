@@ -6,6 +6,7 @@ import (
 	"net/http"
 )
 
+// Route paths
 const (
 	RoutesPath  = "/routes"
 	RouteByName = RoutesPath + "/{" + NameKey + "}"

@@ -12,11 +12,13 @@ import (
 	"strings"
 )
 
+// LibraryResponse ...
 type LibraryResponse struct {
 	Images  []string `json:"images"`
 	Actions []string `json:"actions"`
 }
 
+// LibraryUseCase ...
 type LibraryUseCase interface {
 	GetLibrary() *LibraryResponse
 	SaveImage(serial string, rectangle *models.Rectangle) bool
@@ -28,7 +30,7 @@ type LibraryUseCase interface {
 func (i *interactorImpl) GetLibrary() *LibraryResponse {
 	return &LibraryResponse{
 		Images:  i.libraryNames(i.filesDB.CreateImagesDir(), file.PngExt),
-		Actions: i.libraryNames(i.filesDB.CreateActionsDir(), file.JsonExt),
+		Actions: i.libraryNames(i.filesDB.CreateActionsDir(), file.JSONExt),
 	}
 }
 
@@ -107,7 +109,7 @@ func (i *interactorImpl) SaveAction(action *models.Action) bool {
 		return false
 	}
 
-	actionPath := filepath.Join(actionsDir, action.Name+file.JsonExt)
+	actionPath := filepath.Join(actionsDir, action.Name+file.JSONExt)
 	err := os.WriteFile(actionPath, bytes, 0644)
 	if err != nil {
 		i.logger.Error(err.Error())
@@ -121,7 +123,7 @@ func (i *interactorImpl) getAction(name string) (*models.Action, error) {
 		return nil, errors.New("actions dir not found")
 	}
 
-	actionPath := filepath.Join(actionsDir, strings.TrimSpace(name)+file.JsonExt)
+	actionPath := filepath.Join(actionsDir, strings.TrimSpace(name)+file.JSONExt)
 	bytes, err := os.ReadFile(actionPath)
 	if err != nil {
 		return nil, fmt.Errorf("action not found in library: %s", name)
@@ -147,5 +149,5 @@ func (i *interactorImpl) DeleteAction(name string) bool {
 	if actionsDir == "" {
 		return false
 	}
-	return i.filesDB.DeleteFileByName(actionsDir, strings.TrimSpace(name)+file.JsonExt)
+	return i.filesDB.DeleteFileByName(actionsDir, strings.TrimSpace(name)+file.JSONExt)
 }

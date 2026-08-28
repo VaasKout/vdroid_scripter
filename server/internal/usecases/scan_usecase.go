@@ -14,10 +14,17 @@ import (
 	"gocv.io/x/gocv"
 )
 
+// ScanUseCase ...
 type ScanUseCase interface {
-	Scan(serial string, images []string, locale string, basePort int) ([]FoundLandmark, error)
+	Scan(
+		serial string,
+		images []string,
+		locale string,
+		basePort int,
+	) ([]FoundLandmark, error)
 }
 
+// FoundLandmark ...
 type FoundLandmark struct {
 	Type      string           `json:"type"`
 	Value     string           `json:"value"`

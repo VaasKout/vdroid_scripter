@@ -18,6 +18,7 @@ import (
 	"gocv.io/x/gocv"
 )
 
+// StepsUseCase ...
 type StepsUseCase interface {
 	RunSteps(serial string, steps []models.Step, basePort int) error
 }
@@ -55,7 +56,7 @@ func (i *interactorImpl) checkStepAssets(steps []models.Step) error {
 		if step.IsCustomEvent() {
 			actionPath := filepath.Join(
 				i.filesDB.CreateActionsDir(),
-				strings.TrimSpace(step.Event)+file.JsonExt,
+				strings.TrimSpace(step.Event)+file.JSONExt,
 			)
 			if !file.Exists(actionPath) {
 				return fmt.Errorf("event not found in library: %s", step.Event)
@@ -391,7 +392,6 @@ func (i *interactorImpl) getKeyboardKeys(
 	text string,
 	locale string,
 ) ([]cv.OCRResult, error) {
-	keyboardKeys := []cv.OCRResult{}
 	mat, err := i.scrcpy.GetMatFromLastFrame(serial, true)
 	if err != nil {
 		i.logger.Error(err.Error())
@@ -421,8 +421,7 @@ func (i *interactorImpl) getKeyboardKeys(
 		return []cv.OCRResult{}, fmt.Errorf("buttons not found")
 	}
 
-	keyboardKeys = i.cv.GetKeyboardKeys(filteredButtons, *mat)
-	return keyboardKeys, nil
+	return i.cv.GetKeyboardKeys(filteredButtons, *mat), nil
 }
 
 func (i *interactorImpl) playEvent(

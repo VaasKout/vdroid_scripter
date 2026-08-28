@@ -103,7 +103,7 @@ func (i *interactorImpl) copyVideoStream(
 		select {
 		case <-ctx.Done():
 			return
-		case _, _ = <-clientDisconnected:
+		case <-clientDisconnected:
 			return
 		case buf, ok := <-ch:
 			if !ok {

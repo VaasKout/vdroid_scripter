@@ -85,31 +85,6 @@ func (s *serverImpl) sendStatusOk(w http.ResponseWriter) {
 	json.NewEncoder(w).Encode(response)
 }
 
-func (s *serverImpl) handleImageResponse(w http.ResponseWriter, imagePath string) {
-	imgFile, err := os.Open(imagePath)
-	if err != nil {
-		http.Error(w, "cannot open image", http.StatusInternalServerError)
-		return
-	}
-	defer imgFile.Close()
-
-	var buffer bytes.Buffer
-	writer := multipart.NewWriter(&buffer)
-	defer writer.Close()
-
-	// Create a form file field
-	part, err := writer.CreateFormFile(ImagesFormField, filepath.Base(imagePath))
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	// Copy file data into the part
-	io.Copy(part, imgFile)
-	w.Header().Set("Content-Type", writer.FormDataContentType())
-	w.Write(buffer.Bytes())
-}
-
 func (s *serverImpl) handleScreenshotResponse(
 	w http.ResponseWriter,
 	imagePath string,

@@ -29,6 +29,7 @@ func init() {
 	}
 }
 
+// Scrcpy properties
 const (
 	ScrcpyVersion = "3.3.4"
 
@@ -38,6 +39,7 @@ const (
 	ScrcpyDir        = "scrcpy"
 )
 
+// Adb commands
 const (
 	PushFile          = "adb -s %s push %s /data/local/tmp/scrcpy-server.jar"
 	ForwardTCPPort    = "adb -s %s forward tcp:1234 localabstract:scrcpy"
@@ -262,7 +264,7 @@ func createRectangles(img *gocv.Mat) ([]image.Rectangle, error) {
 	)
 
 	var rectangles []image.Rectangle
-	for i := 0; i < contours.Size(); i++ {
+	for i := range contours.Size() {
 		pts := contours.At(i)
 		rect := gocv.BoundingRect(pts)
 		rectangles = append(rectangles, rect)

@@ -33,11 +33,13 @@ func init() {
 	}
 }
 
+// Size of different buffers
 const (
 	BufSize    = 1 * 1024 * 1024 //1MB
 	HeaderSize = 12
 )
 
+// Scrcpy properties and adb commands
 const (
 	ScrcpyVersion = "3.3.4"
 
@@ -51,6 +53,7 @@ const (
 	StartScrcpyServer = "adb -s %s shell CLASSPATH=/data/local/tmp/scrcpy-server.jar app_process / com.genymobile.scrcpy.Server %s log_level=verbose tunnel_forward=true audio=false control=false cleanup=false"
 )
 
+// PTS flags
 const (
 	SCPacketFlagConfig   uint64 = 1 << 63
 	SCPacketFlagKeyFrame uint64 = 1 << 62
@@ -58,6 +61,7 @@ const (
 	SCPacketPtsMask uint64 = SCPacketFlagKeyFrame - 1
 )
 
+// DecoderData ...
 type DecoderData struct {
 	Decoder        *h264.Decoder
 	Buf            []byte
@@ -65,6 +69,7 @@ type DecoderData struct {
 	ConfigFrameBuf []byte
 }
 
+// Free ...
 func (d *DecoderData) Free() {
 	if d == nil {
 		return
@@ -77,6 +82,7 @@ func (d *DecoderData) Free() {
 	d.ConfigFrameBuf = []byte{}
 }
 
+// Allocate ...
 func (d *DecoderData) Allocate(width, height int) error {
 	if d == nil {
 		return errors.New("data is nil")
@@ -398,8 +404,10 @@ func executeCommand(cmd string) (string, error) {
 	return string(result), err
 }
 
+// MinBorderDistance ...
 const MinBorderDistance = 20
 
+// Rectangle ...
 type Rectangle struct {
 	LeftX   int `json:"left_x"`
 	RightX  int `json:"right_x"`
@@ -407,6 +415,7 @@ type Rectangle struct {
 	BottomY int `json:"bottom_y"`
 }
 
+// ImgRectanglesToDomain ...
 func ImgRectanglesToDomain(imgRectangles []image.Rectangle) []Rectangle {
 	var rectangles []Rectangle
 	for _, imgRectangle := range imgRectangles {
@@ -485,7 +494,7 @@ func createRectangles(img *gocv.Mat) ([]image.Rectangle, error) {
 	)
 
 	var rectangles []image.Rectangle
-	for i := 0; i < contours.Size(); i++ {
+	for i := range contours.Size() {
 		pts := contours.At(i)
 		rect := gocv.BoundingRect(pts)
 		rectangles = append(rectangles, rect)

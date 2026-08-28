@@ -20,6 +20,7 @@ const (
 	MinBorderDistance      = 20
 )
 
+// Rectangle ...
 type Rectangle struct {
 	LeftX   int `json:"left_x"`
 	RightX  int `json:"right_x"`
@@ -27,6 +28,7 @@ type Rectangle struct {
 	BottomY int `json:"bottom_y"`
 }
 
+// ToJSON ...
 func (r *Rectangle) ToJSON() string {
 	result, err := json.Marshal(r)
 	if err != nil {

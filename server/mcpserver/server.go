@@ -45,11 +45,13 @@ Duplicates: when a landmark value matches several places on screen, disambiguate
 
 Failure and recovery: a failed step clears the remaining queue and stores the error as the session status, so the final status names the target that could not be found. Recover from the failure point: scan the screen (with the relevant library images in the images param), apply the user's instruction or the route's prompt to what the scan shows — tap the alternative the user named, scroll with a generated swipe (swipe_up to reveal content below) or the screen's recorded swipe action (variants _1, _2, ...) when the target should be below, or report honestly when the scan shows an unexpected screen — then re-queue the remaining steps from the failed one onward, again in one call. Conditional dictations split at the condition: queue the unconditional prefix, give the probe step its own short timeout, and resolve the condition with a scan after the wait.`
 
+// Server ...
 type Server struct {
 	api *apiClient
 	mcp *mcp.Server
 }
 
+// New ...
 func New(baseURL string) *Server {
 	var server = &Server{
 		api: newAPIClient(baseURL),
@@ -62,6 +64,7 @@ func New(baseURL string) *Server {
 	return server
 }
 
+// Run ...
 func (s *Server) Run(ctx context.Context) error {
 	return s.mcp.Run(ctx, &mcp.StdioTransport{})
 }

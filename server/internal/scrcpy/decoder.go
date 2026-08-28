@@ -22,6 +22,7 @@ const (
 	SCPacketPtsMask uint64 = SCPacketFlagKeyFrame - 1
 )
 
+// DecoderData ...
 type DecoderData struct {
 	Decoder *h264.Decoder
 
@@ -30,6 +31,7 @@ type DecoderData struct {
 	ConfigFrameBuf []byte
 }
 
+// Free ...
 func (d *DecoderData) Free() {
 	if d == nil {
 		return
@@ -42,6 +44,7 @@ func (d *DecoderData) Free() {
 	d.Buf = []byte{}
 }
 
+// Allocate ...
 func (d *DecoderData) Allocate(width, height int) error {
 	if d == nil {
 		return fmt.Errorf("data is nil")
@@ -58,6 +61,7 @@ func (d *DecoderData) Allocate(width, height int) error {
 	return nil
 }
 
+// GetSize ...
 func (d *DecoderData) GetSize() (width, height int) {
 	if d == nil || d.Decoder == nil {
 		return 0, 0

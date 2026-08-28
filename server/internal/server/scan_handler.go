@@ -6,6 +6,7 @@ import (
 	"strings"
 )
 
+// Scan path and query keys
 const (
 	ScanPath  = "/scan"
 	ImagesKey = "images"

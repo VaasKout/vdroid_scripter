@@ -11,6 +11,7 @@ import (
 	"strings"
 )
 
+// RouteUseCase ...
 type RouteUseCase interface {
 	GetRoutes() []string
 	GetRoute(name string) (*models.Route, error)
@@ -20,7 +21,7 @@ type RouteUseCase interface {
 }
 
 func (i *interactorImpl) GetRoutes() []string {
-	return i.libraryNames(i.filesDB.CreateRoutesDir(), file.JsonExt)
+	return i.libraryNames(i.filesDB.CreateRoutesDir(), file.JSONExt)
 }
 
 func (i *interactorImpl) GetRoute(name string) (*models.Route, error) {
@@ -34,7 +35,7 @@ func (i *interactorImpl) GetRoute(name string) (*models.Route, error) {
 		return nil, errors.New("routes dir not found")
 	}
 
-	data, err := os.ReadFile(filepath.Join(routesDir, name+file.JsonExt))
+	data, err := os.ReadFile(filepath.Join(routesDir, name+file.JSONExt))
 	if err != nil {
 		return nil, fmt.Errorf("route not found: %s", name)
 	}
@@ -69,7 +70,7 @@ func (i *interactorImpl) SaveRoute(route *models.Route) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(filepath.Join(routesDir, route.Name+file.JsonExt), data, 0644)
+	return os.WriteFile(filepath.Join(routesDir, route.Name+file.JSONExt), data, 0644)
 }
 
 func (i *interactorImpl) DeleteRoute(name string) bool {
@@ -81,7 +82,7 @@ func (i *interactorImpl) DeleteRoute(name string) bool {
 	if routesDir == "" {
 		return false
 	}
-	return i.filesDB.DeleteFileByName(routesDir, strings.TrimSpace(name)+file.JsonExt)
+	return i.filesDB.DeleteFileByName(routesDir, strings.TrimSpace(name)+file.JSONExt)
 }
 
 func (i *interactorImpl) RunRoute(serial string, name string, basePort int) error {

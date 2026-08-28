@@ -93,19 +93,14 @@ func GetRandomXY(r *image.Rectangle) (int, int) {
 	var topYWithOffset = r.Min.Y + yOffset
 	var bottomYWithOffset = r.Max.Y - yOffset
 
-	var xToPress = 0
-	var yToPress = 0
-
+	var xToPress = leftXWithOffset
 	if leftXWithOffset < rightXWithOffset {
 		xToPress = numutils.RandInt(leftXWithOffset, rightXWithOffset)
-	} else {
-		xToPress = leftXWithOffset
 	}
 
+	var yToPress = topYWithOffset
 	if topYWithOffset < bottomYWithOffset {
 		yToPress = numutils.RandInt(topYWithOffset, bottomYWithOffset)
-	} else {
-		yToPress = topYWithOffset
 	}
 
 	return xToPress, yToPress
@@ -116,6 +111,7 @@ func ImageRectIsEmpty(r *image.Rectangle) bool {
 	return r == nil || (r.Dy() == 0 && r.Dx() == 0)
 }
 
+// ClosestRect ...
 func ClosestRect(rects []image.Rectangle, target *image.Rectangle) *image.Rectangle {
 	if len(rects) == 0 {
 		return nil
@@ -126,8 +122,8 @@ func ClosestRect(rects []image.Rectangle, target *image.Rectangle) *image.Rectan
 
 	best := &rects[0]
 	bestDist := centerDistance(*best, *target)
-	for index := 1; index < len(rects); index++ {
-		dist := centerDistance(rects[index], *target)
+	for index, rect := range rects {
+		dist := centerDistance(rect, *target)
 		if dist < bestDist {
 			best = &rects[index]
 			bestDist = dist
@@ -144,6 +140,7 @@ func centerDistance(a image.Rectangle, b image.Rectangle) float64 {
 	return math.Hypot(ax-bx, ay-by)
 }
 
+// SortRectsReadingOrder ...
 func SortRectsReadingOrder(rects []image.Rectangle) {
 	sort.SliceStable(rects, func(a, b int) bool {
 		if rects[a].Min.Y != rects[b].Min.Y {

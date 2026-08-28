@@ -164,10 +164,8 @@ func (c *cvImpl) findKeyboardRectangles(
 	matrix [][]image.Rectangle,
 	key string,
 ) []image.Rectangle {
-	var requiredSize = 0
-	if result, ok := keyboardSizeMap[key]; ok {
-		requiredSize = result
-	} else {
+	requiredSize, ok := keyboardSizeMap[key]
+	if !ok {
 		requiredSize = keyboardSizeMap[DefaultOCRLanguage]
 	}
 

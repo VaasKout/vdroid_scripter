@@ -8,6 +8,7 @@ import (
 	"gocv.io/x/gocv"
 )
 
+// OcrUseCase ...
 type OcrUseCase interface {
 	FindText(serial string, text string, locale string) []cv.OCRResult
 }

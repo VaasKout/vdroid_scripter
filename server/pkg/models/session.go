@@ -1,5 +1,6 @@
 package models
 
+// Session statuses
 const (
 	StatusIdle        = "idle"
 	StatusClosed      = "closed"
@@ -7,6 +8,7 @@ const (
 	StatusError       = "unable to find %s %s on screen"
 )
 
+// Session ...
 type Session struct {
 	ServerPort  int
 	VideoPort   int

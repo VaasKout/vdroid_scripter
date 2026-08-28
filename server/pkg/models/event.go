@@ -13,6 +13,7 @@ const (
 	ControlBytesSize = 32
 )
 
+// Touch event properties
 const (
 	TypeInjectTouchEvent byte = 2
 
@@ -35,6 +36,7 @@ const (
 	SwipeJitterPx         = 2
 )
 
+// Touch actions
 const (
 	ActionDown byte = 0
 	ActionUp   byte = 1
@@ -50,11 +52,13 @@ type Event struct {
 // ControlBytes ...
 type ControlBytes []byte
 
+// GenerateTapEvents ...
 func GenerateTapEvents(screenWidth int, screenHeight int) []Event {
 	upTime := int64(TapDurationMinMs + rand.IntN(TapDurationJitterMs))
 	return generateTapPair(screenWidth, screenHeight, upTime)
 }
 
+// GenerateLongTapEvents ...
 func GenerateLongTapEvents(screenWidth int, screenHeight int) []Event {
 	upTime := int64(LongTapDurationMinMs + rand.IntN(LongTapDurationJitterMs))
 	return generateTapPair(screenWidth, screenHeight, upTime)
@@ -73,6 +77,7 @@ func generateTapPair(screenWidth int, screenHeight int, upTime int64) []Event {
 	}
 }
 
+// GenerateSwipeEvents ...
 func GenerateSwipeEvents(direction string, screenWidth int, screenHeight int) []Event {
 	start, end := swipeEndpoints(direction, screenWidth, screenHeight)
 	control := swipeControlPoint(start, end)
@@ -235,6 +240,7 @@ func (b *ControlBytes) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+// CountOffset ...
 func (b *ControlBytes) CountOffset(
 	stepZone *image.Rectangle,
 ) (int, int) {
