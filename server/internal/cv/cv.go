@@ -2,7 +2,6 @@
 package cv
 
 import (
-	"android_vision_scripter/internal/bashcmd"
 	"android_vision_scripter/pkg/logger"
 )
 
@@ -21,17 +20,12 @@ type API interface {
 }
 
 type cvImpl struct {
-	cmdRunner bashcmd.CmdAPI
-	logAPI    *logger.Logger
+	logAPI *logger.Logger
 }
 
 // New instance of CvAPI
-func New(
-	cmdRunner bashcmd.CmdAPI,
-	logAPI *logger.Logger,
-) API {
+func New(logAPI *logger.Logger) API {
 	return &cvImpl{
-		cmdRunner: cmdRunner,
-		logAPI:    logAPI,
+		logAPI: logAPI,
 	}
 }

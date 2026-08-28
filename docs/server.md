@@ -12,7 +12,10 @@ Tesseract OCR), builds the server, and installs the `vdroid-scripter` binary to
 Debian/Ubuntu, and Fedora.
 
 The server needs **OpenCV 4** (gocv does not support OpenCV 5 yet). On macOS
-that is the `opencv@4` formula. On Arch, whose official `opencv` package is
+that is the `opencv@4` formula. OCR runs in-process against libtesseract, so
+the Tesseract headers are a build dependency too: the brew and Arch
+`tesseract` packages include them, Debian/Ubuntu needs `libtesseract-dev`
+and Fedora `tesseract-devel` (the script installs these). On Arch, whose official `opencv` package is
 now version 5, the script installs the AUR `opencv4` package instead: through
 plain `pacman` when a configured repo carries it (e.g. chaotic-aur, prebuilt),
 otherwise through `paru` or `yay`; with no AUR helper available it stops and

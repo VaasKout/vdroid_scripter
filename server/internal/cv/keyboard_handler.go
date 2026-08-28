@@ -36,7 +36,6 @@ type KeyboardHandler interface {
 	) []OCRResult
 	ResetKeyboardKeys(
 		keyboardDir string,
-		tesseractDir string,
 		screenshot string,
 		lang string,
 		upperCase bool,
@@ -70,7 +69,6 @@ func (c *cvImpl) GetKeyboardKeys(
 
 func (c *cvImpl) ResetKeyboardKeys(
 	keyboardDir string,
-	tesseractDir string,
 	screenshot string,
 	lang string,
 	upperCase bool,
@@ -105,7 +103,7 @@ func (c *cvImpl) ResetKeyboardKeys(
 
 	for _, rect := range keyboardRects {
 		cropped := img.Region(rect)
-		ocrResult, err := c.FindTextRectangles(&cropped, tesseractDir, ocrParams)
+		ocrResult, err := c.FindTextRectangles(&cropped, ocrParams)
 		if err != nil || len(ocrResult) == 0 {
 			cropped.Close()
 			continue

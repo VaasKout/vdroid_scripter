@@ -1,14 +1,11 @@
 package cv
 
 import (
-	"android_vision_scripter/pkg/core/file"
-	"encoding/json"
+	"android_vision_scripter/pkg/models"
+	"android_vision_scripter/pkg/tesseract"
 	"errors"
-	"fmt"
 	"image"
 	"image/color"
-	"os"
-	"path/filepath"
 	"strings"
 
 	"gocv.io/x/gocv"
@@ -173,7 +170,6 @@ type OcrParams struct {
 type TextHandler interface {
 	FindTextRectangles(
 		img *gocv.Mat,
-		dir string,
 		params *OcrParams,
 	) ([]OCRResult, error)
 }
@@ -198,7 +194,7 @@ func InitOcrParams(text string, lang string, psm int, oem int) *OcrParams {
 	}
 
 	if lang == Numbers || lang == Phone {
-		ocrParams.WhiteList = "-c tessedit_char_whitelist=0123456789"
+		ocrParams.WhiteList = "0123456789"
 	}
 
 	return ocrParams
@@ -206,48 +202,47 @@ func InitOcrParams(text string, lang string, psm int, oem int) *OcrParams {
 
 func (c *cvImpl) FindTextRectangles(
 	img *gocv.Mat,
-	dir string,
 	params *OcrParams,
 ) ([]OCRResult, error) {
 	if params == nil {
 		return []OCRResult{}, errors.New("params are empty")
 	}
 
-	err := c.createEdges(img, dir)
+	edges, err := c.createEdges(img)
 	if err != nil {
-		fmt.Println("Create edges error: " + err.Error())
 		return []OCRResult{}, err
 	}
+	defer edges.Close()
 
-	err = c.readTextFromEdgesImage(
-		filepath.Join(dir, EdgesPng),
-		params.Psm,
+	words, err := tesseract.Recognize(
+		edges.ToBytes(),
+		edges.Cols(),
+		edges.Rows(),
+		edges.Cols(),
 		params.Lang,
+		params.Psm,
 		params.Oem,
 		params.WhiteList,
 	)
 	if err != nil {
-		fmt.Println("ReadTextFromImage: " + err.Error())
 		return []OCRResult{}, err
 	}
 
-	results := c.findRectangleInOcrJSON(filepath.Join(dir, OcrJSON), params.Text)
-	return results, nil
+	return filterResults(wordsToOCRResults(words), params.Text), nil
 }
 
-func (c *cvImpl) createEdges(img *gocv.Mat, dir string) error {
+func (c *cvImpl) createEdges(img *gocv.Mat) (gocv.Mat, error) {
 	if img.Empty() {
-		return errors.New("createEdges img empty")
+		return gocv.NewMat(), errors.New("createEdges img empty")
 	}
 	gray := gocv.NewMat()
 	defer gray.Close()
 	err := gocv.CvtColor(*img, &gray, gocv.ColorBGRToGray)
 	if err != nil {
-		return err
+		return gocv.NewMat(), err
 	}
 
 	edges := gocv.NewMat()
-	defer edges.Close()
 	gocv.Threshold(gray, &edges, 0, MaxThreshHold, gocv.ThresholdBinary|gocv.ThresholdOtsu)
 
 	if gocv.CountNonZero(edges)*2 < edges.Rows()*edges.Cols() {
@@ -256,15 +251,29 @@ func (c *cvImpl) createEdges(img *gocv.Mat, dir string) error {
 
 	err = invertDarkRegions(&edges)
 	if err != nil {
-		return err
+		edges.Close()
+		return gocv.NewMat(), err
 	}
+	return edges, nil
+}
 
-	var edgesPath = filepath.Join(dir, EdgesPng)
-	ok := gocv.IMWrite(edgesPath, edges)
-	if !ok {
-		return errors.New("could not write " + EdgesPng)
+func wordsToOCRResults(words []tesseract.Word) []OCRResult {
+	results := []OCRResult{}
+	for _, word := range words {
+		if word.Text == "" {
+			continue
+		}
+		results = append(results, OCRResult{
+			Text: word.Text,
+			Rectangle: models.Rectangle{
+				LeftX:   word.Rect.Min.X,
+				TopY:    word.Rect.Min.Y,
+				RightX:  word.Rect.Max.X,
+				BottomY: word.Rect.Max.Y,
+			},
+		})
 	}
-	return nil
+	return results
 }
 
 func invertDarkRegions(edges *gocv.Mat) error {
@@ -315,57 +324,7 @@ func invertDarkRegions(edges *gocv.Mat) error {
 	return inverted.CopyToWithMask(edges, regionMask)
 }
 
-func (c *cvImpl) readTextFromEdgesImage(
-	imgPath string,
-	psm int,
-	lang string,
-	oem int,
-	whiteList string,
-) error {
-	dir, err := file.FindDirectoryOfFile(imgPath)
-	if err != nil {
-		fmt.Println(err)
-		return err
-	}
-
-	cmd := fmt.Sprintf(
-		"tesseract %s %s -l %s --psm %d --oem %d %s tsv",
-		imgPath,
-		filepath.Join(dir, OutputTsv),
-		lang,
-		psm,
-		oem,
-		whiteList,
-	)
-	_, err = c.cmdRunner.ExecuteCommand(cmd)
-	if err != nil {
-		fmt.Println("Error running Tesseract:", err)
-		return err
-	}
-
-	// Read Tesseract output
-	data, err := os.ReadFile(filepath.Join(dir, OutputTsv+".tsv"))
-	if err != nil {
-		fmt.Println("Error reading OCR output:", err)
-		return err
-	}
-	results := TsvToOCRResult(string(data))
-
-	// Save results as JSON
-	ocrResultsFile, _ := os.Create(filepath.Join(dir, OcrJSON))
-	defer ocrResultsFile.Close()
-	err = json.NewEncoder(ocrResultsFile).Encode(results)
-	return err
-}
-
-func (c *cvImpl) findRectangleInOcrJSON(osrJSONPath string, text string) []OCRResult {
-	osrJSON, err := os.ReadFile(osrJSONPath)
-	if err != nil {
-		c.logAPI.Error(err.Error())
-		return []OCRResult{}
-	}
-
-	var ocrArray = OCRJsonToArray(osrJSON)
+func filterResults(ocrArray []OCRResult, text string) []OCRResult {
 	words := strings.Fields(text)
 	if len(words) == 0 {
 		return ocrArray

@@ -2,7 +2,6 @@ package usecases
 
 import (
 	"android_vision_scripter/internal/cv"
-	"android_vision_scripter/internal/filesdb"
 	"android_vision_scripter/pkg/core/file"
 	"android_vision_scripter/pkg/core/numutils"
 	"android_vision_scripter/pkg/core/strutils"
@@ -226,7 +225,7 @@ func (i *interactorImpl) findRect(
 			continue
 		}
 
-		foundRect, err := i.findLandmarkChain(serial, mat, step)
+		foundRect, err := i.findLandmarkChain(mat, step)
 		mat.Close()
 
 		if err != nil {
@@ -242,13 +241,12 @@ func (i *interactorImpl) findRect(
 }
 
 func (i *interactorImpl) findLandmarkChain(
-	serial string,
 	mat *gocv.Mat,
 	step *models.Step,
 ) (*image.Rectangle, error) {
 	var prevRect *image.Rectangle
 	for _, landmark := range step.Landmarks {
-		candidates, err := i.findLandmarkCandidates(serial, mat, &landmark)
+		candidates, err := i.findLandmarkCandidates(mat, &landmark)
 		if err != nil {
 			return nil, err
 		}
@@ -263,7 +261,6 @@ func (i *interactorImpl) findLandmarkChain(
 }
 
 func (i *interactorImpl) findLandmarkCandidates(
-	serial string,
 	mat *gocv.Mat,
 	landmark *models.Landmark,
 ) ([]image.Rectangle, error) {
@@ -285,17 +282,13 @@ func (i *interactorImpl) findLandmarkCandidates(
 	}
 
 	if landmark.Type == models.Text {
-		tesseractDir := i.filesDB.CreateLogsDir(serial, filesdb.TesseractDir)
-		if tesseractDir == "" {
-			return nil, fmt.Errorf("tesseract dir was not found")
-		}
 		var ocrParams = cv.InitOcrParams(
 			landmark.Value,
 			landmark.Locale,
 			cv.PsmText,
 			cv.OemText,
 		)
-		ocrResults, err := i.cv.FindTextRectangles(mat, tesseractDir, ocrParams)
+		ocrResults, err := i.cv.FindTextRectangles(mat, ocrParams)
 		if err != nil {
 			return nil, err
 		}

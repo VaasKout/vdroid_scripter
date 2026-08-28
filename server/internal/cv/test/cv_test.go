@@ -5,7 +5,6 @@ import (
 	"android_vision_scripter/internal/bashcmd"
 	"android_vision_scripter/internal/cv"
 	"android_vision_scripter/internal/filesdb"
-	"android_vision_scripter/pkg/core/file"
 	"android_vision_scripter/pkg/logger"
 	"android_vision_scripter/pkg/models"
 	"fmt"
@@ -33,10 +32,9 @@ func TestGetTextFromImage(t *testing.T) {
 	}
 	var logAPI = logger.New(logger.INFO, true)
 	var filesDB = filesdb.New(fileProps)
-	var cmdRunner = bashcmd.New(filesDB, logAPI)
-	var cvAPI = cv.New(cmdRunner, logAPI)
+	var cvAPI = cv.New(logAPI)
+	dir := filesDB.CreateLogsDir(TestSerial)
 
-	dir := filesDB.CreateLogsDir(TestSerial, filesdb.TesseractDir)
 	testImage := TestTextFile
 
 	img := gocv.IMRead(testImage, gocv.IMReadColor)
@@ -46,7 +44,7 @@ func TestGetTextFromImage(t *testing.T) {
 	defer img.Close()
 
 	ocrParams := cv.InitOcrParams("", TestLocale, cv.PsmText, cv.OemText)
-	ocrResult, err := cvAPI.FindTextRectangles(&img, dir, ocrParams)
+	ocrResult, err := cvAPI.FindTextRectangles(&img, ocrParams)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -77,10 +75,8 @@ func TestFindSignText(t *testing.T) {
 	}
 	var logAPI = logger.New(logger.INFO, true)
 	var filesDB = filesdb.New(fileProps)
-	var cmdRunner = bashcmd.New(filesDB, logAPI)
-	var cvAPI = cv.New(cmdRunner, logAPI)
-
-	dir := filesDB.CreateLogsDir(TestSerial, filesdb.TesseractDir)
+	var cvAPI = cv.New(logAPI)
+	dir := filesDB.CreateLogsDir(TestSerial)
 
 	img := gocv.IMRead(TestTextFile2, gocv.IMReadColor)
 	if img.Empty() {
@@ -89,7 +85,7 @@ func TestFindSignText(t *testing.T) {
 	defer img.Close()
 
 	ocrParams := cv.InitOcrParams(TestSignPhrase, TestLocale, cv.PsmText, cv.OemText)
-	ocrResult, err := cvAPI.FindTextRectangles(&img, dir, ocrParams)
+	ocrResult, err := cvAPI.FindTextRectangles(&img, ocrParams)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -125,16 +121,11 @@ func TestGetTextFromScreenshot(t *testing.T) {
 	var logAPI = logger.New(logger.INFO, true)
 	var filesDB = filesdb.New(fileProps)
 	var cmdRunner = bashcmd.New(filesDB, logAPI)
-	var cvAPI = cv.New(cmdRunner, logAPI)
+	var cvAPI = cv.New(logAPI)
 
 	screenshot := cmdRunner.ScreenShot(TestSerial)
 	if screenshot == "" {
 		t.Fatal("screenshot is empty")
-	}
-
-	dir, err := file.FindDirectoryOfFile(screenshot)
-	if err != nil {
-		t.Fatal(err)
 	}
 
 	img := gocv.IMRead(screenshot, gocv.IMReadColor)
@@ -144,7 +135,7 @@ func TestGetTextFromScreenshot(t *testing.T) {
 	defer img.Close()
 
 	ocrParams := cv.InitOcrParams("", TestLocale, cv.PsmText, cv.OemText)
-	ocrResult, err := cvAPI.FindTextRectangles(&img, dir, ocrParams)
+	ocrResult, err := cvAPI.FindTextRectangles(&img, ocrParams)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -176,7 +167,7 @@ func TestResetKeyboardKeys(t *testing.T) {
 	var logAPI = logger.New(logger.INFO, true)
 	var filesDB = filesdb.New(fileProps)
 	var cmdRunner = bashcmd.New(filesDB, logAPI)
-	var cvAPI = cv.New(cmdRunner, logAPI)
+	var cvAPI = cv.New(logAPI)
 
 	screenshot := cmdRunner.ScreenShot(TestSerial)
 	if screenshot == "" {
@@ -190,10 +181,9 @@ func TestResetKeyboardKeys(t *testing.T) {
 	defer img.Close()
 
 	keyboardDir := filesDB.CreateKeyboardDir(TestSerial, TestLocale)
-	tesseractDir := filesDB.CreateLogsDir(TestSerial, filesdb.TesseractDir)
 
 	start := time.Now()
-	ocrResult := cvAPI.ResetKeyboardKeys(keyboardDir, tesseractDir, screenshot, TestLocale, false)
+	ocrResult := cvAPI.ResetKeyboardKeys(keyboardDir, screenshot, TestLocale, false)
 	elapsed := time.Since(start)
 
 	keyboardButtons := filesDB.GetFiles(keyboardDir)
@@ -218,7 +208,7 @@ func TestGetKeyboardKeys(t *testing.T) {
 	var logAPI = logger.New(logger.INFO, true)
 	var filesDB = filesdb.New(fileProps)
 	var cmdRunner = bashcmd.New(filesDB, logAPI)
-	var cvAPI = cv.New(cmdRunner, logAPI)
+	var cvAPI = cv.New(logAPI)
 
 	screenshot := cmdRunner.ScreenShot(TestSerial)
 	if screenshot == "" {
@@ -261,7 +251,7 @@ func TestDrawAllRectangles(t *testing.T) {
 	var logAPI = logger.New(logger.INFO, true)
 	var filesDB = filesdb.New(fileProps)
 	var cmdRunner = bashcmd.New(filesDB, logAPI)
-	var cvAPI = cv.New(cmdRunner, logAPI)
+	var cvAPI = cv.New(logAPI)
 
 	screenshot := cmdRunner.ScreenShot(TestSerial)
 	if screenshot == "" {
@@ -307,7 +297,7 @@ func TestFindTemplate(t *testing.T) {
 	var logAPI = logger.New(logger.INFO, true)
 	var filesDB = filesdb.New(fileProps)
 	var cmdRunner = bashcmd.New(filesDB, logAPI)
-	var cvAPI = cv.New(cmdRunner, logAPI)
+	var cvAPI = cv.New(logAPI)
 
 	screenshot := cmdRunner.ScreenShot(TestSerial)
 	if screenshot == "" {

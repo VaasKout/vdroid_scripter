@@ -38,7 +38,7 @@ func main() {
 
 	filesDB := filesdb.New(cfg.FilesProps)
 	cmdRunner := bashcmd.New(filesDB, logAPI)
-	cvAPI := cv.New(cmdRunner, logAPI)
+	cvAPI := cv.New(logAPI)
 	scrcpy := scrcpy.New(cmdRunner, cvAPI, filesDB, cfg.ScrcpyProps, logAPI)
 	yoloAPI := yolo.New(filesDB, logAPI)
 	network := network.New(logAPI)

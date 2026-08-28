@@ -8,7 +8,6 @@ import (
 // Basic directories for phone data
 const (
 	ScreenshotDir = "screenshot"
-	TesseractDir  = "tesseract"
 )
 
 // FilesDB ...

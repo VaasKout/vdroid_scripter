@@ -2,7 +2,6 @@ package usecases
 
 import (
 	"android_vision_scripter/internal/cv"
-	"android_vision_scripter/internal/filesdb"
 	"android_vision_scripter/pkg/core/file"
 	"android_vision_scripter/pkg/models"
 	"errors"
@@ -63,7 +62,7 @@ func (i *interactorImpl) Scan(
 
 	landmarks := i.scanYolo(mat)
 
-	textLandmarks, err := i.scanText(serial, mat, locale)
+	textLandmarks, err := i.scanText(mat, locale)
 	if err != nil {
 		return nil, err
 	}
@@ -120,17 +119,11 @@ func (i *interactorImpl) scanYolo(mat *gocv.Mat) []FoundLandmark {
 }
 
 func (i *interactorImpl) scanText(
-	serial string,
 	mat *gocv.Mat,
 	locale string,
 ) ([]FoundLandmark, error) {
-	tesseractDir := i.filesDB.CreateLogsDir(serial, filesdb.TesseractDir)
-	if tesseractDir == "" {
-		return nil, errors.New("tesseract dir was not found")
-	}
-
 	ocrParams := cv.InitOcrParams("", locale, cv.PsmText, cv.OemText)
-	results, err := i.cv.FindTextRectangles(mat, tesseractDir, ocrParams)
+	results, err := i.cv.FindTextRectangles(mat, ocrParams)
 	if err != nil {
 		return nil, err
 	}

@@ -2,7 +2,6 @@ package usecases
 
 import (
 	"android_vision_scripter/internal/cv"
-	"android_vision_scripter/internal/filesdb"
 	"android_vision_scripter/pkg/core/file"
 	"android_vision_scripter/pkg/models"
 	"path/filepath"
@@ -99,11 +98,9 @@ func (i *interactorImpl) ResetKeyboardKeys(
 
 	i.filesDB.DeletePathInKeyboardDir(modelOs, locale)
 	keyboardDir := i.filesDB.CreateKeyboardDir(modelOs, locale)
-	tesseractDir := i.filesDB.CreateLogsDir(serial, filesdb.TesseractDir)
 
 	return i.cv.ResetKeyboardKeys(
 		keyboardDir,
-		tesseractDir,
 		screenshot,
 		locale,
 		upperCase,

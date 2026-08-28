@@ -2,7 +2,6 @@ package usecases
 
 import (
 	"android_vision_scripter/internal/cv"
-	"android_vision_scripter/internal/filesdb"
 	"strings"
 
 	"gocv.io/x/gocv"
@@ -20,11 +19,6 @@ func (i *interactorImpl) FindText(
 ) []cv.OCRResult {
 	text = strings.TrimSpace(text)
 	if text == "" {
-		return []cv.OCRResult{}
-	}
-
-	dir := i.filesDB.CreateLogsDir(serial, filesdb.TesseractDir)
-	if dir == "" {
 		return []cv.OCRResult{}
 	}
 
@@ -46,7 +40,7 @@ func (i *interactorImpl) FindText(
 		cv.OemText,
 	)
 
-	result, err := i.cv.FindTextRectangles(&img, dir, ocrParams)
+	result, err := i.cv.FindTextRectangles(&img, ocrParams)
 	if err != nil {
 		i.logger.Error(err.Error())
 		return []cv.OCRResult{}

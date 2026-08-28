@@ -28,7 +28,7 @@ func TestConnectToServer(t *testing.T) {
 	var fileDB = filesdb.New(config.FilesProps)
 	logAPI := logger.New(logger.INFO, true)
 	var cmdAPI = bashcmd.New(fileDB, logAPI)
-	var cvAPI = cv.New(cmdAPI, logAPI)
+	var cvAPI = cv.New(logAPI)
 	var scrcpyAPI = scrcpy.New(cmdAPI, cvAPI, fileDB, config.ScrcpyProps, logAPI)
 
 	var wg sync.WaitGroup
