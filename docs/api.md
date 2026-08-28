@@ -32,9 +32,7 @@ This document describes every HTTP endpoint exposed by the server, defined in
 | ------ | ---- | ----------- |
 | GET | `/ping` | Health check |
 | GET | `/devices` | List connected ADB devices |
-| GET | `/devices/{serial}/screenshot` | Take an ADB screenshot, optionally with detected UI rectangles |
 | POST | `/run_steps` | Queue one or more steps to run in order on a device |
-| GET | `/devices/{serial}/find_text` | OCR: locate text on the current screen |
 | GET | `/library` | List image and action names in the library |
 | POST | `/save_image` | Crop and save a named template image into the library |
 | POST | `/save_action` | Save a named recorded gesture into the library |
@@ -85,33 +83,6 @@ Returns all ADB devices currently visible to the server.
   }
   ```
   `devices` is `[]` when none are connected.
-
-### `GET /devices/{serial}/screenshot`
-
-Takes a screenshot over ADB and returns it as multipart form data.
-
-- **Path params:** `serial` (required).
-- **Query params:** `rectangles` — `true` to also run UI rectangle detection
-  (`FindAllRectangles`) on the screenshot.
-- **Response `200`:** multipart form with an `image` file field (the
-  screenshot) and, when `rectangles=true`, a `rectangles` field holding a JSON
-  array of [`Rectangle`](#rectangle) (`[]` when nothing was detected).
-- **Errors:** `400` if `serial` is empty, `500` when the screenshot could not
-  be taken.
-
-### `GET /devices/{serial}/find_text`
-
-Takes a screenshot and runs OCR to locate matching text on the current screen.
-
-- **Path params:** `serial` (required).
-- **Query params:**
-  - `text` — text to search for.
-  - `locale` — OCR language/locale.
-- **Response `200`:** array of [`OCRResult`](#ocrresult).
-  ```json
-  [{ "text": "Login", "rectangle": { "left_x": 40, "right_x": 220, "top_y": 900, "bottom_y": 980 } }]
-  ```
-- **Errors:** `400` if `serial` is empty.
 
 ## Steps
 

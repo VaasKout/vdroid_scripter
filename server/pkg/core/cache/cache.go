@@ -9,7 +9,6 @@ import (
 type Cache[V any] interface {
 	Add(key string, value V)
 	Get(key string) (V, bool)
-	Update(key string, modify func(V) V) bool
 	Delete(key string)
 	GetMap() map[string]V
 	GetDataArray() []V
@@ -48,17 +47,6 @@ func (c *SafeCache[V]) Get(key string) (V, bool) {
 	defer c.mu.Unlock()
 	val, ok := c.store[key]
 	return val, ok
-}
-
-func (c *SafeCache[V]) Update(key string, modify func(V) V) bool {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	value, ok := c.store[key]
-	if !ok {
-		return false
-	}
-	c.store[key] = modify(value)
-	return true
 }
 
 // GetMap ...

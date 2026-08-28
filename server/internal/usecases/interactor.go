@@ -29,7 +29,6 @@ type Interactor interface {
 	ScanUseCase
 	RouteUseCase
 	StepsUseCase
-	OcrUseCase
 }
 
 type interactorImpl struct {

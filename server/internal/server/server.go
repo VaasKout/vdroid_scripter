@@ -5,28 +5,15 @@ import (
 	"android_vision_scripter/config"
 	"android_vision_scripter/internal/usecases"
 	"android_vision_scripter/pkg/logger"
-	"android_vision_scripter/pkg/models"
-	"bytes"
 	"encoding/json"
 	"fmt"
-	"io"
-	"mime/multipart"
 	"net/http"
-	"os"
-	"path/filepath"
 )
 
 // Query keys
 const (
-	SerialKey     = "serial"
-	NameKey       = "name"
-	RectanglesKey = "rectangles"
-)
-
-// Multipart consts
-const (
-	ImagesFormField     = "image"
-	RectanglesFormField = "rectangles"
+	SerialKey = "serial"
+	NameKey   = "name"
 )
 
 // ANSI colors for terminal logs
@@ -83,42 +70,6 @@ func (s *serverImpl) sendStatusOk(w http.ResponseWriter) {
 	}
 	s.setHeaders(w)
 	json.NewEncoder(w).Encode(response)
-}
-
-func (s *serverImpl) handleScreenshotResponse(
-	w http.ResponseWriter,
-	imagePath string,
-	rectangles []models.Rectangle,
-) {
-	imgFile, err := os.Open(imagePath)
-	if err != nil {
-		http.Error(w, "cannot open image", http.StatusInternalServerError)
-		return
-	}
-	defer imgFile.Close()
-
-	var buffer bytes.Buffer
-	writer := multipart.NewWriter(&buffer)
-
-	part, err := writer.CreateFormFile(ImagesFormField, filepath.Base(imagePath))
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	io.Copy(part, imgFile)
-
-	if rectangles != nil {
-		field, err := writer.CreateFormField(RectanglesFormField)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		json.NewEncoder(field).Encode(rectangles)
-	}
-
-	writer.Close()
-	w.Header().Set("Content-Type", writer.FormDataContentType())
-	w.Write(buffer.Bytes())
 }
 
 func (s *serverImpl) setHeaders(w http.ResponseWriter) {

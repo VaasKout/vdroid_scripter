@@ -131,43 +131,45 @@ func (i *interactorImpl) GetSessionStatus(serial string) string {
 }
 
 func (i *interactorImpl) addStepsToQueue(serial string, steps []models.Step) bool {
-	return i.sessionsCache.Update(serial, func(session models.Session) models.Session {
-		session.Query = append(session.Query, steps...)
-		return session
-	})
+	session, ok := i.sessionsCache.Get(serial)
+	if !ok {
+		return false
+	}
+	session.Query = append(session.Query, steps...)
+	i.sessionsCache.Add(serial, session)
+	return true
 }
 
 func (i *interactorImpl) popNextStep(serial string) (models.Step, bool) {
-	var step models.Step
-	var found bool
-	i.sessionsCache.Update(serial, func(session models.Session) models.Session {
-		if len(session.Query) == 0 {
-			return session
-		}
-		step = session.Query[0]
-		session.Query = session.Query[1:]
-		session.Status = fmt.Sprintf(models.StatusRunningStep, step.ToString())
-		found = true
-		return session
-	})
-	return step, found
+	session, ok := i.sessionsCache.Get(serial)
+	if !ok || len(session.Query) == 0 {
+		return models.Step{}, false
+	}
+
+	step := session.Query[0]
+	session.Query = session.Query[1:]
+	session.Status = fmt.Sprintf(models.StatusRunningStep, step.ToString())
+	i.sessionsCache.Add(serial, session)
+	return step, true
 }
 
 func (i *interactorImpl) failSessionQueue(serial string, err error) {
-	i.sessionsCache.Update(serial, func(session models.Session) models.Session {
-		session.Status = err.Error()
-		session.Query = nil
-		return session
-	})
+	session, ok := i.sessionsCache.Get(serial)
+	if !ok {
+		return
+	}
+	session.Status = err.Error()
+	session.Query = nil
+	i.sessionsCache.Add(serial, session)
 }
 
 func (i *interactorImpl) finishSessionStep(serial string) {
-	i.sessionsCache.Update(serial, func(session models.Session) models.Session {
-		if len(session.Query) == 0 {
-			session.Status = models.StatusIdle
-		}
-		return session
-	})
+	session, ok := i.sessionsCache.Get(serial)
+	if !ok || len(session.Query) != 0 {
+		return
+	}
+	session.Status = models.StatusIdle
+	i.sessionsCache.Add(serial, session)
 }
 
 func (i *interactorImpl) runSessionQueue(serial string) {
@@ -186,7 +188,7 @@ func (i *interactorImpl) runSessionQueue(serial string) {
 
 		step, found := i.popNextStep(serial)
 		if !found {
-			time.Sleep(300 * time.Millisecond)
+			time.Sleep(100 * time.Millisecond)
 			continue
 		}
 
