@@ -209,10 +209,10 @@ func (c *cvImpl) FindTextRectangles(
 	}
 
 	edges, err := c.createEdges(img)
+	defer edges.Close()
 	if err != nil {
 		return []OCRResult{}, err
 	}
-	defer edges.Close()
 
 	words, err := tesseract.Recognize(
 		edges.ToBytes(),

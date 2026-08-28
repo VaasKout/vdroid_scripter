@@ -29,10 +29,10 @@ func (i *interactorImpl) TakeScreenshot(
 	}
 
 	img := gocv.IMRead(screenshot, gocv.IMReadColor)
+	defer img.Close()
 	if img.Empty() {
 		return "", nil, fmt.Errorf("couldn't read screenshot for %s", serial)
 	}
-	defer img.Close()
 
 	gray := gocv.NewMat()
 	defer gray.Close()

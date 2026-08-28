@@ -44,10 +44,10 @@ func (c *cvImpl) FindImages(
 	}
 
 	templateMat := gocv.IMRead(template, gocv.IMReadColor)
+	defer templateMat.Close()
 	if templateMat.Empty() {
 		return nil, errors.New("could not read template")
 	}
-	defer templateMat.Close()
 
 	result := gocv.NewMat()
 	defer result.Close()
