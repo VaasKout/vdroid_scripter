@@ -241,7 +241,7 @@ func (i *interactorImpl) writeToCVClient(
 			}
 
 			if cvMode == scrcpy.Yolo {
-				sleepUntilNextSecond()
+				sleepUntilNext(time.Second)
 			}
 		}
 	}

@@ -466,7 +466,7 @@ Closes the session: stops the scrcpy server and tears down the sockets.
 | ----- | ---- | ---- | ----- |
 | Event | `event` | string | `tap`, `long_tap`, `type_text`, a generated swipe (`swipe_up`, `swipe_down`, `swipe_left`, `swipe_right`), the name of a library event, or **empty for a visibility check** |
 | Landmarks | `landmarks` | []Landmark | omitempty; the target chain — resolved in order on one frame, each landmark found nearest to the previous one, the event applies to the **last** one. Empty only for a target-less library event replay. |
-| Timeout | `timeout` | int | omitempty; seconds to locate the landmarks before failing (default `3` when omitted or `<= 0`). The runner grabs the latest video frame and retries roughly once per second until the deadline. Session auto-open waits for the first video frame (up to ~15s) before any step runs, so startup never counts against it. |
+| Timeout | `timeout` | int | omitempty; seconds to locate the landmarks before failing (default `3` when omitted or `<= 0`). The runner grabs the latest video frame and retries roughly every 500ms until the deadline. Session auto-open waits for the first video frame (up to ~15s) before any step runs, so startup never counts against it. |
 
 ### Landmark
 

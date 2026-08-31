@@ -17,6 +17,11 @@ import (
 	"gocv.io/x/gocv"
 )
 
+// SearchRetryDelay ...
+const (
+	SearchRetryDelay = 500 * time.Millisecond
+)
+
 // StepsUseCase ...
 type StepsUseCase interface {
 	RunSteps(serial string, steps []models.Step, basePort int) error
@@ -217,11 +222,11 @@ func (i *interactorImpl) findRect(
 		mat, err := i.scrcpy.GetMatFromLastFrame(serial, true)
 		if err != nil {
 			i.logger.Error(err.Error())
-			sleepUntilNextSecond()
+			sleepUntilNext(SearchRetryDelay)
 			continue
 		}
 		if mat == nil {
-			sleepUntilNextSecond()
+			sleepUntilNext(SearchRetryDelay)
 			continue
 		}
 
@@ -230,7 +235,7 @@ func (i *interactorImpl) findRect(
 
 		if err != nil {
 			i.logger.Error(err.Error())
-			sleepUntilNextSecond()
+			sleepUntilNext(SearchRetryDelay)
 			continue
 		}
 		return foundRect, nil
@@ -336,7 +341,7 @@ attemptsLoop:
 		keyboardKeys, err := i.getKeyboardKeys(serial, text, locale)
 		if err != nil {
 			i.logger.Error(err.Error())
-			sleepUntilNextSecond()
+			sleepUntilNext(SearchRetryDelay)
 			continue attemptsLoop
 		}
 		chars := []rune(strings.ToLower(text))
@@ -360,7 +365,7 @@ attemptsLoop:
 			}
 
 			i.logger.Error(fmt.Sprintf("char %c not found", ch))
-			sleepUntilNextSecond()
+			sleepUntilNext(SearchRetryDelay)
 			continue attemptsLoop
 		}
 
@@ -440,8 +445,8 @@ func (i *interactorImpl) playEvent(
 	}
 }
 
-func sleepUntilNextSecond() {
+func sleepUntilNext(interval time.Duration) {
 	now := time.Now()
-	next := now.Truncate(time.Second).Add(time.Second)
+	next := now.Truncate(interval).Add(interval)
 	time.Sleep(next.Sub(now))
 }
