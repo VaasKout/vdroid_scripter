@@ -16,6 +16,7 @@ const (
 // Delays in milliseconds
 const (
 	DefaultDelayMs int = 1000
+	NoDelayMs      int = -1
 )
 
 // Generated event names
@@ -87,8 +88,11 @@ func (s *Step) GetTimeout() time.Duration {
 
 // GetDelay ...
 func (s *Step) GetDelay() time.Duration {
-	if s == nil || s.Delay <= 0 {
+	if s == nil || s.Delay == 0 {
 		return time.Duration(DefaultDelayMs) * time.Millisecond
+	}
+	if s.Delay < 0 {
+		return 0
 	}
 	return time.Duration(s.Delay) * time.Millisecond
 }

@@ -309,7 +309,9 @@ Loads a saved route and queues its steps on the device — exactly equivalent
 to `GET /routes/{name}` followed by `POST /devices/{serial}/run_steps` with
 the route's steps. With `start_id` the queue starts from the step carrying
 that id (inclusive), skipping everything before it — for rerunning a route
-from a known mid-flow point.
+from a known mid-flow point. The first queued step always runs with **zero
+delay** (its `delay` is overridden): a route start has no previous action
+to settle.
 
 - **Query params:** `serial` and `name` (both required); `start_id` —
   optional step id (`1..N`, stamped on save) to start from; omitted means
@@ -482,7 +484,7 @@ Closes the session: stops the scrcpy server and tears down the sockets.
 | Event | `event` | string | `tap`, `long_tap`, `type_text`, a generated swipe (`swipe_up`, `swipe_down`, `swipe_left`, `swipe_right`), the name of a library event, or **empty for a visibility check** |
 | Landmarks | `landmarks` | []Landmark | omitempty; the target chain — resolved in order on one frame, each landmark found nearest to the previous one, the event applies to the **last** one. Empty only for a target-less library event replay. |
 | Timeout | `timeout` | int | omitempty; seconds to locate the landmarks before failing (default `3` when omitted or `<= 0`). The runner grabs the latest video frame and retries back to back until the deadline. Session auto-open waits for the first video frame (up to ~15s) before any step runs, so startup never counts against it. |
-| Delay | `delay` | int | omitempty; milliseconds slept **before** the step acts (default `1000` when omitted or `<= 0`) — paces the flow and lets the previous action's screen change settle. |
+| Delay | `delay` | int | omitempty; milliseconds slept **before** the step acts (default `1000` when omitted or `0`) — paces the flow and lets the previous action's screen change settle. A negative value means **no delay** (0ms). |
 
 ### Landmark
 

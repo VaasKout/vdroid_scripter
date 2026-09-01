@@ -99,5 +99,8 @@ func (i *interactorImpl) RunRoute(serial string, name string, startID int, baseP
 			return err
 		}
 	}
+	if len(steps) > 0 {
+		steps[0].Delay = models.NoDelayMs
+	}
 	return i.RunSteps(serial, steps, basePort)
 }
