@@ -23,6 +23,7 @@ const (
 	TestLocale     = "eng"
 	TestTextFile   = "./text_template.png"
 	TestTextFile2  = "./text_template_2.png"
+	TestTextFile3  = "./text_template_3.png"
 	TestSignPhrase = "Sign In"
 )
 
@@ -35,7 +36,7 @@ func TestGetTextFromImage(t *testing.T) {
 	var cvAPI = cv.New(logAPI)
 	dir := filesDB.CreateLogsDir(TestSerial)
 
-	testImage := TestTextFile
+	testImage := TestTextFile3
 
 	img := gocv.IMRead(testImage, gocv.IMReadColor)
 	if img.Empty() {

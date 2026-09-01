@@ -21,6 +21,8 @@ const (
 	darkRegionMinAreaRatio = 0.0025
 	darkRegionMinAreaPx    = 2000.0
 	darkRegionMinFillRatio = 0.5
+	darkRegionMinContrast  = 30.0
+	darkRegionMinTextRatio = 0.005
 
 	phraseMaxGapHeights = 3
 
@@ -245,14 +247,14 @@ func (c *cvImpl) createEdges(img *gocv.Mat) (gocv.Mat, error) {
 	edges := gocv.NewMat()
 	gocv.Threshold(gray, &edges, 0, MaxThreshHold, gocv.ThresholdBinary|gocv.ThresholdOtsu)
 
-	if gocv.CountNonZero(edges)*2 < edges.Rows()*edges.Cols() {
-		gocv.BitwiseNot(edges, &edges)
-	}
-
-	err = invertDarkRegions(&edges)
+	err = rebinarizeDarkRegions(&edges, &gray)
 	if err != nil {
 		edges.Close()
 		return gocv.NewMat(), err
+	}
+
+	if gocv.CountNonZero(edges)*2 < edges.Rows()*edges.Cols() {
+		gocv.BitwiseNot(edges, &edges)
 	}
 	return edges, nil
 }
@@ -276,7 +278,7 @@ func wordsToOCRResults(words []tesseract.Word) []OCRResult {
 	return results
 }
 
-func invertDarkRegions(edges *gocv.Mat) error {
+func rebinarizeDarkRegions(edges *gocv.Mat, gray *gocv.Mat) error {
 	inverted := gocv.NewMat()
 	defer inverted.Close()
 	gocv.BitwiseNot(*edges, &inverted)
@@ -284,12 +286,12 @@ func invertDarkRegions(edges *gocv.Mat) error {
 	contours := gocv.FindContours(inverted, gocv.RetrievalExternal, gocv.ChainApproxSimple)
 	defer contours.Close()
 
-	regionMask := gocv.Zeros(edges.Rows(), edges.Cols(), gocv.MatTypeCV8UC1)
-	defer regionMask.Close()
+	invertMask := gocv.Zeros(edges.Rows(), edges.Cols(), gocv.MatTypeCV8UC1)
+	defer invertMask.Close()
 
 	minArea := max(float64(edges.Rows()*edges.Cols())*darkRegionMinAreaRatio, darkRegionMinAreaPx)
 	white := color.RGBA{R: 255, G: 255, B: 255, A: 255}
-	found := false
+	invertFound := false
 	for i := range contours.Size() {
 		rect := gocv.BoundingRect(contours.At(i))
 		bboxArea := float64(rect.Dx() * rect.Dy())
@@ -304,14 +306,22 @@ func invertDarkRegions(edges *gocv.Mat) error {
 			continue
 		}
 
-		err := gocv.DrawContours(&regionMask, contours, i, white, -1)
+		rebinarized, err := rebinarizeRegion(edges, gray, &inverted, contours, i)
 		if err != nil {
 			return err
 		}
-		found = true
+		if rebinarized {
+			continue
+		}
+
+		err = gocv.DrawContours(&invertMask, contours, i, white, -1)
+		if err != nil {
+			return err
+		}
+		invertFound = true
 	}
 
-	if !found {
+	if !invertFound {
 		return nil
 	}
 
@@ -321,7 +331,94 @@ func invertDarkRegions(edges *gocv.Mat) error {
 	if err != nil {
 		return err
 	}
-	return inverted.CopyToWithMask(edges, regionMask)
+	return inverted.CopyToWithMask(edges, invertMask)
+}
+
+func rebinarizeRegion(
+	edges *gocv.Mat,
+	gray *gocv.Mat,
+	inverted *gocv.Mat,
+	contours gocv.PointsVector,
+	index int,
+) (bool, error) {
+	contourMask := gocv.Zeros(edges.Rows(), edges.Cols(), gocv.MatTypeCV8UC1)
+	defer contourMask.Close()
+	white := color.RGBA{R: 255, G: 255, B: 255, A: 255}
+	err := gocv.DrawContours(&contourMask, contours, index, white, -1)
+	if err != nil {
+		return false, err
+	}
+
+	tightMask := gocv.NewMat()
+	defer tightMask.Close()
+	gocv.BitwiseAnd(contourMask, *inverted, &tightMask)
+
+	hist := gocv.NewMat()
+	defer hist.Close()
+	gocv.CalcHist([]gocv.Mat{*gray}, []int{0}, tightMask, &hist, []int{256}, []float64{0, 256}, false)
+
+	threshold, contrast, textRatio := histOtsuStats(&hist)
+	if contrast < darkRegionMinContrast {
+		return false, nil
+	}
+	if textRatio < darkRegionMinTextRatio || textRatio >= 0.5 {
+		return false, nil
+	}
+
+	binary := gocv.NewMat()
+	defer binary.Close()
+	gocv.Threshold(*gray, &binary, float32(threshold), MaxThreshHold, gocv.ThresholdBinary)
+	return true, binary.CopyToWithMask(edges, tightMask)
+}
+
+func histOtsuStats(hist *gocv.Mat) (int, float64, float64) {
+	bins := make([]float64, hist.Rows())
+	total := 0.0
+	weightedSum := 0.0
+	for i := range bins {
+		value := float64(hist.GetFloatAt(i, 0))
+		bins[i] = value
+		total += value
+		weightedSum += float64(i) * value
+	}
+	if total == 0 {
+		return 0, 0, 0
+	}
+
+	bestThreshold := 0
+	bestVariance := -1.0
+	weightBelow := 0.0
+	sumBelow := 0.0
+	for i, value := range bins {
+		weightBelow += value
+		if weightBelow == 0 {
+			continue
+		}
+		weightAbove := total - weightBelow
+		if weightAbove == 0 {
+			break
+		}
+		sumBelow += float64(i) * value
+		meanGap := (weightedSum-sumBelow)/weightAbove - sumBelow/weightBelow
+		variance := weightBelow * weightAbove * meanGap * meanGap
+		if variance > bestVariance {
+			bestVariance = variance
+			bestThreshold = i
+		}
+	}
+
+	weightBelow = 0
+	sumBelow = 0
+	for i, value := range bins[:bestThreshold+1] {
+		weightBelow += value
+		sumBelow += float64(i) * value
+	}
+	weightAbove := total - weightBelow
+	if weightBelow == 0 || weightAbove == 0 {
+		return bestThreshold, 0, 0
+	}
+	contrast := (weightedSum-sumBelow)/weightAbove - sumBelow/weightBelow
+	return bestThreshold, contrast, weightBelow / total
 }
 
 func filterResults(ocrArray []OCRResult, text string) []OCRResult {
