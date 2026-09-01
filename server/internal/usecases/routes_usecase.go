@@ -17,7 +17,7 @@ type RouteUseCase interface {
 	GetRoute(name string) (*models.Route, error)
 	SaveRoute(route *models.Route) error
 	DeleteRoute(name string) bool
-	RunRoute(serial string, name string, basePort int) error
+	RunRoute(serial string, name string, startID int, basePort int) error
 }
 
 func (i *interactorImpl) GetRoutes() []string {
@@ -60,6 +60,7 @@ func (i *interactorImpl) SaveRoute(route *models.Route) error {
 	if err := i.checkStepAssets(route.Steps); err != nil {
 		return err
 	}
+	route.StampStepIDs()
 
 	routesDir := i.filesDB.CreateRoutesDir()
 	if routesDir == "" {
@@ -85,10 +86,18 @@ func (i *interactorImpl) DeleteRoute(name string) bool {
 	return i.filesDB.DeleteFileByName(routesDir, strings.TrimSpace(name)+file.JSONExt)
 }
 
-func (i *interactorImpl) RunRoute(serial string, name string, basePort int) error {
+func (i *interactorImpl) RunRoute(serial string, name string, startID int, basePort int) error {
 	route, err := i.GetRoute(name)
 	if err != nil {
 		return err
 	}
-	return i.RunSteps(serial, route.Steps, basePort)
+
+	steps := route.Steps
+	if startID > 0 {
+		steps, err = route.StepsFromID(startID)
+		if err != nil {
+			return err
+		}
+	}
+	return i.RunSteps(serial, steps, basePort)
 }

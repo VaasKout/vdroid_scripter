@@ -1,6 +1,7 @@
 package server
 
 import (
+	"android_vision_scripter/pkg/core/strutils"
 	"android_vision_scripter/pkg/models"
 	"encoding/json"
 	"net/http"
@@ -11,6 +12,11 @@ const (
 	RoutesPath  = "/routes"
 	RouteByName = RoutesPath + "/{" + NameKey + "}"
 	RunRoute    = "/run_route"
+)
+
+// Route query keys
+const (
+	StartIDKey = "start_id"
 )
 
 func (s *serverImpl) handleRouteFunctions() {
@@ -107,7 +113,17 @@ func (s *serverImpl) handleRunRoute(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err := s.interactor.RunRoute(serial, name, s.serverProps.SocketPort)
+	var startID int
+	rawStartID := r.URL.Query().Get(StartIDKey)
+	if rawStartID != "" {
+		startID = strutils.ToInt(rawStartID)
+		if startID < 1 {
+			http.Error(w, "invalid start_id: "+rawStartID, http.StatusBadRequest)
+			return
+		}
+	}
+
+	err := s.interactor.RunRoute(serial, name, startID, s.serverProps.SocketPort)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

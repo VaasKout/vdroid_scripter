@@ -33,7 +33,7 @@ Locale: for text landmarks and type_text, always set the landmark's locale to th
 
 Perception: scan is the ONLY way to observe the screen — there are no screenshots and never will be. Call scan when a step failed, when the user's instruction is conditional ("if X is not visible, ..."), or when the user explicitly asks what is on screen. Never scan habitually between steps — the happy path is one queue_steps call and one wait_for_session. Pass in images the library image names plausibly related to the current app so scan reports which of them are visible; scan's landmarks are exactly what step landmarks consume — build follow-up steps from the returned type/value pairs.
 
-Routes: a route is a saved flow — a name, the user's dictation as its prompt, and the exact steps that ran to success. When the user asks to save or remember a flow as <name>, call save_route with the name, the user's dictation VERBATIM as the prompt (conditions included), and the steps that actually succeeded in order; a duplicate name overwrites. The prompt may be absent on routes saved elsewhere (the Android client saves routes without one) — treat such a route as a plain script with no recorded intent. To run a saved route: run_route, then wait_for_session once — 'idle' means the whole route succeeded. To extend a route: get_route, append the new steps, call save_route with the full list — nothing executes. If a route step fails, recover from the failure point guided by the route's prompt: scan, decide, queue the remaining steps with queue_steps — and after a recovered run ask the user whether to update the route with the steps that worked. Never create or modify routes without being asked.
+Routes: a route is a saved flow — a name, the user's dictation as its prompt, and the exact steps that ran to success. When the user asks to save or remember a flow as <name>, call save_route with the name, the user's dictation VERBATIM as the prompt (conditions included), and the steps that actually succeeded in order; a duplicate name overwrites. The prompt may be absent on routes saved elsewhere (the Android client saves routes without one) — treat such a route as a plain script with no recorded intent. To run a saved route: run_route, then wait_for_session once — 'idle' means the whole route succeeded. Saving stamps every step with an id (1..N, its position); run_route accepts an optional start_id to start mid-route from that step id — use it when the user asks to run a route from a specific point, or to rerun the unchanged remainder after a recovered failure; an id the route does not contain is an error and nothing runs. To extend a route: get_route, append the new steps, call save_route with the full list — nothing executes. If a route step fails, the error status names the failed step's id; recover from that point guided by the route's prompt: scan, decide, then either queue adjusted steps with queue_steps or, when the remaining steps need no changes, run_route with start_id of the failed step — and after a recovered run ask the user whether to update the route with the steps that worked. Never create or modify routes without being asked.
 
 Curation: library images and actions are created by the human with the Android client. There are no tools here to create them. Ask the user to add a library item ONLY when the target truly cannot be reached any other way — no readable text for a text landmark, no yolo class, no generated swipe that gets there. Never request curation for something written on the screen.
 
@@ -115,8 +115,9 @@ type routeNameInput struct {
 }
 
 type runRouteInput struct {
-	Serial string `json:"serial" jsonschema:"device serial number, get it from list_devices"`
-	Name   string `json:"name" jsonschema:"route name from get_routes"`
+	Serial  string `json:"serial" jsonschema:"device serial number, get it from list_devices"`
+	Name    string `json:"name" jsonschema:"route name from get_routes"`
+	StartID int    `json:"start_id,omitempty" jsonschema:"id of the step to start from (route steps carry ids 1..N, see get_route); omit to run the whole route; an id the route does not contain is an error and nothing runs"`
 }
 
 func (s *stepInput) describe() string {
@@ -245,9 +246,11 @@ func (s *Server) registerTools() {
 	mcp.AddTool(s.mcp, &mcp.Tool{
 		Name: "run_route",
 		Description: "Queue a saved route's steps on the device; a session opens " +
-			"automatically if none exists. Call wait_for_session once afterwards: " +
-			"'idle' means the whole route succeeded; an error status names the step " +
-			"that failed — recover from that point guided by the route's prompt.",
+			"automatically if none exists. Pass start_id to start mid-route from " +
+			"that step id (route steps carry ids 1..N); omit it to run the whole " +
+			"route. Call wait_for_session once afterwards: 'idle' means the whole " +
+			"route succeeded; an error status names the step id that failed — " +
+			"recover from that point guided by the route's prompt.",
 	}, s.handleRunRoute)
 }
 
@@ -456,7 +459,7 @@ func (s *Server) handleRunRoute(
 	if in.Serial == "" || in.Name == "" {
 		return nil, nil, fmt.Errorf("serial and name are required")
 	}
-	err := s.api.runRoute(in.Serial, in.Name)
+	err := s.api.runRoute(in.Serial, in.Name, in.StartID)
 	if err != nil {
 		return nil, nil, err
 	}

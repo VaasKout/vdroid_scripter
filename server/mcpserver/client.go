@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -127,10 +128,13 @@ func (c *apiClient) deleteRoute(name string) error {
 	return err
 }
 
-func (c *apiClient) runRoute(serial string, name string) error {
+func (c *apiClient) runRoute(serial string, name string, startID int) error {
 	var query = url.Values{}
 	query.Set("serial", serial)
 	query.Set("name", name)
+	if startID > 0 {
+		query.Set("start_id", strconv.Itoa(startID))
+	}
 
 	_, err := c.request(http.MethodGet, "/run_route?"+query.Encode(), nil)
 	return err

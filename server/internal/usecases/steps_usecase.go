@@ -100,7 +100,7 @@ func (i *interactorImpl) executeStep(serial string, step *models.Step) error {
 	time.Sleep(step.GetDelay())
 	err := i.runStepAction(serial, step)
 	if err != nil {
-		return err
+	    return fmt.Errorf("step %d: %w", step.ID, err)
 	}
 
 	i.logger.Info(fmt.Sprintf("step %s is COMPLETE ✅", step.ToString()))

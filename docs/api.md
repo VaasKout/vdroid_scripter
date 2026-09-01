@@ -291,7 +291,10 @@ Saves a route, overwriting an existing one with the same name.
   ```
   `name` and a non-empty valid `steps` array are required; `prompt` is
   optional. Steps validate like `/devices/{serial}/run_steps`: referenced
-  library images and events must exist.
+  library images and events must exist. Saving stamps every step's `id`
+  with its position (`1..N`), overwriting any ids the client sent — the
+  saved file and `GET /routes/{name}` return them, and `GET /run_route`
+  addresses them via `start_id`.
 - **Response `200`:** `{ "status": "ok" }`
 - **Errors:** `400` on invalid JSON, an invalid route, or a missing asset.
 
@@ -304,13 +307,19 @@ Saves a route, overwriting an existing one with the same name.
 
 Loads a saved route and queues its steps on the device — exactly equivalent
 to `GET /routes/{name}` followed by `POST /devices/{serial}/run_steps` with
-the route's steps.
+the route's steps. With `start_id` the queue starts from the step carrying
+that id (inclusive), skipping everything before it — for rerunning a route
+from a known mid-flow point.
 
-- **Query params:** `serial` and `name` (both required).
+- **Query params:** `serial` and `name` (both required); `start_id` —
+  optional step id (`1..N`, stamped on save) to start from; omitted means
+  the whole route.
 - **Response `200`:** `{ "status": "ok" }` — the steps were queued. Track the
   outcome via [`GET /devices/{serial}/session`](#get-devicesserialsession).
-- **Errors:** `400` if a query is missing, `500` when the route doesn't
-  exist, a referenced asset is gone, or the session couldn't be started.
+- **Errors:** `400` if a query is missing or `start_id` is not a positive
+  integer, `500` when the route doesn't exist, no step carries the given
+  `start_id` (nothing is queued), a referenced asset is gone, or the
+  session couldn't be started.
 
 ## Keyboard
 
@@ -407,6 +416,11 @@ Returns the session's status.
     the last queued step failed; the queue was cleared. The error stays until
     the next step is queued.
 
+  Steps carrying an `id` (route steps do) are prefixed with it in both
+  forms — `running step 3: tap on image catalog_cart_icon`,
+  `step 3: unable to find ...` — so a failed route run can be retried with
+  [`GET /run_route`](#get-run_route)`?start_id=3`.
+
 ### `DELETE /devices/{serial}/session`
 
 Closes the session: stops the scrcpy server and tears down the sockets.
@@ -464,6 +478,7 @@ Closes the session: stops the scrcpy server and tears down the sockets.
 
 | Field | JSON | Type | Notes |
 | ----- | ---- | ---- | ----- |
+| ID | `id` | int | omitempty; stamped automatically when a route is saved (position in the route, `1..N`) — addressable via [`GET /run_route`](#get-run_route)'s `start_id` and shown in session statuses (`running step 3: ...`). Ignored by validation; steps sent to `run_steps` normally omit it. |
 | Event | `event` | string | `tap`, `long_tap`, `type_text`, a generated swipe (`swipe_up`, `swipe_down`, `swipe_left`, `swipe_right`), the name of a library event, or **empty for a visibility check** |
 | Landmarks | `landmarks` | []Landmark | omitempty; the target chain — resolved in order on one frame, each landmark found nearest to the previous one, the event applies to the **last** one. Empty only for a target-less library event replay. |
 | Timeout | `timeout` | int | omitempty; seconds to locate the landmarks before failing (default `3` when omitted or `<= 0`). The runner grabs the latest video frame and retries back to back until the deadline. Session auto-open waits for the first video frame (up to ~15s) before any step runs, so startup never counts against it. |

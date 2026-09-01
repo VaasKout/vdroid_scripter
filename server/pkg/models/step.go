@@ -70,6 +70,7 @@ func (l *Landmark) ToString() string {
 
 // Step ...
 type Step struct {
+	ID        int        `json:"id,omitempty"`
 	Event     string     `json:"event"`
 	Landmarks []Landmark `json:"landmarks,omitempty"`
 	Timeout   int        `json:"timeout,omitempty"`
@@ -196,6 +197,10 @@ func (s *Step) ToString() string {
 	if s == nil {
 		return ""
 	}
+	return fmt.Sprintf("step %d: %s", s.ID, s.description())
+}
+
+func (s *Step) description() string {
 	if s.IsCheckEvent() {
 		return fmt.Sprintf("check on %s", s.LandmarksToString())
 	}
