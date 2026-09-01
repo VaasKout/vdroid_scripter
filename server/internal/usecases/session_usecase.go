@@ -200,6 +200,5 @@ func (i *interactorImpl) runSessionQueue(serial string) {
 		}
 
 		i.finishSessionStep(serial)
-		time.Sleep(300 * time.Millisecond)
 	}
 }

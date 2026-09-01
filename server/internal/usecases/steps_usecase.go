@@ -17,11 +17,6 @@ import (
 	"gocv.io/x/gocv"
 )
 
-// SearchRetryDelay ...
-const (
-	SearchRetryDelay = 500 * time.Millisecond
-)
-
 // StepsUseCase ...
 type StepsUseCase interface {
 	RunSteps(serial string, steps []models.Step, basePort int) error
@@ -102,6 +97,7 @@ func (i *interactorImpl) executeStep(serial string, step *models.Step) error {
 
 	i.logger.Info(fmt.Sprintf("running step %s... ⏳", step.ToString()))
 
+	time.Sleep(step.GetDelay())
 	err := i.runStepAction(serial, step)
 	if err != nil {
 		return err
@@ -148,7 +144,6 @@ func (i *interactorImpl) playGeneratedSwipe(serial string, step *models.Step) er
 
 	events := models.GenerateSwipeEvents(step.Event, width, height)
 	i.playEvent(serial, foundRect, events)
-	time.Sleep(300 * time.Millisecond)
 	return nil
 }
 
@@ -205,7 +200,6 @@ func (i *interactorImpl) playCustomEvent(serial string, step *models.Step) error
 	}
 
 	i.playEvent(serial, foundRect, action.Events)
-	time.Sleep(300 * time.Millisecond) //animation delay
 	return nil
 }
 
@@ -222,11 +216,9 @@ func (i *interactorImpl) findRect(
 		mat, err := i.scrcpy.GetMatFromLastFrame(serial, true)
 		if err != nil {
 			i.logger.Error(err.Error())
-			sleepUntilNext(SearchRetryDelay)
 			continue
 		}
 		if mat == nil {
-			sleepUntilNext(SearchRetryDelay)
 			continue
 		}
 
@@ -235,7 +227,6 @@ func (i *interactorImpl) findRect(
 
 		if err != nil {
 			i.logger.Error(err.Error())
-			sleepUntilNext(SearchRetryDelay)
 			continue
 		}
 		return foundRect, nil
@@ -341,7 +332,6 @@ attemptsLoop:
 		keyboardKeys, err := i.getKeyboardKeys(serial, text, locale)
 		if err != nil {
 			i.logger.Error(err.Error())
-			sleepUntilNext(SearchRetryDelay)
 			continue attemptsLoop
 		}
 		chars := []rune(strings.ToLower(text))
@@ -365,7 +355,6 @@ attemptsLoop:
 			}
 
 			i.logger.Error(fmt.Sprintf("char %c not found", ch))
-			sleepUntilNext(SearchRetryDelay)
 			continue attemptsLoop
 		}
 

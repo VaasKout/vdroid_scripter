@@ -13,6 +13,11 @@ const (
 	FirstFrameTimeout int = 15
 )
 
+// Delays in milliseconds
+const (
+	DefaultDelayMs int = 1000
+)
+
 // Generated event names
 const (
 	TapEvent      = "tap"
@@ -68,6 +73,7 @@ type Step struct {
 	Event     string     `json:"event"`
 	Landmarks []Landmark `json:"landmarks,omitempty"`
 	Timeout   int        `json:"timeout,omitempty"`
+	Delay     int        `json:"delay,omitempty"`
 }
 
 // GetTimeout ...
@@ -76,6 +82,14 @@ func (s *Step) GetTimeout() time.Duration {
 		return time.Duration(DefaultTimeout) * time.Second
 	}
 	return time.Duration(s.Timeout) * time.Second
+}
+
+// GetDelay ...
+func (s *Step) GetDelay() time.Duration {
+	if s == nil || s.Delay <= 0 {
+		return time.Duration(DefaultDelayMs) * time.Millisecond
+	}
+	return time.Duration(s.Delay) * time.Millisecond
 }
 
 // ValidQueue ...
