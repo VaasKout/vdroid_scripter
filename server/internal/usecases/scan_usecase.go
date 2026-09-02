@@ -47,7 +47,7 @@ func (i *interactorImpl) Scan(
 		return nil, err
 	}
 
-	if err := i.ensureHeadlessSession(serial, basePort); err != nil {
+	if err := i.ensureSessionIsRunning(serial, basePort); err != nil {
 		return nil, err
 	}
 

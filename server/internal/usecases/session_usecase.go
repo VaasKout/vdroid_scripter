@@ -34,7 +34,7 @@ func (i *interactorImpl) StartSession(serial string, basePort int) bool {
 	return true
 }
 
-func (i *interactorImpl) ensureHeadlessSession(serial string, basePort int) error {
+func (i *interactorImpl) ensureSessionIsRunning(serial string, basePort int) error {
 	if _, ok := i.sessionsCache.Get(serial); ok {
 		return nil
 	}
@@ -102,9 +102,7 @@ func (i *interactorImpl) initPorts(basePort int) *models.Session {
 
 	var biggestPort = controlPort
 	for _, conn := range cacheMap {
-		if conn.ControlPort > biggestPort {
-			biggestPort = conn.ControlPort
-		}
+		biggestPort = max(conn.ControlPort, biggestPort)
 	}
 
 	serverPort := biggestPort + 1
@@ -119,6 +117,37 @@ func (i *interactorImpl) initPorts(basePort int) *models.Session {
 		ControlPort: controlPort,
 		Status:      models.StatusIdle,
 		DoneCh:      make(chan struct{}),
+	}
+}
+
+func (i *interactorImpl) runSessionQueue(serial string) {
+	defer i.logger.Info(fmt.Sprintf("queue loop closed for %s... 🛑", serial))
+	for {
+		session, ok := i.sessionsCache.Get(serial)
+		if !ok {
+			return
+		}
+
+		select {
+		case <-session.DoneCh:
+			return
+		default:
+		}
+
+		step, found := i.popNextStep(serial)
+		if !found {
+			time.Sleep(100 * time.Millisecond)
+			continue
+		}
+
+		err := i.executeStep(serial, &step)
+		if err != nil {
+			i.logger.Error(err.Error())
+			i.failSessionQueue(serial, err)
+			continue
+		}
+
+		i.finishSessionStep(serial)
 	}
 }
 
@@ -170,35 +199,4 @@ func (i *interactorImpl) finishSessionStep(serial string) {
 	}
 	session.Status = models.StatusIdle
 	i.sessionsCache.Add(serial, session)
-}
-
-func (i *interactorImpl) runSessionQueue(serial string) {
-	defer i.logger.Info(fmt.Sprintf("queue loop closed for %s... 🛑", serial))
-	for {
-		session, ok := i.sessionsCache.Get(serial)
-		if !ok {
-			return
-		}
-
-		select {
-		case <-session.DoneCh:
-			return
-		default:
-		}
-
-		step, found := i.popNextStep(serial)
-		if !found {
-			time.Sleep(100 * time.Millisecond)
-			continue
-		}
-
-		err := i.executeStep(serial, &step)
-		if err != nil {
-			i.logger.Error(err.Error())
-			i.failSessionQueue(serial, err)
-			continue
-		}
-
-		i.finishSessionStep(serial)
-	}
 }

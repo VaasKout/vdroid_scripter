@@ -20,13 +20,13 @@ const (
 	PointerIDGenericFinger uint64 = 0xFFFFFFFFFFFFFFFE
 	PressureMax            uint16 = 0xFFFF
 
-	TapDurationMinMs    = 50
-	TapDurationJitterMs = 70
+	TapDurationMinMs = 50
+	TapDurationGapMs = 70
 
-	LongTapDurationMinMs    = 700
-	LongTapDurationJitterMs = 200
+	LongTapDurationMinMs = 700
+	LongTapDurationGapMs = 200
 
-	SwipeDurationMinMs    = 300
+	SwipeDurationMinMs    = 100
 	SwipeDurationJitterMs = 200
 	SwipeMoveIntervalMs   = 12
 	SwipeLengthRatio      = 0.5
@@ -43,6 +43,18 @@ const (
 	ActionMove byte = 2
 )
 
+// Generated event names
+const (
+	TapEvent      = "tap"
+	LongTapEvent  = "long_tap"
+	TypeTextEvent = "type_text"
+
+	SwipeUpEvent    = "swipe_up"
+	SwipeDownEvent  = "swipe_down"
+	SwipeLeftEvent  = "swipe_left"
+	SwipeRightEvent = "swipe_right"
+)
+
 // Event ...
 type Event struct {
 	Time int64        `json:"time"`
@@ -54,25 +66,25 @@ type ControlBytes []byte
 
 // GenerateTapEvents ...
 func GenerateTapEvents(screenWidth int, screenHeight int) []Event {
-	upTime := int64(TapDurationMinMs + rand.IntN(TapDurationJitterMs))
-	return generateTapPair(screenWidth, screenHeight, upTime)
+	actionUpMs := int64(TapDurationMinMs + rand.IntN(TapDurationGapMs))
+	return generateTapPair(screenWidth, screenHeight, actionUpMs)
 }
 
 // GenerateLongTapEvents ...
 func GenerateLongTapEvents(screenWidth int, screenHeight int) []Event {
-	upTime := int64(LongTapDurationMinMs + rand.IntN(LongTapDurationJitterMs))
-	return generateTapPair(screenWidth, screenHeight, upTime)
+	actionUpMs := int64(LongTapDurationMinMs + rand.IntN(LongTapDurationGapMs))
+	return generateTapPair(screenWidth, screenHeight, actionUpMs)
 }
 
-func generateTapPair(screenWidth int, screenHeight int, upTime int64) []Event {
+func generateTapPair(screenWidth int, screenHeight int, actionUpMs int64) []Event {
 	return []Event{
 		{
 			Time: 0,
-			Data: generateTouchData(ActionDown, screenWidth, screenHeight, PressureMax),
+			Data: generateTouchData(ActionDown, 0, 0, screenWidth, screenHeight, PressureMax),
 		},
 		{
-			Time: upTime,
-			Data: generateTouchData(ActionUp, screenWidth, screenHeight, 0),
+			Time: actionUpMs,
+			Data: generateTouchData(ActionUp, 0, 0, screenWidth, screenHeight, 0),
 		},
 	}
 }
@@ -85,7 +97,7 @@ func GenerateSwipeEvents(direction string, screenWidth int, screenHeight int) []
 
 	events := []Event{{
 		Time: 0,
-		Data: generatePositionedTouchData(
+		Data: generateTouchData(
 			ActionDown, start.X, start.Y, screenWidth, screenHeight, PressureMax,
 		),
 	}}
@@ -95,7 +107,7 @@ func GenerateSwipeEvents(direction string, screenWidth int, screenHeight int) []
 		point := bezierPoint(start, control, end, progress)
 		events = append(events, Event{
 			Time: t,
-			Data: generatePositionedTouchData(
+			Data: generateTouchData(
 				ActionMove,
 				jitterCoord(point.X),
 				jitterCoord(point.Y),
@@ -106,7 +118,7 @@ func GenerateSwipeEvents(direction string, screenWidth int, screenHeight int) []
 
 	return append(events, Event{
 		Time: duration,
-		Data: generatePositionedTouchData(
+		Data: generateTouchData(
 			ActionUp, end.X, end.Y, screenWidth, screenHeight, 0,
 		),
 	})
@@ -185,22 +197,10 @@ func randRange(minValue int, maxValue int) int {
 	return minValue + rand.IntN(maxValue-minValue)
 }
 
-func generatePositionedTouchData(
+func generateTouchData(
 	action byte,
 	x int,
 	y int,
-	screenWidth int,
-	screenHeight int,
-	pressure uint16,
-) ControlBytes {
-	data := generateTouchData(action, screenWidth, screenHeight, pressure)
-	binary.BigEndian.PutUint32(data[10:14], uint32(x))
-	binary.BigEndian.PutUint32(data[14:18], uint32(y))
-	return data
-}
-
-func generateTouchData(
-	action byte,
 	screenWidth int,
 	screenHeight int,
 	pressure uint16,
@@ -209,6 +209,8 @@ func generateTouchData(
 	data[0] = TypeInjectTouchEvent
 	data[1] = action
 	binary.BigEndian.PutUint64(data[2:10], PointerIDGenericFinger)
+	binary.BigEndian.PutUint32(data[10:14], uint32(x))
+	binary.BigEndian.PutUint32(data[14:18], uint32(y))
 	binary.BigEndian.PutUint16(data[18:20], uint16(screenWidth))
 	binary.BigEndian.PutUint16(data[20:22], uint16(screenHeight))
 	binary.BigEndian.PutUint16(data[22:24], pressure)
@@ -248,11 +250,9 @@ func (b *ControlBytes) CountOffset(
 		return 0, 0
 	}
 
-	x := binary.BigEndian.Uint32((*b)[10:14])
-	y := binary.BigEndian.Uint32((*b)[14:18])
-
+	x, y := b.getTouchPoint()
 	randX, randY := GetRandomXY(stepZone)
-	return randX - int(x), randY - int(y)
+	return randX - x, randY - y
 }
 
 // ApplyOffset ...
@@ -261,19 +261,20 @@ func (b *ControlBytes) ApplyOffset(x, y int) {
 		return
 	}
 
-	var oldX = binary.BigEndian.Uint32((*b)[10:14])
-	var oldY = binary.BigEndian.Uint32((*b)[14:18])
+	oldX, oldY := b.getTouchPoint()
+	var xWithOffset = max(oldX+x, 0)
+	var yWithOffset = max(oldY+y, 0)
 
-	var xWithOffset = int(oldX) + x
-	if xWithOffset < 0 {
-		xWithOffset = 0
-	}
+	b.setTouchPoint(xWithOffset, yWithOffset)
+}
 
-	var yWithOffset = int(oldY) + y
-	if yWithOffset < 0 {
-		yWithOffset = 0
-	}
+func (b ControlBytes) getTouchPoint() (int, int) {
+	x := binary.BigEndian.Uint32(b[10:14])
+	y := binary.BigEndian.Uint32(b[14:18])
+	return int(x), int(y)
+}
 
-	binary.BigEndian.PutUint32((*b)[10:14], uint32(xWithOffset))
-	binary.BigEndian.PutUint32((*b)[14:18], uint32(yWithOffset))
+func (b ControlBytes) setTouchPoint(x int, y int) {
+	binary.BigEndian.PutUint32(b[10:14], uint32(x))
+	binary.BigEndian.PutUint32(b[14:18], uint32(y))
 }

@@ -39,7 +39,7 @@ func (i *interactorImpl) RunSteps(
 		return err
 	}
 
-	if err := i.ensureHeadlessSession(serial, basePort); err != nil {
+	if err := i.ensureSessionIsRunning(serial, basePort); err != nil {
 		return err
 	}
 

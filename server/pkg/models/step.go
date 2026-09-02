@@ -19,18 +19,6 @@ const (
 	NoDelayMs      int = -1
 )
 
-// Generated event names
-const (
-	TapEvent      = "tap"
-	LongTapEvent  = "long_tap"
-	TypeTextEvent = "type_text"
-
-	SwipeUpEvent    = "swipe_up"
-	SwipeDownEvent  = "swipe_down"
-	SwipeLeftEvent  = "swipe_left"
-	SwipeRightEvent = "swipe_right"
-)
-
 // Landmark types
 const (
 	Image = "image"
