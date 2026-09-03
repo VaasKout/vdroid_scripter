@@ -286,6 +286,10 @@ func rebinarizeDarkRegions(edges *gocv.Mat, gray *gocv.Mat) error {
 	contours := gocv.FindContours(inverted, gocv.RetrievalExternal, gocv.ChainApproxSimple)
 	defer contours.Close()
 
+	labels := gocv.NewMat()
+	defer labels.Close()
+	gocv.ConnectedComponents(inverted, &labels)
+
 	invertMask := gocv.Zeros(edges.Rows(), edges.Cols(), gocv.MatTypeCV8UC1)
 	defer invertMask.Close()
 
@@ -306,7 +310,7 @@ func rebinarizeDarkRegions(edges *gocv.Mat, gray *gocv.Mat) error {
 			continue
 		}
 
-		rebinarized, err := rebinarizeRegion(edges, gray, &inverted, contours, i)
+		rebinarized, err := rebinarizeRegion(edges, gray, &labels, contours, i)
 		if err != nil {
 			return err
 		}
@@ -337,25 +341,20 @@ func rebinarizeDarkRegions(edges *gocv.Mat, gray *gocv.Mat) error {
 func rebinarizeRegion(
 	edges *gocv.Mat,
 	gray *gocv.Mat,
-	inverted *gocv.Mat,
+	labels *gocv.Mat,
 	contours gocv.PointsVector,
 	index int,
 ) (bool, error) {
-	contourMask := gocv.Zeros(edges.Rows(), edges.Cols(), gocv.MatTypeCV8UC1)
-	defer contourMask.Close()
-	white := color.RGBA{R: 255, G: 255, B: 255, A: 255}
-	err := gocv.DrawContours(&contourMask, contours, index, white, -1)
-	if err != nil {
-		return false, err
-	}
+	seed := contours.At(index).At(0)
+	label := gocv.NewScalar(float64(labels.GetIntAt(seed.Y, seed.X)), 0, 0, 0)
 
-	tightMask := gocv.NewMat()
-	defer tightMask.Close()
-	gocv.BitwiseAnd(contourMask, *inverted, &tightMask)
+	regionMask := gocv.NewMat()
+	defer regionMask.Close()
+	gocv.InRangeWithScalar(*labels, label, label, &regionMask)
 
 	hist := gocv.NewMat()
 	defer hist.Close()
-	gocv.CalcHist([]gocv.Mat{*gray}, []int{0}, tightMask, &hist, []int{256}, []float64{0, 256}, false)
+	gocv.CalcHist([]gocv.Mat{*gray}, []int{0}, regionMask, &hist, []int{256}, []float64{0, 256}, false)
 
 	threshold, contrast, textRatio := histOtsuStats(&hist)
 	if contrast < darkRegionMinContrast {
@@ -368,7 +367,7 @@ func rebinarizeRegion(
 	binary := gocv.NewMat()
 	defer binary.Close()
 	gocv.Threshold(*gray, &binary, float32(threshold), MaxThreshHold, gocv.ThresholdBinary)
-	return true, binary.CopyToWithMask(edges, tightMask)
+	return true, binary.CopyToWithMask(edges, regionMask)
 }
 
 func histOtsuStats(hist *gocv.Mat) (int, float64, float64) {
