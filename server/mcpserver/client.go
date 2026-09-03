@@ -74,6 +74,7 @@ func (c *apiClient) scan(serial string, images []string, locale string) (string,
 }
 
 func (c *apiClient) queueSteps(serial string, steps []stepInput) error {
+	fillStepDefaults(steps)
 	body, err := json.Marshal(steps)
 	if err != nil {
 		return err
@@ -115,6 +116,7 @@ func (c *apiClient) getRoute(name string) (string, error) {
 }
 
 func (c *apiClient) saveRoute(route *saveRouteInput) error {
+	fillStepDefaults(route.Steps)
 	body, err := json.Marshal(route)
 	if err != nil {
 		return err
@@ -138,4 +140,25 @@ func (c *apiClient) runRoute(serial string, name string, startID int) error {
 
 	_, err := c.request(http.MethodGet, "/run_route?"+query.Encode(), nil)
 	return err
+}
+
+func fillStepDefaults(steps []stepInput) {
+	for index := range steps {
+		step := &steps[index]
+		if step.Timeout == nil {
+			step.Timeout = intPtr(defaultTimeoutMs)
+		}
+		if step.Delay != nil {
+			continue
+		}
+		if index == 0 {
+			step.Delay = intPtr(firstStepDelayMs)
+			continue
+		}
+		step.Delay = intPtr(defaultDelayMs)
+	}
+}
+
+func intPtr(value int) *int {
+	return &value
 }

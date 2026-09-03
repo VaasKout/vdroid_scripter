@@ -33,8 +33,12 @@ func (s *serverImpl) handleRunSteps(w http.ResponseWriter, r *http.Request) {
 
 	var steps []models.Step
 	err := json.NewDecoder(r.Body).Decode(&steps)
-	if err != nil || !models.ValidQueue(steps) {
-		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+	if err != nil {
+		http.Error(w, "invalid JSON: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	if !models.ValidQueue(steps) {
+		http.Error(w, "invalid steps", http.StatusBadRequest)
 		return
 	}
 

@@ -9,14 +9,7 @@ import (
 
 // Timeouts in seconds
 const (
-	DefaultTimeout    int = 3
 	FirstFrameTimeout int = 15
-)
-
-// Delays in milliseconds
-const (
-	DefaultDelayMs int = 1000
-	NoDelayMs      int = -1
 )
 
 // Landmark types
@@ -69,20 +62,25 @@ type Step struct {
 // GetTimeout ...
 func (s *Step) GetTimeout() time.Duration {
 	if s == nil || s.Timeout <= 0 {
-		return time.Duration(DefaultTimeout) * time.Second
+		return 0
 	}
-	return time.Duration(s.Timeout) * time.Second
+	return time.Duration(s.Timeout) * time.Millisecond
 }
 
 // GetDelay ...
 func (s *Step) GetDelay() time.Duration {
-	if s == nil || s.Delay == 0 {
-		return time.Duration(DefaultDelayMs) * time.Millisecond
-	}
-	if s.Delay < 0 {
+	if s == nil || s.Delay <= 0 {
 		return 0
 	}
 	return time.Duration(s.Delay) * time.Millisecond
+}
+
+// ClearStartDelay ...
+func ClearStartDelay(steps []Step) {
+	if len(steps) == 0 {
+		return
+	}
+	steps[0].Delay = 0
 }
 
 // ValidQueue ...
@@ -100,7 +98,7 @@ func ValidQueue(steps []Step) bool {
 
 // Valid ...
 func (s *Step) Valid() bool {
-	if s == nil {
+	if s == nil || s.Timeout < 0 || s.Delay < 0 {
 		return false
 	}
 	if s.IsCustomEvent() && !file.ValidName(s.Event) {

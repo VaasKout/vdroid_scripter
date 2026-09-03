@@ -212,28 +212,34 @@ func (i *interactorImpl) findRect(
 	}
 
 	deadline := time.Now().Add(step.GetTimeout())
-	for time.Now().Before(deadline) {
-		mat, err := i.scrcpy.GetMatFromLastFrame(serial, true)
-		if err != nil {
-			i.logger.Error(err.Error())
-			continue
+	for {
+		foundRect, err := i.findRectOnLastFrame(serial, step)
+		if err == nil {
+			return foundRect, nil
 		}
-		if mat == nil {
-			continue
+		i.logger.Error(err.Error())
+		if !time.Now().Before(deadline) {
+			break
 		}
-
-		foundRect, err := i.findLandmarkChain(mat, step)
-		mat.Close()
-
-		if err != nil {
-			i.logger.Error(err.Error())
-			continue
-		}
-		return foundRect, nil
 	}
 
 	last := step.LastLandmark()
 	return nil, fmt.Errorf(models.StatusError, last.Type, last.Value)
+}
+
+func (i *interactorImpl) findRectOnLastFrame(
+	serial string,
+	step *models.Step,
+) (*image.Rectangle, error) {
+	mat, err := i.scrcpy.GetMatFromLastFrame(serial, true)
+	if err != nil {
+		return nil, err
+	}
+	if mat == nil {
+		return nil, fmt.Errorf("no video frame received from %s", serial)
+	}
+	defer mat.Close()
+	return i.findLandmarkChain(mat, step)
 }
 
 func (i *interactorImpl) findLandmarkChain(
@@ -325,53 +331,67 @@ func (i *interactorImpl) typeText(
 		return fmt.Errorf("nothing to type")
 	}
 
-	typed := false
 	deadline := time.Now().Add(timeout)
-attemptsLoop:
-	for time.Now().Before(deadline) {
-		keyboardKeys, err := i.getKeyboardKeys(serial, text, locale)
-		if err != nil {
-			i.logger.Error(err.Error())
-			continue attemptsLoop
+	for {
+		keysToPress, err := i.findKeysToPress(serial, text, locale)
+		if err == nil {
+			i.pressKeys(serial, keysToPress, tapEvents)
+			return nil
 		}
-		chars := []rune(strings.ToLower(text))
-		keysToPress := make([]cv.OCRResult, len(chars))
-
-	charsLoop:
-		for index, ch := range chars {
-			for _, key := range keyboardKeys {
-				if key.Text == "" {
-					return fmt.Errorf("empty keyboard key")
-				}
-
-				if []rune(key.Text)[0] == ch {
-					keysToPress[index] = key
-					continue charsLoop
-				}
-				if key.Text == cv.Space && unicode.IsSpace(ch) {
-					keysToPress[index] = key
-					continue charsLoop
-				}
-			}
-
-			i.logger.Error(fmt.Sprintf("char %c not found", ch))
-			continue attemptsLoop
+		i.logger.Error(err.Error())
+		if !time.Now().Before(deadline) {
+			return fmt.Errorf("unable to type %q", text)
 		}
+	}
+}
 
-		for _, key := range keysToPress {
-			var imgRect = key.Rectangle.ToImageRectangle()
-			i.playEvent(serial, imgRect, tapEvents)
-			time.Sleep(numutils.RandDelay(100, 300) * time.Millisecond)
-		}
-
-		typed = true
-		break
+func (i *interactorImpl) findKeysToPress(
+	serial string,
+	text string,
+	locale string,
+) ([]cv.OCRResult, error) {
+	keyboardKeys, err := i.getKeyboardKeys(serial, text, locale)
+	if err != nil {
+		return nil, err
 	}
 
-	if !typed {
-		return fmt.Errorf("unable to type %q", text)
+	chars := []rune(strings.ToLower(text))
+	keysToPress := make([]cv.OCRResult, len(chars))
+	for index, ch := range chars {
+		key, found := findKeyboardKey(keyboardKeys, ch)
+		if !found {
+			return nil, fmt.Errorf("char %c not found", ch)
+		}
+		keysToPress[index] = key
 	}
-	return nil
+	return keysToPress, nil
+}
+
+func findKeyboardKey(keys []cv.OCRResult, ch rune) (cv.OCRResult, bool) {
+	for _, key := range keys {
+		if key.Text == "" {
+			continue
+		}
+		if []rune(key.Text)[0] == ch {
+			return key, true
+		}
+		if key.Text == cv.Space && unicode.IsSpace(ch) {
+			return key, true
+		}
+	}
+	return cv.OCRResult{}, false
+}
+
+func (i *interactorImpl) pressKeys(
+	serial string,
+	keys []cv.OCRResult,
+	tapEvents []models.Event,
+) {
+	for _, key := range keys {
+		var imgRect = key.Rectangle.ToImageRectangle()
+		i.playEvent(serial, imgRect, tapEvents)
+		time.Sleep(numutils.RandDelay(100, 300) * time.Millisecond)
+	}
 }
 
 func (i *interactorImpl) getKeyboardKeys(

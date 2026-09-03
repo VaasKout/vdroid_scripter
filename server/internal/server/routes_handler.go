@@ -83,7 +83,7 @@ func (s *serverImpl) handleSaveRoute(w http.ResponseWriter, r *http.Request) {
 	var route = &models.Route{}
 	err := json.NewDecoder(r.Body).Decode(route)
 	if err != nil {
-		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		http.Error(w, "invalid JSON: "+err.Error(), http.StatusBadRequest)
 		return
 	}
 
