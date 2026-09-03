@@ -125,20 +125,24 @@ status and clears the remaining queue.
 - **Request body:** a JSON array of steps.
   ```json
   [
-    { "landmarks": [{ "type": "yolo", "value": "home" }] },
-    { "event": "tap", "landmarks": [{ "type": "image", "value": "catalog_cart_icon" }] },
-    { "event": "swipe_catalog_1" },
-    { "event": "tap", "landmarks": [{ "type": "text", "value": "Potato", "locale": "eng" }], "timeout": 10 },
-    { "event": "tap", "landmarks": [{ "type": "text", "value": "Show refresh rate" }, { "type": "image", "value": "toggle" }] },
-    { "event": "type_text", "landmarks": [{ "type": "text", "value": "hello", "locale": "eng" }] }
+    { "landmarks": [{ "type": "yolo", "value": "home" }], "timeout": 5000, "delay": 0 },
+    { "event": "tap", "landmarks": [{ "type": "image", "value": "catalog_cart_icon" }], "timeout": 5000, "delay": 1000 },
+    { "event": "swipe_catalog_1", "timeout": 0, "delay": 1000 },
+    { "event": "tap", "landmarks": [{ "type": "text", "value": "Checkout", "locale": "eng" }], "timeout": 15000, "delay": 1000 },
+    { "event": "tap", "landmarks": [{ "type": "text", "value": "Show refresh rate" }, { "type": "image", "value": "toggle" }], "timeout": 5000, "delay": 1000 },
+    { "event": "type_text", "landmarks": [{ "type": "text", "value": "hello", "locale": "eng" }], "timeout": 5000, "delay": 1000 }
   ]
   ```
   The array must be non-empty and every entry must be a valid
-  [`Step`](#step).
+  [`Step`](#step). `timeout` and `delay` are milliseconds taken literally —
+  the server holds no defaults, and an omitted key is simply `0` (no delay /
+  one look at the current frame). Sending sensible values is the caller's
+  job.
 - **Response `200`:** `{ "status": "ok" }` — the steps were queued. Track
   execution via [`GET /devices/{serial}/session`](#get-devicesserialsession).
-- **Errors:** `400` on invalid JSON or an invalid step, `500` when a referenced
-  library image/action does not exist or the session could not be started.
+- **Errors:** `400` on invalid JSON or an invalid step; `500` when a
+  referenced library image/action does not exist or the session could not be
+  started.
 
 ## Library
 
@@ -156,7 +160,7 @@ Lists everything in the library.
 - **Response `200`:**
   ```json
   {
-    "images": ["tg_chat_send_button", "catalog_cart_icon"],
+    "images": ["chat_send_button", "catalog_cart_icon"],
     "actions": ["swipe_catalog_1", "swipe_catalog_2"]
   }
   ```
@@ -242,7 +246,7 @@ sorted in reading order (top-to-bottom, left-to-right).
   {
     "landmarks": [
       { "type": "image", "value": "catalog_cart_icon", "rectangle": { "left_x": 40, "right_x": 120, "top_y": 60, "bottom_y": 140 } },
-      { "type": "text", "value": "Каталог", "locale": "rus", "rectangle": { "left_x": 30, "right_x": 220, "top_y": 300, "bottom_y": 350 } },
+      { "type": "text", "value": "Catalog", "locale": "eng", "rectangle": { "left_x": 30, "right_x": 220, "top_y": 300, "bottom_y": 350 } },
       { "type": "yolo", "value": "button", "rectangle": { "left_x": 800, "right_x": 1040, "top_y": 2200, "bottom_y": 2320 } }
     ]
   }
@@ -266,7 +270,7 @@ names, `ValidName` rules, overwrite on the same name).
 
 ### `GET /routes`
 
-- **Response `200`:** `{ "routes": ["x5_buy_corn", "x5_enter"] }` — sorted,
+- **Response `200`:** `{ "routes": ["shop_add_to_cart", "shop_login"] }` — sorted,
   `[]` when none are saved.
 
 ### `GET /routes/{name}`
@@ -281,17 +285,19 @@ Saves a route, overwriting an existing one with the same name.
 - **Request body:** a [`Route`](#route):
   ```json
   {
-    "name": "x5_buy_corn",
-    "prompt": "open the app, if 'login' is visible log in first, then open catalog and ...",
+    "name": "shop_add_to_cart",
+    "prompt": "open the shop app, if 'Log in' is visible sign in first, then open the catalog and add the first item to the cart",
     "steps": [
-      { "event": "tap", "landmarks": [{ "type": "image", "value": "x5_app_icon" }] },
-      { "event": "tap", "landmarks": [{ "type": "text", "value": "Каталог", "locale": "rus" }] }
+      { "event": "tap", "landmarks": [{ "type": "image", "value": "shop_app_icon" }], "timeout": 5000, "delay": 0 },
+      { "event": "tap", "landmarks": [{ "type": "text", "value": "Catalog", "locale": "eng" }], "timeout": 5000, "delay": 1000 }
     ]
   }
   ```
   `name` and a non-empty valid `steps` array are required; `prompt` is
   optional. Steps validate like `/devices/{serial}/run_steps`: referenced
-  library images and events must exist. Saving stamps every step's `id`
+  library images and events must exist. `timeout` and `delay` are stored
+  exactly as sent (an omitted key is `0`; the server never fills defaults).
+  Saving stamps every step's `id`
   with its position (`1..N`), overwriting any ids the client sent — the
   saved file and `GET /routes/{name}` return them, and `GET /run_route`
   addresses them via `start_id`.
@@ -309,9 +315,9 @@ Loads a saved route and queues its steps on the device — exactly equivalent
 to `GET /routes/{name}` followed by `POST /devices/{serial}/run_steps` with
 the route's steps. With `start_id` the queue starts from the step carrying
 that id (inclusive), skipping everything before it — for rerunning a route
-from a known mid-flow point. The first queued step always runs with **zero
-delay** (its `delay` is overridden): a route start has no previous action
-to settle.
+from a known mid-flow point. Whichever step the run starts from gets
+`delay: 0`, overriding the stored value: a route start has no previous
+action to settle.
 
 - **Query params:** `serial` and `name` (both required); `start_id` —
   optional step id (`1..N`, stamped on save) to start from; omitted means
@@ -474,7 +480,8 @@ Closes the session: stops the scrcpy server and tears down the sockets.
     { "type": "text", "value": "Show refresh rate", "locale": "eng" },
     { "type": "image", "value": "toggle" }
   ],
-  "timeout": 15
+  "timeout": 15000,
+  "delay": 1000
 }
 ```
 
@@ -483,8 +490,8 @@ Closes the session: stops the scrcpy server and tears down the sockets.
 | ID | `id` | int | omitempty; stamped automatically when a route is saved (position in the route, `1..N`) — addressable via [`GET /run_route`](#get-run_route)'s `start_id` and shown in session statuses (`running step 3: ...`). Ignored by validation; steps sent to `run_steps` normally omit it. |
 | Event | `event` | string | `tap`, `long_tap`, `type_text`, a generated swipe (`swipe_up`, `swipe_down`, `swipe_left`, `swipe_right`), the name of a library event, or **empty for a visibility check** |
 | Landmarks | `landmarks` | []Landmark | omitempty; the target chain — resolved in order on one frame, each landmark found nearest to the previous one, the event applies to the **last** one. Empty only for a target-less library event replay. |
-| Timeout | `timeout` | int | omitempty; seconds to locate the landmarks before failing (default `3` when omitted or `<= 0`). The runner grabs the latest video frame and retries back to back until the deadline. Session auto-open waits for the first video frame (up to ~15s) before any step runs, so startup never counts against it. |
-| Delay | `delay` | int | omitempty; milliseconds slept **before** the step acts (default `1000` when omitted or `0`) — paces the flow and lets the previous action's screen change settle. A negative value means **no delay** (0ms). |
+| Timeout | `timeout` | int | omitempty; milliseconds to locate the landmarks before failing — taken literally, no default: omitted or `0` means **one look** at the current frame, no waiting; otherwise the runner grabs the latest video frame and retries back to back until the deadline. Session auto-open waits for the first video frame (up to ~15s) before any step runs, so startup never counts against it. |
+| Delay | `delay` | int | omitempty; milliseconds slept **before** the step acts — paces the flow and lets the previous action's screen change settle; taken literally, no default: omitted or `0` means **no delay**. |
 
 ### Landmark
 

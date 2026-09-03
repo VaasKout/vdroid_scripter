@@ -23,7 +23,7 @@ const (
 
 const serverInstructions = `vdroid-scripter drives Android devices with CV-located steps composed from a human-curated library.
 
-Workflow: list_devices for a serial, get_routes for saved flows, then queue steps and wait for the outcome. Call get_library only when image targets or recorded gestures might be needed — it lists the available images (template crops) and actions (recorded gestures); library names carry their context as <app>_<screen>_<what>[_variant] — e.g. swipe_x5_catalog_1 is a swipe recorded on the Pyaterochka catalog screen, first variant.
+Workflow: list_devices for a serial, get_routes for saved flows, then queue steps and wait for the outcome. Call get_library only when image targets or recorded gestures might be needed — it lists the available images (template crops) and actions (recorded gestures); library names carry their context as <app>_<screen>_<what>[_variant] — e.g. shop_catalog_swipe_1 is a swipe recorded on a shop app's catalog screen, first variant.
 
 Text is free: text landmarks and the generated events (tap, long_tap, the swipes, type_text) need NOTHING from the library. An instruction phrased in words visible on screen ("open Settings", "enter wifi connections") is just tap steps with text landmarks — tap the matching words, drilling through the obvious screens (e.g. Settings -> Network & internet -> Wi-Fi). Only reach for the library when the target has no readable text (an icon = image landmark) or needs a recorded gesture.
 
@@ -33,7 +33,7 @@ Steps: a step is an event applied to a chain of landmarks. Each landmark is a CV
 
 Timing: every step carries two millisecond knobs, delay and timeout, and the server takes them literally — this MCP fills in whatever you omit. delay is slept BEFORE the step acts — it paces the flow and gives the previous action's screen change time to settle; omitted, it is 0 on the first step of a batch (nothing preceded it) and 1000 on every later step; 0 means no delay. timeout is how long the server keeps re-locating the target on live frames before failing — retries run back to back, and the step proceeds the moment the target shows up; omitted, it is 5000; 0 means one look at the current frame with no waiting. For a target that appears late (app launch, a navigation tap, network loading) raise timeout (10000-15000) rather than delay; use a bigger delay only when the target is visible early but not yet safe to touch (mid-animation). Keep probe/visibility checks at the default timeout so a negative answer comes back fast. Session startup never eats the step timeout — the first video frame gets its own grace period.
 
-Locale: for text landmarks and type_text, always set the landmark's locale to the Tesseract language code of its value's language. This holds for every language Tesseract supports (rus, deu, fra, jpn, ...); eng is the default. Pass the text exactly as the user wrote it, never transliterate or translate it.
+Locale: for text landmarks and type_text, always set the landmark's locale to the Tesseract language code of its value's language. This holds for every language Tesseract supports; eng is the default. Pass the text exactly as the user wrote it, never transliterate or translate it.
 
 Perception: scan is the ONLY way to observe the screen — there are no screenshots and never will be. Call scan when a step failed, when the user's instruction is conditional ("if X is not visible, ..."), or when the user explicitly asks what is on screen. Never scan habitually between steps — the happy path is one queue_steps call and one wait_for_session. Pass in images the library image names plausibly related to the current app so scan reports which of them are visible; scan's landmarks are exactly what step landmarks consume — build follow-up steps from the returned type/value pairs.
 
@@ -87,7 +87,7 @@ type waitInput struct {
 type landmarkInput struct {
 	Type   string `json:"type" jsonschema:"landmark type: image (template match of a library image), text (OCR), or yolo (detected class)"`
 	Value  string `json:"value" jsonschema:"library image name, text to find on screen, or yolo class name; for type_text the text to type"`
-	Locale string `json:"locale,omitempty" jsonschema:"for text landmarks and type_text: the Tesseract lang code matching the language of value (rus, deu, jpn, ...), default eng"`
+	Locale string `json:"locale,omitempty" jsonschema:"for text landmarks and type_text: the Tesseract lang code matching the language of value, default eng"`
 }
 
 type stepInput struct {
@@ -105,7 +105,7 @@ type queueStepsInput struct {
 type scanInput struct {
 	Serial string   `json:"serial" jsonschema:"device serial number, get it from list_devices"`
 	Images []string `json:"images,omitempty" jsonschema:"library image names to search for on the screen; pass the images plausibly related to the current app; omit for text+yolo only"`
-	Locale string   `json:"locale,omitempty" jsonschema:"Tesseract lang code for the OCR pass (rus, deu, jpn, ...), default eng"`
+	Locale string   `json:"locale,omitempty" jsonschema:"Tesseract lang code for the OCR pass, default eng"`
 }
 
 type saveRouteInput struct {
