@@ -75,6 +75,16 @@ func (s *Step) GetDelay() time.Duration {
 	return time.Duration(s.Delay) * time.Millisecond
 }
 
+// FillStepIDs ...
+func FillStepIDs(steps []Step) {
+	for index := range steps {
+		if steps[index].ID > 0 {
+			continue
+		}
+		steps[index].ID = index + 1
+	}
+}
+
 // ClearStartDelay ...
 func ClearStartDelay(steps []Step) {
 	if len(steps) == 0 {

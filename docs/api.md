@@ -424,8 +424,9 @@ Returns the session's status.
     the last queued step failed; the queue was cleared. The error stays until
     the next step is queued.
 
-  Steps carrying an `id` (route steps do) are prefixed with it in both
-  forms — `running step 3: tap on image catalog_cart_icon`,
+  Every step carries an `id` — a route's saved id, or its 1-based position
+  in the `run_steps` batch — and both forms are prefixed with it:
+  `running step 3: tap on image catalog_cart_icon`,
   `step 3: unable to find ...` — so a failed route run can be retried with
   [`GET /run_route`](#get-run_route)`?start_id=3`.
 
@@ -487,7 +488,7 @@ Closes the session: stops the scrcpy server and tears down the sockets.
 
 | Field | JSON | Type | Notes |
 | ----- | ---- | ---- | ----- |
-| ID | `id` | int | omitempty; stamped automatically when a route is saved (position in the route, `1..N`) — addressable via [`GET /run_route`](#get-run_route)'s `start_id` and shown in session statuses (`running step 3: ...`). Ignored by validation; steps sent to `run_steps` normally omit it. |
+| ID | `id` | int | omitempty; stamped automatically when a route is saved (position in the route, `1..N`, overwriting anything sent) — addressable via [`GET /run_route`](#get-run_route)'s `start_id`. `run_steps` fills a missing id with the step's 1-based position in the batch, so session statuses always name a step (`running step 3: ...`). |
 | Event | `event` | string | `tap`, `long_tap`, `type_text`, a generated swipe (`swipe_up`, `swipe_down`, `swipe_left`, `swipe_right`), the name of a library event, or **empty for a visibility check** |
 | Landmarks | `landmarks` | []Landmark | omitempty; the target chain — resolved in order on one frame, each landmark found nearest to the previous one, the event applies to the **last** one. Empty only for a target-less library event replay. |
 | Timeout | `timeout` | int | omitempty; milliseconds to locate the landmarks before failing — taken literally, no default: omitted or `0` means **one look** at the current frame, no waiting; otherwise the runner grabs the latest video frame and retries back to back until the deadline. Session auto-open waits for the first video frame (up to ~15s) before any step runs, so startup never counts against it. |

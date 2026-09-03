@@ -38,6 +38,7 @@ func (i *interactorImpl) RunSteps(
 	if err := i.checkStepAssets(steps); err != nil {
 		return err
 	}
+	models.FillStepIDs(steps)
 
 	if err := i.ensureSessionIsRunning(serial, basePort); err != nil {
 		return err
@@ -95,7 +96,7 @@ func (i *interactorImpl) executeStep(serial string, step *models.Step) error {
 		return errors.New("step is empty")
 	}
 
-	i.logger.Info(fmt.Sprintf("running step %s... ⏳", step.ToString()))
+	i.logger.Info(fmt.Sprintf("running %s... ⏳", step.ToString()))
 
 	time.Sleep(step.GetDelay())
 	err := i.runStepAction(serial, step)
@@ -103,7 +104,7 @@ func (i *interactorImpl) executeStep(serial string, step *models.Step) error {
 		return fmt.Errorf("step %d: %w", step.ID, err)
 	}
 
-	i.logger.Info(fmt.Sprintf("step %s is COMPLETE ✅", step.ToString()))
+	i.logger.Info(fmt.Sprintf("%s is COMPLETE ✅", step.ToString()))
 	return nil
 }
 
