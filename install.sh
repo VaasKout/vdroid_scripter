@@ -118,7 +118,7 @@ install_apt() {
     golang-go adb ffmpeg pkg-config \
     libopencv-dev \
     libavcodec-dev libavutil-dev \
-    tesseract-ocr libtesseract-dev tesseract-ocr-eng tesseract-ocr-rus
+    tesseract-ocr libtesseract-dev libleptonica-dev tesseract-ocr-eng tesseract-ocr-rus
 }
 
 install_dnf() {
@@ -126,7 +126,7 @@ install_dnf() {
     golang android-tools ffmpeg-free pkgconf-pkg-config \
     opencv-devel \
     libavcodec-free-devel libavutil-free-devel \
-    tesseract tesseract-devel tesseract-langpack-eng tesseract-langpack-rus
+    tesseract tesseract-devel leptonica-devel tesseract-langpack-eng tesseract-langpack-rus
 }
 
 require_go() {
