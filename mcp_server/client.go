@@ -14,24 +14,30 @@ import (
 )
 
 type apiClient struct {
-	baseURL string
-	client  *http.Client
-	startMu sync.Mutex
+	baseURL    string
+	client     *http.Client
+	pingClient *http.Client
+	startMu    sync.Mutex
 }
 
 func newAPIClient(baseURL string) *apiClient {
 	return &apiClient{
-		baseURL: baseURL,
-		client:  &http.Client{Timeout: 30 * time.Second},
+		baseURL:    baseURL,
+		client:     &http.Client{Timeout: 30 * time.Second},
+		pingClient: &http.Client{Timeout: pingTimeout},
 	}
 }
 
 func (c *apiClient) request(method string, path string, reqBody io.Reader) ([]byte, error) {
 	body, err := c.send(method, path, reqBody)
-	if !isConnectionRefused(err) {
-		return body, err
+	if err == nil {
+		return body, nil
 	}
-	if err := c.startServer(); err != nil {
+	started, recoverErr := c.recoverServer()
+	if recoverErr != nil {
+		return nil, recoverErr
+	}
+	if !started {
 		return nil, err
 	}
 	if err := rewind(reqBody); err != nil {

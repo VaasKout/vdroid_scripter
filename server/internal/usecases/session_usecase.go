@@ -10,6 +10,7 @@ import (
 type SessionUseCase interface {
 	StartSession(serial string, basePort int) bool
 	CloseSession(serial string)
+	CloseAllSessions()
 	GetPortsJSON(serial string) map[string]string
 	GetSessionStatus(serial string) string
 }
@@ -70,6 +71,12 @@ func (i *interactorImpl) CloseSession(serial string) {
 		i.sessionsCache.Delete(serial)
 	}
 	i.setScrcpyState(serial, false)
+}
+
+func (i *interactorImpl) CloseAllSessions() {
+	for serial := range i.sessionsCache.GetMap() {
+		i.CloseSession(serial)
+	}
 }
 
 func (i *interactorImpl) GetPortsJSON(serial string) map[string]string {

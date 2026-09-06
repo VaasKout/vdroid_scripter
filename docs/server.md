@@ -96,15 +96,24 @@ claude mcp add vdroid -- <path>/vdroid-mcp
 The MCP server talks to a running vdroid server at the URL from the
 `VDROID_URL` env var (default `http://127.0.0.1:8080`).
 
-The MCP server also **starts `vdroid-scripter` on demand**: when a request is
-refused and the URL is local (`localhost`/`127.0.0.1`), it launches the binary
+The MCP server also **starts `vdroid-scripter` on demand**: when any request
+fails it checks `GET /ping` first; a healthy ping means the original error was
+genuine and is returned, a non-vdroid answer is reported as a port conflict,
+and when nothing answers at a local URL (`localhost`/`127.0.0.1`) it launches the binary
 (from `VDROID_BIN`, else `vdroid-scripter` on `PATH`, else `/usr/local/bin` or
 `/opt/homebrew/bin`) as a detached process, appends its output to
 `~/Library/Caches/vdroid_scripter/logs/server.log` (macOS; `~/.cache/...` on
-Linux), waits up to 15 s for `/ping`, and retries the request. The `ping` tool exposes
+Linux), polls `/ping` once a second for up to 15 s, then gives adb device discovery up
+to 10 s more to report at least one device, and retries the request once; if
+nothing answers in time the tool returns an error naming the binary, the URL
+and the log file. The `ping` tool exposes
 the same check explicitly so the AI can start a session with it. The server keeps
 running after the AI session ends, so later sessions find it already up. A
-remote `VDROID_URL` is never auto-started.
+remote `VDROID_URL` is never auto-started. To stop it, ask the AI to stop the
+server (the `stop_server` tool sends SIGTERM to the local `vdroid-scripter`
+process — there is deliberately no HTTP shutdown endpoint, since the API is
+unauthenticated) or `pkill vdroid-scripter`; either way the server closes every
+device session before exiting.
 
 ### API Reference
 

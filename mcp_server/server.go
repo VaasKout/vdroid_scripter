@@ -23,7 +23,7 @@ const (
 
 const serverInstructions = `vdroid-scripter drives Android devices with CV-located steps composed from a human-curated library.
 
-Workflow: ping first (it starts the vdroid server when needed and waits for it), then list_devices for a serial, get_routes for saved flows, then queue steps and wait for the outcome. Call get_library only when image targets or recorded gestures might be needed — it lists the available images (template crops) and actions (recorded gestures); library names carry their context as <app>_<screen>_<what>[_variant] — e.g. shop_catalog_swipe_1 is a swipe recorded on a shop app's catalog screen, first variant.
+Workflow: ping first (it starts the vdroid server when needed and waits for it), then list_devices for a serial, get_routes for saved flows, then queue steps and wait for the outcome. Call get_library only when image targets or recorded gestures might be needed — it lists the available images (template crops) and actions (recorded gestures); library names carry their context as <app>_<screen>_<what>[_variant] — e.g. shop_catalog_swipe_1 is a swipe recorded on a shop app's catalog screen, first variant. stop_server shuts the whole vdroid server process down (every device session closes) — only when the user explicitly asks to stop or restart it; the next tool call starts it again on demand.
 
 Text is free: text landmarks and the generated events (tap, long_tap, the swipes, type_text) need NOTHING from the library. An instruction phrased in words visible on screen ("open Settings", "enter wifi connections") is just tap steps with text landmarks — tap the matching words, drilling through the obvious screens (e.g. Settings -> Network & internet -> Wi-Fi). Only reach for the library when the target has no readable text (an icon = image landmark) or needs a recorded gesture.
 
@@ -212,6 +212,14 @@ func (s *Server) registerTools() {
 	}, s.handleCloseSession)
 
 	mcp.AddTool(s.mcp, &mcp.Tool{
+		Name: "stop_server",
+		Description: "Stop the local vdroid server process (SIGTERM to vdroid-scripter " +
+			"on this machine; it closes every device session first, so screen " +
+			"capture stops on every phone). Only when the user explicitly asks to " +
+			"stop or restart the server — the next tool call starts it again on demand.",
+	}, s.handleStopServer)
+
+	mcp.AddTool(s.mcp, &mcp.Tool{
 		Name: "get_session_status",
 		Description: "Get the session status for a device. Values: 'closed' (no session), " +
 			"'idle' (session open, step queue empty — previous steps all succeeded), " +
@@ -282,6 +290,21 @@ func (s *Server) handlePing(
 		return nil, nil, err
 	}
 	return textResult("vdroid server is up at " + s.api.baseURL), nil, nil
+}
+
+func (s *Server) handleStopServer(
+	ctx context.Context,
+	req *mcp.CallToolRequest,
+	in emptyInput,
+) (*mcp.CallToolResult, any, error) {
+	stopped, err := s.api.stopServer()
+	if err != nil {
+		return nil, nil, err
+	}
+	if !stopped {
+		return textResult("vdroid server is not running"), nil, nil
+	}
+	return textResult("vdroid server stopped"), nil, nil
 }
 
 func (s *Server) handleListDevices(

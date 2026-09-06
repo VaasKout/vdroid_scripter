@@ -30,7 +30,6 @@ func (s *serverImpl) handleDeviceFunctions() {
 		}
 		http.Error(w, "use GET method", http.StatusMethodNotAllowed)
 	})
-
 }
 
 func (s *serverImpl) handleDeviceList(w http.ResponseWriter) {

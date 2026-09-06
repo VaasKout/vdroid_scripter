@@ -13,7 +13,10 @@ import (
 	"android_vision_scripter/pkg/core/network"
 	"android_vision_scripter/pkg/logger"
 	"fmt"
+	"os"
+	"os/signal"
 	"runtime"
+	"syscall"
 	"time"
 
 	// _ "net/http/pprof" uncomment for profiling
@@ -45,10 +48,20 @@ func main() {
 
 	interactor := usecases.New(cvAPI, cmdRunner, filesDB, scrcpy, yoloAPI, network, logAPI)
 	serverAPI := server.New(interactor, cfg.ServerProps, logAPI)
+	go closeSessionsOnSignal(interactor, logAPI)
 
 	// Uncomment to watch alloc space in real time
 	// go logHeap()
 	serverAPI.ListenAndServe()
+}
+
+func closeSessionsOnSignal(interactor usecases.Interactor, logAPI *logger.Logger) {
+	signals := make(chan os.Signal, 1)
+	signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM)
+	<-signals
+	logAPI.Info("shutting down, closing sessions... 🛑")
+	interactor.CloseAllSessions()
+	os.Exit(0)
 }
 
 func logHeap() {
