@@ -2,8 +2,9 @@
 package tesseract
 
 /*
-#cgo pkg-config: tesseract
+#cgo pkg-config: tesseract lept
 #include <stdlib.h>
+#include <allheaders.h>
 #include <tesseract/capi.h>
 */
 import "C"
@@ -58,6 +59,8 @@ func getEngine(lang string, oem int) (*engine, error) {
 			lang, oem,
 		)
 	}
+
+	C.setMsgSeverity(C.L_SEVERITY_NONE)
 
 	created := &engine{api: api}
 	engines[key] = created
