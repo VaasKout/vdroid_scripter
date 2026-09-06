@@ -9,12 +9,14 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
 type apiClient struct {
 	baseURL string
 	client  *http.Client
+	startMu sync.Mutex
 }
 
 func newAPIClient(baseURL string) *apiClient {
@@ -25,6 +27,29 @@ func newAPIClient(baseURL string) *apiClient {
 }
 
 func (c *apiClient) request(method string, path string, reqBody io.Reader) ([]byte, error) {
+	body, err := c.send(method, path, reqBody)
+	if !isConnectionRefused(err) {
+		return body, err
+	}
+	if err := c.startServer(); err != nil {
+		return nil, err
+	}
+	if err := rewind(reqBody); err != nil {
+		return nil, err
+	}
+	return c.send(method, path, reqBody)
+}
+
+func rewind(reqBody io.Reader) error {
+	seeker, ok := reqBody.(io.Seeker)
+	if !ok {
+		return nil
+	}
+	_, err := seeker.Seek(0, io.SeekStart)
+	return err
+}
+
+func (c *apiClient) send(method string, path string, reqBody io.Reader) ([]byte, error) {
 	req, err := http.NewRequest(method, c.baseURL+path, reqBody)
 	if err != nil {
 		return nil, err
@@ -47,6 +72,11 @@ func (c *apiClient) request(method string, path string, reqBody io.Reader) ([]by
 		return nil, fmt.Errorf("%s %s failed (%d): %s", method, path, resp.StatusCode, string(body))
 	}
 	return body, nil
+}
+
+func (c *apiClient) pingServer() error {
+	_, err := c.request(http.MethodGet, "/ping", nil)
+	return err
 }
 
 func (c *apiClient) getDevices() (string, error) {

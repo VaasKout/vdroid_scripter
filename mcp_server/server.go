@@ -23,7 +23,7 @@ const (
 
 const serverInstructions = `vdroid-scripter drives Android devices with CV-located steps composed from a human-curated library.
 
-Workflow: list_devices for a serial, get_routes for saved flows, then queue steps and wait for the outcome. Call get_library only when image targets or recorded gestures might be needed — it lists the available images (template crops) and actions (recorded gestures); library names carry their context as <app>_<screen>_<what>[_variant] — e.g. shop_catalog_swipe_1 is a swipe recorded on a shop app's catalog screen, first variant.
+Workflow: ping first (it starts the vdroid server when needed and waits for it), then list_devices for a serial, get_routes for saved flows, then queue steps and wait for the outcome. Call get_library only when image targets or recorded gestures might be needed — it lists the available images (template crops) and actions (recorded gestures); library names carry their context as <app>_<screen>_<what>[_variant] — e.g. shop_catalog_swipe_1 is a swipe recorded on a shop app's catalog screen, first variant.
 
 Text is free: text landmarks and the generated events (tap, long_tap, the swipes, type_text) need NOTHING from the library. An instruction phrased in words visible on screen ("open Settings", "enter wifi connections") is just tap steps with text landmarks — tap the matching words, drilling through the obvious screens (e.g. Settings -> Network & internet -> Wi-Fi). Only reach for the library when the target has no readable text (an icon = image landmark) or needs a recorded gesture.
 
@@ -148,9 +148,17 @@ func (s *stepInput) describe() string {
 
 func (s *Server) registerTools() {
 	mcp.AddTool(s.mcp, &mcp.Tool{
+		Name: "ping",
+		Description: "Check that the vdroid server is reachable, starting it when it is " +
+			"not (waits up to 15 seconds for it to come up). Call this first in a " +
+			"session so the startup wait is visible; every other tool also starts " +
+			"the server on demand.",
+	}, s.handlePing)
+
+	mcp.AddTool(s.mcp, &mcp.Tool{
 		Name: "list_devices",
 		Description: "List connected Android devices with their serial numbers. " +
-			"Call this first to find the serial required by every other tool.",
+			"Call this after ping to find the serial required by every other tool.",
 	}, s.handleListDevices)
 
 	mcp.AddTool(s.mcp, &mcp.Tool{
@@ -262,6 +270,18 @@ func textResult(text string) *mcp.CallToolResult {
 	return &mcp.CallToolResult{
 		Content: []mcp.Content{&mcp.TextContent{Text: text}},
 	}
+}
+
+func (s *Server) handlePing(
+	ctx context.Context,
+	req *mcp.CallToolRequest,
+	in emptyInput,
+) (*mcp.CallToolResult, any, error) {
+	err := s.api.pingServer()
+	if err != nil {
+		return nil, nil, err
+	}
+	return textResult("vdroid server is up at " + s.api.baseURL), nil, nil
 }
 
 func (s *Server) handleListDevices(

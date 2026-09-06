@@ -6,7 +6,7 @@
 
 This is a tool for remotely controlling Android devices and creating automation scripts using computer vision without requiring users to manually write code or commands.
 
-The project consists of two main components:
+The project consists of three main components:
 <br clear="left"/>
 
 * **Server**
@@ -15,10 +15,14 @@ The project consists of two main components:
 * **Client**
   An example Android application that connects to the server. The client can be **any application capable of decoding H.264 streams and handling input events (e.g., clicks, gestures)**.
 
+* **MCP Server**
+  A small Go program in `mcp_server/` that exposes the server's HTTP API as [MCP](https://modelcontextprotocol.io) tools, so an AI agent (Claude Code, opencode, ...) can drive devices with natural-language flows. It is just another client: no CV libraries, only Go — and it starts `vdroid-scripter` on demand, so no separate terminal is needed.
+
 
 ## Getting Started
 * [server](docs/server.md)
 * [android-client](docs/android_client.md)
+* [mcp-server](docs/server.md#building-the-mcp-server)
 
 ## Project Status
 

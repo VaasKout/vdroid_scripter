@@ -77,16 +77,16 @@ export PKG_CONFIG_PATH="$(brew --prefix opencv@4)/lib/pkgconfig:$(brew --prefix 
 
 ### Building the MCP Server
 
-`server/mcpserver` contains an MCP (Model Context Protocol) server that exposes
+`mcp_server` (at the repository root, its own Go module) contains an MCP (Model Context Protocol) server that exposes
 the HTTP API as tools for AI-driven flow building. It needs only Go — none of
 the CV native libraries:
 
 ```bash
-cd server && go build -o vdroid-mcp ./mcpserver
+cd mcp_server && go build -o vdroid-mcp .
 ```
 
 The `-o` flag is required: without it the default output name collides with the
-`mcpserver` directory. Register the binary with your MCP client, e.g. for
+`mcp_server` directory. Register the binary with your MCP client, e.g. for
 Claude Code:
 
 ```bash
@@ -95,6 +95,16 @@ claude mcp add vdroid -- <path>/vdroid-mcp
 
 The MCP server talks to a running vdroid server at the URL from the
 `VDROID_URL` env var (default `http://127.0.0.1:8080`).
+
+The MCP server also **starts `vdroid-scripter` on demand**: when a request is
+refused and the URL is local (`localhost`/`127.0.0.1`), it launches the binary
+(from `VDROID_BIN`, else `vdroid-scripter` on `PATH`, else `/usr/local/bin` or
+`/opt/homebrew/bin`) as a detached process, appends its output to
+`~/Library/Caches/vdroid_scripter/logs/server.log` (macOS; `~/.cache/...` on
+Linux), waits up to 15 s for `/ping`, and retries the request. The `ping` tool exposes
+the same check explicitly so the AI can start a session with it. The server keeps
+running after the AI session ends, so later sessions find it already up. A
+remote `VDROID_URL` is never auto-started.
 
 ### API Reference
 
