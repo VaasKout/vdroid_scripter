@@ -25,13 +25,6 @@ const (
 	LocalTCPUrlFormat = "tcp://127.0.0.1:%d"
 )
 
-// CV type consts
-const (
-	NoCV = iota
-	CVRects
-	Yolo
-)
-
 // Attempts to establish scrcpy connection on start
 const (
 	ConnAttempts = 4

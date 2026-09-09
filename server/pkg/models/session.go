@@ -12,7 +12,6 @@ const (
 type Session struct {
 	ServerPort  int
 	VideoPort   int
-	CVPort      int
 	ControlPort int
 	Query       []Step
 	Status      string
