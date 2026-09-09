@@ -34,12 +34,9 @@ internal class LibraryInteractor @Inject constructor(
     private val coroutineScope: CoroutineScope =
         coroutineScopeFactory.createBackgroundScope("library_interactor")
 
-    private val currentState: LibraryState
-        get() = _stateFlow.value
-
-    override val uiStateFlow: SharedFlow<LibraryUiState>
-        get() = stateFlow.map(uiStateMapper::map)
-            .shareIn(coroutineScope, SharingStarted.WhileSubscribed(), replay = 1)
+    override val uiStateFlow: SharedFlow<LibraryUiState> = stateFlow
+        .map(uiStateMapper::map)
+        .shareIn(coroutineScope, SharingStarted.WhileSubscribed(), replay = 1)
 
     override val uiCommandsFlow: CommandFlow<LibraryUiCommand> = CommandFlow(coroutineScope)
 
@@ -52,17 +49,10 @@ internal class LibraryInteractor @Inject constructor(
                 )
             }
 
-            when (val result = scripterDataSource.getLibrary()) {
-                is ApiResponse.Success -> _stateFlow.update {
-                    it.copy(
-                        images = result.data.images,
-                        actions = result.data.actions,
-                    )
-                }
-
-                is ApiResponse.Error -> {
-                    uiCommandsFlow.tryEmit(LibraryUiCommand.ShowNetworkError)
-                }
+            val libraryLoaded = loadLibrary()
+            val routesLoaded = loadRoutes()
+            if (!libraryLoaded || !routesLoaded) {
+                uiCommandsFlow.tryEmit(LibraryUiCommand.ShowNetworkError)
             }
 
             if (!onStart) delay(500.milliseconds)
@@ -72,30 +62,29 @@ internal class LibraryInteractor @Inject constructor(
         }
     }
 
-    override fun onDeleteItem(type: LibraryType, name: String) {
-        _stateFlow.update {
-            it.copy(itemToDelete = LibraryState.ItemToDelete(type = type, name = name))
-        }
+    override fun onCardClicked(type: LibraryType) {
+        uiCommandsFlow.tryEmit(LibraryUiCommand.OpenList(type))
     }
 
-    override fun onDismiss() {
+    private suspend fun loadLibrary(): Boolean {
+        val result = scripterDataSource.getLibrary()
+        if (result !is ApiResponse.Success) return false
         _stateFlow.update {
-            it.copy(itemToDelete = null)
+            it.copy(
+                images = result.data.images,
+                actions = result.data.actions,
+            )
         }
+        return true
     }
 
-    override fun onConfirmDelete() {
-        val target = currentState.itemToDelete ?: return
-        coroutineScope.launch {
-            val deleted = when (target.type) {
-                LibraryType.IMAGES -> scripterDataSource.deleteImage(target.name)
-                LibraryType.ACTIONS -> scripterDataSource.deleteAction(target.name)
-            }
-
-            if (!deleted) uiCommandsFlow.tryEmit(LibraryUiCommand.ShowNetworkError)
-            onDismiss()
-            onLoadData(onStart = false)
+    private suspend fun loadRoutes(): Boolean {
+        val result = scripterDataSource.getRoutes()
+        if (result !is ApiResponse.Success) return false
+        _stateFlow.update {
+            it.copy(routes = result.data)
         }
+        return true
     }
 
     fun clear() {

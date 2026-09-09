@@ -35,8 +35,6 @@ data class AdbDevice(
 data class StreamingData(
     @SerialName("video_port")
     val videoPort: String = "",
-    @SerialName("cv_port")
-    val cvPort: String = "",
     @SerialName("control_port")
     val controlPort: String = "",
 )

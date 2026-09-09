@@ -15,9 +15,10 @@ internal class MenuPreviewUiStateHolder(state: MenuUiState) : MenuUiStateHolder 
     override fun init(serial: String) {}
     override fun onAddClicked() {}
     override fun onAddItemConfirmed(name: String, itemType: ItemType) {}
-    override fun onCvModeClicked() {}
-    override fun onTextModeClicked() {}
-    override fun onTryToFindText(text: String, locale: String) {}
+    override fun onRectanglesClicked() {}
+    override fun onRefreshRectanglesClicked() {}
+    override fun onScanClicked() {}
+    override fun onScanConfirmed(locale: String, includeImages: Boolean) {}
     override fun onKeyboardClicked() {}
     override fun onKeyboardModeClicked() {}
     override fun onEditKeyboardButtonSaved(oldKey: String, newKey: String) {}

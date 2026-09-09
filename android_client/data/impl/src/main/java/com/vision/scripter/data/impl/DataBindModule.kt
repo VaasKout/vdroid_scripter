@@ -1,7 +1,6 @@
 package com.vision.scripter.data.impl
 
 import com.vision.scripter.data.api.ControlStreamer
-import com.vision.scripter.data.api.CvStreamer
 import com.vision.scripter.data.api.ScripterDataSource
 import com.vision.scripter.data.api.VideoStreamer
 import dagger.Binds
@@ -18,9 +17,6 @@ interface DataBindModule {
 
     @Binds
     fun bindVideoStreamer(videoStreamerImpl: VideoStreamerImpl): VideoStreamer
-
-    @Binds
-    fun bindCvStreamer(cvStreamerImpl: CvStreamerImpl): CvStreamer
 
     @Binds
     fun bindControlStreamer(controlStreamerImpl: ControlStreamerImpl): ControlStreamer

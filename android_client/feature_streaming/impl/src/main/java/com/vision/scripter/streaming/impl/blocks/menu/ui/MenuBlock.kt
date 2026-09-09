@@ -11,7 +11,7 @@ import com.vision.scripter.streaming.impl.blocks.menu.state.MenuType
 import com.vision.scripter.streaming.impl.blocks.menu.ui.dialogs.AddItemDialog
 import com.vision.scripter.streaming.impl.blocks.menu.ui.dialogs.EditKeyboardDialog
 import com.vision.scripter.streaming.impl.blocks.menu.ui.dialogs.KeyboardDialog
-import com.vision.scripter.streaming.impl.blocks.menu.ui.dialogs.TextToFindDialog
+import com.vision.scripter.streaming.impl.blocks.menu.ui.dialogs.ScanDialog
 import com.vision.scripter.streaming.impl.blocks.menu.ui.menu.CustomActionMenu
 import com.vision.scripter.streaming.impl.blocks.menu.ui.menu.KeyboardMenu
 import com.vision.scripter.streaming.impl.blocks.menu.ui.menu.SelectingTemplateMenu
@@ -54,7 +54,6 @@ private fun MenuContent(
         is MenuType.SelectingCV -> {
             SelectingTemplateMenu(
                 modifier = modifier,
-                cvMode = state.menuType.localCvMode,
                 uiStateHolder = uiStateHolder,
             )
         }
@@ -86,9 +85,9 @@ private fun MenuContent(
             )
         }
 
-        is DialogState.Text -> {
-            TextToFindDialog(
-                onTryToFindText = uiStateHolder::onTryToFindText,
+        is DialogState.Scan -> {
+            ScanDialog(
+                onScan = uiStateHolder::onScanConfirmed,
                 onDismiss = uiStateHolder::onDialogDismissed,
             )
         }

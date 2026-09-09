@@ -55,21 +55,12 @@ internal fun DeviceItem(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                if (uiDevice.preview != null) {
-                    Image(
-                        modifier = Modifier.size(128.dp),
-                        contentScale = ContentScale.Fit,
-                        bitmap = uiDevice.preview,
-                        contentDescription = ""
-                    )
-                } else {
-                    Image(
-                        modifier = Modifier.size(128.dp),
-                        contentScale = ContentScale.Fit,
-                        imageVector = Icons.Default.PhoneIphone,
-                        contentDescription = ""
-                    )
-                }
+                Image(
+                    modifier = Modifier.size(128.dp),
+                    contentScale = ContentScale.Fit,
+                    imageVector = Icons.Default.PhoneIphone,
+                    contentDescription = ""
+                )
                 Column {
                     uiDevice.deviceParams.forEach { (key, value) ->
                         val keyWord = stringResource(key)

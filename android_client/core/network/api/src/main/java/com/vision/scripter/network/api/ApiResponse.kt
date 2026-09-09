@@ -7,5 +7,5 @@ sealed class ApiResponse<out T> {
 
 sealed class NetworkError {
     object NoUrlError : NetworkError()
-    data class ServerError(private val msg: String) : NetworkError()
+    data class ServerError(val msg: String) : NetworkError()
 }

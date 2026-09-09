@@ -16,10 +16,11 @@ interface MenuUiStateHolder {
     fun onAddClicked()
     fun onAddItemConfirmed(name: String, itemType: ItemType)
 
-    fun onCvModeClicked()
+    fun onRectanglesClicked()
+    fun onRefreshRectanglesClicked()
 
-    fun onTextModeClicked()
-    fun onTryToFindText(text: String, locale: String)
+    fun onScanClicked()
+    fun onScanConfirmed(locale: String, includeImages: Boolean)
 
     fun onKeyboardClicked()
     fun onKeyboardModeClicked()

@@ -43,7 +43,6 @@ kotlin {
 dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
-    implementation(libs.material)
 
     implementation(libs.androidx.ui)
     implementation(libs.androidx.ui.graphics)
@@ -56,7 +55,6 @@ dependencies {
     implementation(libs.androidx.activity.compose)
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.navigation.compose)
-    implementation(libs.coil3.coil.compose)
 
     implementation(libs.hilt.android)
     ksp(libs.hilt.android.compiler)

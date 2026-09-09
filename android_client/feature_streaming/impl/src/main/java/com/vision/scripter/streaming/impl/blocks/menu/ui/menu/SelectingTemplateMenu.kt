@@ -9,6 +9,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
@@ -20,13 +21,11 @@ import androidx.compose.ui.unit.dp
 import com.vision.scripter.streaming.impl.blocks.menu.ui.MenuPreviewUiStateHolder
 import com.vision.scripter.streaming.impl.blocks.menu.ui.MenuUiStateHolder
 import com.vision.scripter.streaming.impl.blocks.menu.ui.usualMenuPreviewUiState
-import com.vision.scripter.streaming.impl.screen.state.CVMode
 import com.vision.scripter.ui.customClickable
 
 @Composable
 fun SelectingTemplateMenu(
     modifier: Modifier = Modifier,
-    cvMode: CVMode,
     uiStateHolder: MenuUiStateHolder,
 ) {
     Column(
@@ -42,8 +41,8 @@ fun SelectingTemplateMenu(
         Icon(
             modifier = Modifier
                 .size(32.dp)
-                .customClickable(onClick = uiStateHolder::onCvModeClicked),
-            imageVector = detectionIcon(cvMode),
+                .customClickable(onClick = uiStateHolder::onRefreshRectanglesClicked),
+            imageVector = Icons.Filled.Refresh,
             tint = Color.Red,
             contentDescription = ""
         )
@@ -72,7 +71,6 @@ fun SelectingTemplateMenu(
 @Composable
 fun SelectingTemplateMenuPreview() {
     SelectingTemplateMenu(
-        cvMode = CVMode.CV_RECTS,
         uiStateHolder = MenuPreviewUiStateHolder(usualMenuPreviewUiState),
     )
 }

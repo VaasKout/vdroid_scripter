@@ -10,7 +10,8 @@ class VideoUiStateMapper @Inject constructor() {
     fun map(state: VideoState): VideoUiState {
         return VideoUiState(
             streamingIsLoading = state.streamingData == null,
-            rectangles = state.cvRectangles.toPersistentList(),
+            rectangles = state.overlay.rectangles.toPersistentList(),
+            scanRectangles = state.overlay.scan.toPersistentList(),
             selectedRectangles = state.selectedRectangles.toPersistentList(),
             keyboardButtons = state.keyboardButtons.toPersistentList(),
         )

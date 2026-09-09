@@ -6,16 +6,23 @@ import com.vision.scripter.data.api.models.AdbDevicesResponse
 import com.vision.scripter.data.api.models.CvRectangle
 import com.vision.scripter.data.api.models.EditKeyboardRequest
 import com.vision.scripter.data.api.models.Event
+import com.vision.scripter.data.api.models.FoundLandmark
 import com.vision.scripter.data.api.models.KeyboardButtons
+import com.vision.scripter.data.api.models.LandmarksResponse
 import com.vision.scripter.data.api.models.Library
 import com.vision.scripter.data.api.models.RectangleWithText
+import com.vision.scripter.data.api.models.RectanglesResponse
+import com.vision.scripter.data.api.models.Route
+import com.vision.scripter.data.api.models.RoutesResponse
 import com.vision.scripter.data.api.models.SaveActionRequest
 import com.vision.scripter.data.api.models.SaveImageRequest
+import com.vision.scripter.data.api.models.SessionStatus
+import com.vision.scripter.data.api.models.SessionStatusResponse
+import com.vision.scripter.data.api.models.Step
 import com.vision.scripter.data.api.models.StreamingData
 import com.vision.scripter.data.api.models.isEmpty
 import com.vision.scripter.network.api.ApiResponse
 import com.vision.scripter.network.api.NetworkClient
-import com.vision.scripter.network.api.NetworkError
 import kotlinx.serialization.json.Json
 import java.net.URLEncoder
 import javax.inject.Inject
@@ -33,20 +40,6 @@ class ScripterDataSourceImpl @Inject constructor(
                 val devices = if (json.isEmpty()) listOf()
                 else Json.decodeFromString<AdbDevicesResponse>(result.data).devices
                 ApiResponse.Success(devices)
-            }
-
-            is ApiResponse.Error -> result
-        }
-    }
-
-    override suspend fun getDevicePreview(serial: String): ApiResponse<ByteArray> {
-        return when (val result = networkClient.getMultipart("preview/$serial")) {
-            is ApiResponse.Success -> {
-                val bytesArray = result.data
-                if (bytesArray.isEmpty()) {
-                    val networkError = NetworkError.ServerError("no images")
-                    ApiResponse.Error(networkError)
-                } else ApiResponse.Success(result.data.first())
             }
 
             is ApiResponse.Error -> result
@@ -130,25 +123,6 @@ class ScripterDataSourceImpl @Inject constructor(
         return result is ApiResponse.Success
     }
 
-    override suspend fun findText(
-        serial: String,
-        text: String,
-        locale: String,
-    ): ApiResponse<List<RectangleWithText>> {
-        return when (val result = networkClient.get(
-            "/devices/$serial/find_text?text=${encodeQuery(text)}&locale=$locale",
-        )) {
-            is ApiResponse.Success -> {
-                val json = result.data
-                val ocrData = if (json.isEmpty()) listOf()
-                else Json.decodeFromString<List<RectangleWithText>>(result.data)
-                ApiResponse.Success(ocrData)
-            }
-
-            is ApiResponse.Error -> result
-        }
-    }
-
     override suspend fun resetKeyboard(
         serial: String,
         locale: String
@@ -207,6 +181,85 @@ class ScripterDataSourceImpl @Inject constructor(
             "/devices/$serial/delete_button?locale=$locale&name=${encodeQuery(name)}",
         )
         return result is ApiResponse.Success
+    }
+
+    override suspend fun getSessionStatus(serial: String): ApiResponse<SessionStatus> {
+        return networkClient.get("devices/$serial/session").decode(SessionStatus.Closed) {
+            SessionStatus.parse(Json.decodeFromString<SessionStatusResponse>(it).status)
+        }
+    }
+
+    override suspend fun closeSession(serial: String): Boolean {
+        if (serial.isEmpty()) return false
+        val result = networkClient.delete("devices/$serial/session")
+        return result is ApiResponse.Success
+    }
+
+    override suspend fun getRoutes(): ApiResponse<List<String>> {
+        return networkClient.get("routes").decode(listOf()) {
+            Json.decodeFromString<RoutesResponse>(it).routes
+        }
+    }
+
+    override suspend fun getRoute(name: String): ApiResponse<Route> {
+        return networkClient.get("routes/${encodePath(name)}").decode(Route()) {
+            Json.decodeFromString<Route>(it)
+        }
+    }
+
+    override suspend fun deleteRoute(name: String): Boolean {
+        if (name.isEmpty()) return false
+        val result = networkClient.delete("routes/${encodePath(name)}")
+        return result is ApiResponse.Success
+    }
+
+    override suspend fun runRoute(serial: String, name: String): ApiResponse<Unit> {
+        val path = "run_route?serial=${encodeQuery(serial)}&name=${encodeQuery(name)}"
+        return networkClient.get(path).ignoreBody()
+    }
+
+    override suspend fun queueSteps(serial: String, steps: List<Step>): ApiResponse<Unit> {
+        val body = Json.encodeToString(steps)
+        return networkClient.post("devices/$serial/queue_steps", body).ignoreBody()
+    }
+
+    override suspend fun scan(
+        serial: String,
+        images: List<String>,
+        locale: String,
+    ): ApiResponse<List<FoundLandmark>> {
+        val path = buildString {
+            append("devices/$serial/scan?locale=${encodeQuery(locale)}")
+            if (images.isNotEmpty()) {
+                append("&images=${encodeQuery(images.joinToString(","))}")
+            }
+        }
+        return networkClient.get(path).decode(listOf()) {
+            Json.decodeFromString<LandmarksResponse>(it).landmarks
+        }
+    }
+
+    override suspend fun getRectangles(serial: String): ApiResponse<List<CvRectangle>> {
+        return networkClient.get("devices/$serial/rectangles").decode(listOf()) {
+            Json.decodeFromString<RectanglesResponse>(it).rectangles
+        }
+    }
+
+    private inline fun <T> ApiResponse<String>.decode(
+        empty: T,
+        parse: (String) -> T,
+    ): ApiResponse<T> {
+        return when (this) {
+            is ApiResponse.Success -> ApiResponse.Success(if (data.isEmpty()) empty else parse(data))
+            is ApiResponse.Error -> this
+        }
+    }
+
+    private fun ApiResponse<String>.ignoreBody(): ApiResponse<Unit> {
+        return when (this) {
+            is ApiResponse.Success -> ApiResponse.Success(Unit)
+            is ApiResponse.Error -> this
+        }
     }
 
     private fun encodeQuery(value: String): String = URLEncoder.encode(value, "UTF-8")

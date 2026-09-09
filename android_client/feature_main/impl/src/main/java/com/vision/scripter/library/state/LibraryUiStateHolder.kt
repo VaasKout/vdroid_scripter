@@ -10,8 +10,5 @@ interface LibraryUiStateHolder {
     val uiCommandsFlow: CommandFlow<LibraryUiCommand>
 
     fun onLoadData(onStart: Boolean)
-
-    fun onDeleteItem(type: LibraryType, name: String)
-    fun onDismiss()
-    fun onConfirmDelete()
+    fun onCardClicked(type: LibraryType)
 }

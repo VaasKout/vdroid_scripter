@@ -50,11 +50,8 @@ dependencies {
 
     implementation(libs.ktor.client.cio)
     implementation(libs.ktor.ktor.client.content.negotiation)
-    implementation(libs.ktor.client.websockets)
-    implementation(libs.ktor.client.android)
     implementation(libs.ktor.client.core)
     implementation(libs.ktor.client.serialization.jvm)
-    implementation(libs.ktor.client.logging)
     implementation(libs.ktor.serialization.kotlinx.json)
 
     testImplementation(libs.junit)

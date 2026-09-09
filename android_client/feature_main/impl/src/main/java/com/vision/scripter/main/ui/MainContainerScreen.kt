@@ -3,9 +3,8 @@ package com.vision.scripter.main.ui
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Gesture
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.PhoneAndroid
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -21,16 +20,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import com.vision.scripter.devices.ui.DevicesScreen
 import com.vision.scripter.devices.ui.DevicesUiStateHolder
-import com.vision.scripter.library.state.LibraryType
 import com.vision.scripter.library.state.LibraryUiStateHolder
 import com.vision.scripter.library.ui.LibraryScreen
 import com.vision.scripter.main.impl.R
 import com.vision.scripter.main.ui.items.MainTopBar
 import com.vision.scripter.ui.ProvideSnackbarHost
 
-private const val HomeTab = 0
-private const val ImagesTab = 1
-private const val ActionsTab = 2
+private const val DevicesTab = 0
+private const val LibraryTab = 1
 
 @Composable
 internal fun MainContainerScreen(
@@ -38,7 +35,7 @@ internal fun MainContainerScreen(
     libraryUiStateHolder: LibraryUiStateHolder,
     snackbarHostState: SnackbarHostState,
 ) {
-    var selectedTab by rememberSaveable { mutableIntStateOf(HomeTab) }
+    var selectedTab by rememberSaveable { mutableIntStateOf(DevicesTab) }
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
@@ -50,51 +47,33 @@ internal fun MainContainerScreen(
         bottomBar = {
             NavigationBar {
                 NavigationBarItem(
-                    selected = selectedTab == HomeTab,
-                    onClick = { selectedTab = HomeTab },
+                    selected = selectedTab == DevicesTab,
+                    onClick = { selectedTab = DevicesTab },
                     icon = {
                         Icon(
-                            imageVector = Icons.Default.Home,
+                            imageVector = Icons.Default.PhoneAndroid,
                             contentDescription = null,
                         )
                     },
-                    label = { Text(text = stringResource(R.string.home)) },
+                    label = { Text(text = stringResource(R.string.devices)) },
                 )
                 NavigationBarItem(
-                    selected = selectedTab == ImagesTab,
-                    onClick = { selectedTab = ImagesTab },
+                    selected = selectedTab == LibraryTab,
+                    onClick = { selectedTab = LibraryTab },
                     icon = {
                         Icon(
-                            imageVector = Icons.Default.Image,
+                            imageVector = Icons.Default.Folder,
                             contentDescription = null,
                         )
                     },
-                    label = { Text(text = stringResource(R.string.images)) },
-                )
-                NavigationBarItem(
-                    selected = selectedTab == ActionsTab,
-                    onClick = { selectedTab = ActionsTab },
-                    icon = {
-                        Icon(
-                            imageVector = Icons.Default.Gesture,
-                            contentDescription = null,
-                        )
-                    },
-                    label = { Text(text = stringResource(R.string.custom_events)) },
+                    label = { Text(text = stringResource(R.string.library)) },
                 )
             }
         }
     ) { paddingValues ->
         when (selectedTab) {
-            ImagesTab -> LibraryScreen(
+            LibraryTab -> LibraryScreen(
                 uiStateHolder = libraryUiStateHolder,
-                type = LibraryType.IMAGES,
-                paddingValues = paddingValues,
-            )
-
-            ActionsTab -> LibraryScreen(
-                uiStateHolder = libraryUiStateHolder,
-                type = LibraryType.ACTIONS,
                 paddingValues = paddingValues,
             )
 

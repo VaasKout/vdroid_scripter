@@ -5,20 +5,14 @@ import com.vision.scripter.library.state.LibraryUiCommand
 import com.vision.scripter.library.state.LibraryUiState
 import com.vision.scripter.library.state.LibraryUiStateHolder
 import com.vision.scripter.ui.CommandFlow
-import kotlinx.collections.immutable.persistentListOf
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 
 internal val libraryUiStatePreview = LibraryUiState(
     isLoading = false,
-    images = persistentListOf(
-        "x5_catalog_cart_icon",
-        "tg_chat_send_button",
-    ),
-    actions = persistentListOf(
-        "swipe_x5_catalog_1",
-        "swipe_x5_catalog_2",
-    ),
+    imagesCount = 12,
+    actionsCount = 4,
+    routesCount = 2,
 )
 
 internal class LibraryUiStateHolderPreview(state: LibraryUiState) : LibraryUiStateHolder {
@@ -27,7 +21,5 @@ internal class LibraryUiStateHolderPreview(state: LibraryUiState) : LibraryUiSta
         get() = throw UnsupportedOperationException()
 
     override fun onLoadData(onStart: Boolean) {}
-    override fun onDeleteItem(kind: LibraryType, name: String) {}
-    override fun onDismiss() {}
-    override fun onConfirmDelete() {}
+    override fun onCardClicked(type: LibraryType) {}
 }

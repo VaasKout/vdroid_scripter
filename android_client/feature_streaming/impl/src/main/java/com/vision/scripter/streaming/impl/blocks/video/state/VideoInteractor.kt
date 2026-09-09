@@ -11,7 +11,7 @@ import com.vision.scripter.network.api.ApiResponse
 import com.vision.scripter.prefs.api.DataStoreRepository
 import com.vision.scripter.streaming.impl.blocks.video.ui.VideoUiState
 import com.vision.scripter.streaming.impl.blocks.video.ui.VideoUiStateHolder
-import com.vision.scripter.streaming.impl.data.CvStreamerRepository
+import com.vision.scripter.streaming.impl.data.CvRepository
 import com.vision.scripter.streaming.impl.data.ItemType
 import com.vision.scripter.streaming.impl.data.KeyboardRepository
 import com.vision.scripter.streaming.impl.data.RecordRepository
@@ -44,7 +44,7 @@ class VideoInteractor @Inject constructor(
     private val dataStoreRepository: DataStoreRepository,
     private val videoRepository: VideoStreamerRepository,
     private val controlStreamer: ControlStreamer,
-    private val cvRepository: CvStreamerRepository,
+    private val cvRepository: CvRepository,
     private val keyboardRepository: KeyboardRepository,
     private val recordRepository: RecordRepository,
     private val eventsHolder: StreamingEventsHolder,
@@ -52,6 +52,10 @@ class VideoInteractor @Inject constructor(
 
     private val coroutineScope: CoroutineScope =
         coroutineScopeFactory.createBackgroundScope("video_interactor")
+    private val streamScope: CoroutineScope =
+        coroutineScopeFactory.createIoScope("video_stream")
+    private val closeScope: CoroutineScope =
+        coroutineScopeFactory.createIoScope("video_close")
 
     private val _stateFlow = MutableStateFlow(VideoState())
     private val stateFlow = _stateFlow.asStateFlow()
@@ -74,15 +78,15 @@ class VideoInteractor @Inject constructor(
 
     private fun startReactiveStreams() {
         combine(
-            cvRepository.observeRectangles(),
+            cvRepository.observeOverlay(),
             cvRepository.observeSelectedRectangles(),
             videoRepository.observeScreenSizes(),
             keyboardRepository.observeKeyboardButtons(),
             recordRepository.observeRecord(),
-        ) { rectangles, selectedRects, screenSizes, keyboardButtons, record ->
+        ) { overlay, selectedRects, screenSizes, keyboardButtons, record ->
             _stateFlow.update {
                 it.copy(
-                    cvRectangles = rectangles,
+                    overlay = overlay,
                     selectedRectangles = selectedRects,
                     screenSizes = screenSizes,
                     keyboardButtons = keyboardButtons,
@@ -107,7 +111,8 @@ class VideoInteractor @Inject constructor(
                     _stateFlow.update {
                         it.copy(
                             streamingHost = fullServerUri.host.orEmpty(),
-                            streamingData = result.data
+                            streamingData = result.data,
+                            sessionOpen = true,
                         )
                     }
                 }
@@ -124,7 +129,7 @@ class VideoInteractor @Inject constructor(
         surfaceHeight: Int,
         newSurface: Surface,
     ) {
-        streamJob = coroutineScope.launch {
+        streamJob = streamScope.launch {
             val streamingData = currentState.streamingData ?: return@launch
             val videoConnected = videoRepository.initConnection(
                 host = currentState.streamingHost,
@@ -139,15 +144,8 @@ class VideoInteractor @Inject constructor(
                 port = streamingData.controlPort.toInt(),
             )
 
-            val cvConnected = cvRepository.initConnection(
-                host = currentState.streamingHost,
-                port = streamingData.cvPort.toInt(),
-            )
-
-            val screenSizes = currentState.screenSizes
-            val connectionEstablished =
-                videoConnected && controlConnected && cvConnected && screenSizes != null
-
+            val screenSizes = videoRepository.observeScreenSizes().value
+            val connectionEstablished = videoConnected && controlConnected && screenSizes != null
             if (!connectionEstablished) {
                 _stateFlow.update {
                     it.copy(streamingData = null)
@@ -157,14 +155,8 @@ class VideoInteractor @Inject constructor(
             }
 
             eventsHolder.sendEvent(StreamingEvent.SuccessLoading)
-
-            launch {
-                videoRepository.decodeFramesInLoop(
-                    mimeType = currentState.videoCodec.mimeType,
-                )
-            }
-            cvRepository.decodeRectanglesInLoop(
-                screenSizes = screenSizes,
+            videoRepository.decodeFramesInLoop(
+                mimeType = currentState.videoCodec.mimeType,
             )
         }
     }
@@ -210,6 +202,7 @@ class VideoInteractor @Inject constructor(
     }
 
     fun closeStreams() {
+        closeSession()
         if (streamJob?.isActive == true) {
             streamJob?.cancel()
             streamJob = null
@@ -219,7 +212,17 @@ class VideoInteractor @Inject constructor(
         cvRepository.close()
     }
 
+    private fun closeSession() {
+        val state = currentState
+        if (!state.sessionOpen || state.serial.isEmpty()) return
+        _stateFlow.update { it.copy(sessionOpen = false) }
+        closeScope.launch {
+            scripterDataSource.closeSession(state.serial)
+        }
+    }
+
     fun clear() {
         coroutineScope.cancel()
+        streamScope.cancel()
     }
 }

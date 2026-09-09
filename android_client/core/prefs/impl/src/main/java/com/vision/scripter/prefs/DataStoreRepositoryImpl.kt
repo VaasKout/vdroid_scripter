@@ -29,12 +29,6 @@ class DataStoreRepositoryImpl @Inject constructor(
     )
     private val dataStore = context.dataStore
 
-    override suspend fun clearAll() {
-        withContext(dispatchersFactory.io) {
-            dataStore.edit { it.clear() }
-        }
-    }
-
     override suspend fun saveSerialNumber(serialNumber: String) {
         withContext(dispatchersFactory.io) {
             dataStore.edit { it[stringPreferencesKey(SERIAL_NUMBER_KEY)] = serialNumber }

@@ -11,6 +11,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -46,6 +47,17 @@ fun KeyboardMenu(
         if (menuType.isLoading) {
             CircularProgressIndicator(modifier = Modifier.size(32.dp))
             return
+        }
+
+        if (menuType.mode == KeyboardMode.ADD_NEW) {
+            Icon(
+                modifier = Modifier
+                    .size(32.dp)
+                    .customClickable(onClick = uiStateHolder::onRefreshRectanglesClicked),
+                imageVector = Icons.Filled.Refresh,
+                tint = Color.Red,
+                contentDescription = "",
+            )
         }
 
         Icon(

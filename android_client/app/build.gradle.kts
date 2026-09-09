@@ -78,7 +78,6 @@ dependencies {
     debugImplementation(libs.androidx.ui.tooling)
     debugImplementation(libs.androidx.ui.test.manifest)
     implementation(libs.kotlinx.serialization.json)
-    implementation(libs.androidx.window)
     implementation(libs.androidx.foundation)
 
     implementation(libs.hilt.android)
@@ -88,8 +87,6 @@ dependencies {
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.kotlinx.coroutines.android)
 
-    implementation(libs.coil3.coil.compose)
-    implementation(libs.coil.network.okhttp)
 
     implementation(project(":data:api"))
     implementation(project(":data:impl"))

@@ -34,9 +34,9 @@ class WelcomeInteractor @Inject constructor(
     private val coroutineScope: CoroutineScope =
         coroutineScopeFactory.createBackgroundScope("welcome_interactor")
 
-    override val uiStateFlow: StateFlow<WelcomeUiState?>
-        get() = stateFlow.map(uiStateMapper::map)
-            .stateIn(coroutineScope, SharingStarted.WhileSubscribed(), initialValue = null)
+    override val uiStateFlow: StateFlow<WelcomeUiState?> = stateFlow
+        .map(uiStateMapper::map)
+        .stateIn(coroutineScope, SharingStarted.WhileSubscribed(), initialValue = null)
 
     override val uiCommandsFlow: CommandFlow<WelcomeUiCommand> = CommandFlow(coroutineScope)
 

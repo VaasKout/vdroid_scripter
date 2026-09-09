@@ -21,7 +21,6 @@ class DevicesUiStateMapper @Inject constructor() {
                 UiDevice(
                     serial = it.serial,
                     deviceParams = it.toMap(),
-                    preview = null,
                 )
             }.toImmutableList(),
         )

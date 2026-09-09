@@ -4,5 +4,5 @@ plugins {
     alias(libs.plugins.kotlin.compose) apply false
     alias(libs.plugins.android.library) apply false
     alias(libs.plugins.ksp) apply false
-    id("com.google.dagger.hilt.android") version "2.59.1" apply false
+    alias(libs.plugins.hilt.android) apply false
 }

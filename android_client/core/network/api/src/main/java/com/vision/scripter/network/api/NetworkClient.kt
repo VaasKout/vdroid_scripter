@@ -4,5 +4,4 @@ interface NetworkClient {
     suspend fun get(path: String): ApiResponse<String>
     suspend fun post(path: String, body: String): ApiResponse<String>
     suspend fun delete(path: String): ApiResponse<String>
-    suspend fun getMultipart(path: String): ApiResponse<List<ByteArray>>
 }

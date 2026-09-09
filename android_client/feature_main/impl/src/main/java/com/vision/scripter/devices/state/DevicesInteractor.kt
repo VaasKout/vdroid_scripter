@@ -36,9 +36,9 @@ class DevicesInteractor @Inject constructor(
     private val coroutineScope: CoroutineScope =
         coroutineScopeFactory.createBackgroundScope("main_interactor")
 
-    override val uiStateFlow: SharedFlow<DevicesUiState>
-        get() = stateFlow.map(uiStateMapper::map)
-            .shareIn(coroutineScope, SharingStarted.WhileSubscribed(), replay = 1)
+    override val uiStateFlow: SharedFlow<DevicesUiState> = stateFlow
+        .map(uiStateMapper::map)
+        .shareIn(coroutineScope, SharingStarted.WhileSubscribed(), replay = 1)
 
     override val uiCommandsFlow: CommandFlow<DevicesUiCommand> = CommandFlow(coroutineScope)
 

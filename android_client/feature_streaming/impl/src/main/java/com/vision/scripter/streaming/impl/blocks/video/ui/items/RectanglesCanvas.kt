@@ -17,10 +17,13 @@ import androidx.compose.ui.unit.sp
 import com.vision.scripter.data.api.models.CvRectangle
 import com.vision.scripter.data.api.models.RectangleWithText
 
+private val ScanColor = Color(0xFF2E7D32)
+
 @Composable
 fun RectanglesCanvas(
     modifier: Modifier = Modifier,
     cvRectangles: List<CvRectangle>,
+    scanRectangles: List<CvRectangle>,
     selectedRectangles: List<CvRectangle>,
     keyboardButtons: List<RectangleWithText>,
 ) {
@@ -44,6 +47,14 @@ fun RectanglesCanvas(
                 textMeasurer = textMeasurer,
                 rectangle = it,
                 color = Color.Red,
+            )
+        }
+
+        scanRectangles.forEach {
+            drawRectangle(
+                textMeasurer = textMeasurer,
+                rectangle = it,
+                color = ScanColor,
             )
         }
 

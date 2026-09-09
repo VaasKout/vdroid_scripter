@@ -11,25 +11,23 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Camera
 import androidx.compose.material.icons.filled.Keyboard
-import androidx.compose.material.icons.filled.TextFields
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.vision.scripter.streaming.impl.blocks.menu.state.MenuType
 import com.vision.scripter.streaming.impl.blocks.menu.ui.MenuPreviewUiStateHolder
 import com.vision.scripter.streaming.impl.blocks.menu.ui.MenuUiStateHolder
 import com.vision.scripter.streaming.impl.blocks.menu.ui.usualMenuPreviewUiState
-import com.vision.scripter.streaming.impl.screen.state.CVMode
 import com.vision.scripter.ui.customClickable
 
 @Composable
@@ -52,9 +50,7 @@ fun UsualMenu(
             Icon(
                 modifier = Modifier
                     .size(32.dp)
-                    .customClickable(
-                        onClick = uiStateHolder::onAddClicked,
-                    ),
+                    .customClickable(onClick = uiStateHolder::onAddClicked),
                 imageVector = Icons.Filled.Add,
                 tint = MaterialTheme.colorScheme.onSurface,
                 contentDescription = ""
@@ -63,21 +59,17 @@ fun UsualMenu(
             Icon(
                 modifier = Modifier
                     .size(32.dp)
-                    .customClickable(onClick = uiStateHolder::onCvModeClicked),
-                imageVector = detectionIcon(menuType.localCvMode),
-                tint = if (menuType.localCvMode != CVMode.NO_CV) Color.Red
+                    .customClickable(onClick = uiStateHolder::onRectanglesClicked),
+                imageVector = if (menuType.rectsShown) Icons.Filled.Visibility
+                else Icons.Filled.VisibilityOff,
+                tint = if (menuType.rectsShown) Color.Red
                 else MaterialTheme.colorScheme.onSurface,
                 contentDescription = "",
             )
 
-            Icon(
-                modifier = Modifier
-                    .size(32.dp)
-                    .customClickable(onClick = uiStateHolder::onTextModeClicked),
-                imageVector = Icons.Filled.TextFields,
-                tint = if (menuType.textHighlighted) Color.Red
-                else MaterialTheme.colorScheme.onSurface,
-                contentDescription = "",
+            ScanIcon(
+                menuType = menuType,
+                onClick = uiStateHolder::onScanClicked,
             )
 
             Icon(
@@ -85,8 +77,7 @@ fun UsualMenu(
                     .size(32.dp)
                     .customClickable(onClick = uiStateHolder::onKeyboardClicked),
                 imageVector = Icons.Filled.Keyboard,
-                tint = if (menuType.keyboardHighlighted) Color.Red
-                else MaterialTheme.colorScheme.onSurface,
+                tint = MaterialTheme.colorScheme.onSurface,
                 contentDescription = "",
             )
 
@@ -119,19 +110,31 @@ fun UsualMenu(
                 color = Color.White,
                 shape = RoundedCornerShape(topStart = 8.dp, bottomStart = 8.dp),
             )
-            .customClickable(
-                onClick = uiStateHolder::onExpandClicked,
-            ),
+            .customClickable(onClick = uiStateHolder::onExpandClicked),
         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
         tint = MaterialTheme.colorScheme.onSurface,
         contentDescription = ""
     )
 }
 
-fun detectionIcon(cvMode: CVMode): ImageVector = when (cvMode) {
-    CVMode.YOLO -> Icons.Filled.Camera
-    CVMode.CV_RECTS -> Icons.Filled.Visibility
-    else -> Icons.Filled.VisibilityOff
+@Composable
+private fun ScanIcon(
+    menuType: MenuType.Usual,
+    onClick: () -> Unit,
+) {
+    if (menuType.scanning) {
+        CircularProgressIndicator(modifier = Modifier.size(32.dp))
+        return
+    }
+    Icon(
+        modifier = Modifier
+            .size(32.dp)
+            .customClickable(onClick = onClick),
+        imageVector = Icons.Filled.Search,
+        tint = if (menuType.scanShown) Color.Red
+        else MaterialTheme.colorScheme.onSurface,
+        contentDescription = "",
+    )
 }
 
 @Preview
@@ -154,11 +157,11 @@ private fun UsualExpandedMenuPreview() {
 
 @Preview
 @Composable
-private fun UsualExpandedHighlightedTextPreview() {
+private fun UsualExpandedHighlightedPreview() {
     UsualMenu(
         menuType = MenuType.Usual(
             expanded = true,
-            localCvMode = CVMode.CV_RECTS,
+            rectsShown = true,
         ),
         uiStateHolder = MenuPreviewUiStateHolder(usualMenuPreviewUiState),
     )

@@ -18,23 +18,6 @@ val keyboardLocales = listOf(
     PHONE,
 )
 
-enum class CVMode(val value: Int) {
-    NO_CV(0),
-    CV_RECTS(1),
-    YOLO(2),
-}
-
-fun CVMode.increment(): CVMode {
-    val newValue = this.value + 1
-    val newMode = CVMode.entries.firstOrNull { it.value == newValue }
-    return newMode ?: CVMode.NO_CV
-}
-
-fun CVMode.toggleDetection(): CVMode = when (this) {
-    CVMode.CV_RECTS -> CVMode.YOLO
-    else -> CVMode.CV_RECTS
-}
-
 enum class KeyboardMode {
     EDIT,
     ADD_NEW,

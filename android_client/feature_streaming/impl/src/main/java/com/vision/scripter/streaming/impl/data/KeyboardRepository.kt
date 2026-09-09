@@ -24,7 +24,7 @@ import javax.inject.Inject
 @StreamingScope
 class KeyboardRepository @Inject constructor(
     private val scripterDataSource: ScripterDataSource,
-    private val cvRepository: CvStreamerRepository,
+    private val cvRepository: CvRepository,
 ) {
 
     private val _stateFlow = MutableStateFlow(Keyboard())

@@ -1,14 +1,25 @@
 <resources>
     <string name="devices_not_found">Devices not found</string>
 
-    <string name="home">Home</string>
+    <string name="devices">Devices</string>
+    <string name="library">Library</string>
     <string name="images">Images</string>
-    <string name="custom_events">Custom events</string>
+    <string name="actions">Actions</string>
+    <string name="routes">Routes</string>
+    <string name="items_count">%1$d items</string>
     <string name="streaming">Streaming</string>
 
     <string name="delete_dialog_title">Confirmation</string>
-    <string name="image_delete_dialog_text">Delete image %1s?</string>
-    <string name="action_delete_dialog_text">Delete custom action %1s?</string>
+    <string name="image_delete_dialog_text">Delete image %1$s?</string>
+    <string name="action_delete_dialog_text">Delete action %1$s?</string>
+    <string name="route_delete_dialog_text">Delete route %1$s?</string>
+
+    <string name="pick_device">Run on</string>
+    <string name="busy_device">Busy: %1$s</string>
+    <string name="last_used">Last used</string>
+    <string name="running_on">on %1$s</string>
+    <string name="play">Play</string>
+    <string name="delete">Delete</string>
 
     <string name="serial_key">Serial</string>
     <string name="brand_key">Brand</string>

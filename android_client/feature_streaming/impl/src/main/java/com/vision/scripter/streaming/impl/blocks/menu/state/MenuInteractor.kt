@@ -1,21 +1,21 @@
 package com.vision.scripter.streaming.impl.blocks.menu.state
 
 import com.vision.scripter.coroutines.api.CoroutineScopeFactory
+import com.vision.scripter.data.api.ScripterDataSource
 import com.vision.scripter.data.api.models.adjustToServer
+import com.vision.scripter.network.api.ApiResponse
 import com.vision.scripter.streaming.impl.blocks.menu.ui.MenuUiCommand
 import com.vision.scripter.streaming.impl.blocks.menu.ui.MenuUiState
 import com.vision.scripter.streaming.impl.blocks.menu.ui.MenuUiStateHolder
-import com.vision.scripter.streaming.impl.data.CvStreamerRepository
+import com.vision.scripter.streaming.impl.data.CvRepository
 import com.vision.scripter.streaming.impl.data.ItemType
 import com.vision.scripter.streaming.impl.data.KeyboardRepository
 import com.vision.scripter.streaming.impl.data.RecordRepository
 import com.vision.scripter.streaming.impl.data.VideoStreamerRepository
 import com.vision.scripter.streaming.impl.screen.StreamingEvent
 import com.vision.scripter.streaming.impl.screen.StreamingEventsHolder
-import com.vision.scripter.streaming.impl.screen.state.CVMode
 import com.vision.scripter.streaming.impl.screen.state.KeyboardMode
 import com.vision.scripter.streaming.impl.screen.state.increment
-import com.vision.scripter.streaming.impl.screen.state.toggleDetection
 import com.vision.scripter.ui.CommandFlow
 import dagger.hilt.android.scopes.ViewModelScoped
 import kotlinx.coroutines.CoroutineScope
@@ -36,7 +36,8 @@ import javax.inject.Inject
 class MenuInteractor @Inject constructor(
     coroutineScopeFactory: CoroutineScopeFactory,
     uiStateMapper: MenuUiStateMapper,
-    private val cvRepository: CvStreamerRepository,
+    private val scripterDataSource: ScripterDataSource,
+    private val cvRepository: CvRepository,
     private val keyboardRepository: KeyboardRepository,
     private val recordRepository: RecordRepository,
     private val videoRepository: VideoStreamerRepository,
@@ -102,15 +103,56 @@ class MenuInteractor @Inject constructor(
 
         recordRepository.initData(name = trimmedName, itemType = itemType)
         if (itemType == ItemType.IMAGE) {
-            _menuState.update {
-                it.copy(type = MenuType.SelectingCV(localCvMode = CVMode.CV_RECTS))
-            }
-            switchCvMode(CVMode.CV_RECTS)
+            _menuState.update { it.copy(type = MenuType.SelectingCV) }
+            refreshRectangles()
             return
         }
 
         if (itemType == ItemType.ACTION) {
             _menuState.update { it.copy(type = MenuType.CustomAction()) }
+        }
+    }
+
+    override fun onRectanglesClicked() {
+        val type = _menuState.value.type
+        if (type !is MenuType.Usual) return
+        if (type.rectsShown) {
+            _menuState.update { it.copy(type = type.copy(rectsShown = false)) }
+            cvRepository.clearOverlay()
+            return
+        }
+        _menuState.update { it.copy(type = type.copy(rectsShown = true, scanShown = false)) }
+        refreshRectangles()
+    }
+
+    override fun onRefreshRectanglesClicked() {
+        refreshRectangles()
+    }
+
+    override fun onScanClicked() {
+        val type = _menuState.value.type
+        if (type !is MenuType.Usual || type.scanning) return
+        if (type.scanShown) {
+            _menuState.update { it.copy(type = type.copy(scanShown = false)) }
+            cvRepository.clearOverlay()
+            return
+        }
+        _dialogState.update { DialogState.Scan }
+    }
+
+    override fun onScanConfirmed(locale: String, includeImages: Boolean) {
+        hideDialog()
+        val type = _menuState.value.type
+        if (type !is MenuType.Usual) return
+        _menuState.update { it.copy(type = type.copy(scanning = true, rectsShown = false)) }
+        coroutineScope.launch {
+            val found = scan(locale = locale, includeImages = includeImages)
+            _menuState.update { state ->
+                val current = state.type
+                if (current !is MenuType.Usual) return@update state
+                state.copy(type = current.copy(scanning = false, scanShown = found))
+            }
+            if (!found) eventRepository.sendEvent(StreamingEvent.ShowNetworkError)
         }
     }
 
@@ -129,51 +171,6 @@ class MenuInteractor @Inject constructor(
         val state = _menuState.value
         if (state.type !is MenuType.CustomAction) return
         recordRepository.switchRecording()
-    }
-
-    override fun onCvModeClicked() {
-        when (val type = _menuState.value.type) {
-            is MenuType.SelectingCV -> {
-                val cvMode = type.localCvMode.toggleDetection()
-                _menuState.update { it.copy(type = type.copy(localCvMode = cvMode)) }
-                switchCvMode(cvMode)
-            }
-
-            is MenuType.Usual -> {
-                val newCvMode = type.localCvMode.increment()
-                _menuState.update { it.copy(type = type.copy(localCvMode = newCvMode)) }
-                switchCvMode(newCvMode)
-            }
-
-            else -> {}
-        }
-    }
-
-    override fun onTextModeClicked() {
-        val type = _menuState.value.type
-        if (type !is MenuType.Usual) return
-        if (type.textHighlighted) {
-            _menuState.update { it.copy(type = type.copy(textHighlighted = false)) }
-            switchCvMode(CVMode.NO_CV)
-            return
-        }
-        _dialogState.update { DialogState.Text }
-    }
-
-    override fun onTryToFindText(text: String, locale: String) {
-        hideDialog()
-        findText(text = text.trim(), locale = locale)
-        val type = _menuState.value.type
-        if (type is MenuType.Usual) {
-            _menuState.update {
-                it.copy(
-                    type = type.copy(
-                        localCvMode = CVMode.NO_CV,
-                        textHighlighted = true
-                    )
-                )
-            }
-        }
     }
 
     override fun onKeyboardModeClicked() {
@@ -275,29 +272,29 @@ class MenuInteractor @Inject constructor(
         }
     }
 
-    private fun switchCvMode(cvMode: CVMode) {
+    private fun refreshRectangles() {
         coroutineScope.launch {
-            if (cvMode == CVMode.NO_CV) {
-                cvRepository.restoreSelectedRectangles()
-            } else {
-                cvRepository.snapshotSelectedRectangles()
-            }
-            cvRepository.nextCvMode(cvMode)
+            val screenSizes = videoRepository.observeScreenSizes().value ?: return@launch
+            val loaded = cvRepository.refreshRectangles(serial = serial, screenSizes = screenSizes)
+            if (!loaded) eventRepository.sendEvent(StreamingEvent.ShowNetworkError)
         }
     }
 
-    private fun findText(text: String, locale: String) {
-        coroutineScope.launch {
-            val screenSizes = videoRepository.observeScreenSizes().value ?: return@launch
-            val found = cvRepository.findTextRectangles(
-                serial = serial,
-                text = text,
-                locale = locale,
-                screenSizes = screenSizes,
-            )
-            if (!found) {
-                eventRepository.sendEvent(StreamingEvent.ShowNetworkError)
-            }
+    private suspend fun scan(locale: String, includeImages: Boolean): Boolean {
+        val screenSizes = videoRepository.observeScreenSizes().value ?: return false
+        val images = if (includeImages) libraryImages() ?: return false else listOf()
+        return cvRepository.scan(
+            serial = serial,
+            images = images,
+            locale = locale,
+            screenSizes = screenSizes,
+        )
+    }
+
+    private suspend fun libraryImages(): List<String>? {
+        return when (val result = scripterDataSource.getLibrary()) {
+            is ApiResponse.Success -> result.data.images
+            is ApiResponse.Error -> null
         }
     }
 
@@ -306,10 +303,10 @@ class MenuInteractor @Inject constructor(
             keyboardRepository.updateKeyboardState(keyboardMode)
             cvRepository.clearSelectedRectangles()
             if (keyboardMode == KeyboardMode.ADD_NEW) {
-                cvRepository.nextCvMode(CVMode.CV_RECTS)
+                refreshRectangles()
                 return@launch
             }
-            cvRepository.nextCvMode(CVMode.NO_CV)
+            cvRepository.clearOverlay()
         }
     }
 
@@ -351,9 +348,9 @@ class MenuInteractor @Inject constructor(
         if (!loaded) eventRepository.sendEvent(StreamingEvent.ShowNetworkError)
     }
 
-    private suspend fun dropState() {
+    private fun dropState() {
         cvRepository.clearSelectedRectangles()
-        cvRepository.nextCvMode(CVMode.NO_CV)
+        cvRepository.clearOverlay()
         keyboardRepository.clear()
     }
 
@@ -366,9 +363,7 @@ class MenuInteractor @Inject constructor(
 
     private fun exitKeyboard() {
         _menuState.update { it.copy(type = MenuType.Usual(expanded = true)) }
-        coroutineScope.launch {
-            dropState()
-        }
+        dropState()
     }
 
     private fun onEditKeyboardRectangleSelected(oldKey: String) {

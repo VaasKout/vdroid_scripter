@@ -6,7 +6,6 @@ import com.vision.scripter.network.api.NetworkClient
 import com.vision.scripter.network.api.NetworkError
 import com.vision.scripter.prefs.api.DataStoreRepository
 import io.ktor.client.HttpClient
-import io.ktor.client.call.body
 import io.ktor.client.engine.cio.CIO
 import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
@@ -16,13 +15,8 @@ import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
-import io.ktor.http.content.MultiPartData
-import io.ktor.http.content.PartData
-import io.ktor.http.content.forEachPart
 import io.ktor.http.contentType
-import io.ktor.utils.io.readRemaining
 import kotlinx.coroutines.withContext
-import kotlinx.io.readByteArray
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -66,11 +60,14 @@ class NetworkClientImpl @Inject constructor(
                 return@withContext ApiResponse.Error(error = NetworkError.NoUrlError)
             }
             try {
-                val result = client.post(url) {
+                val response = client.post(url) {
                     setBody(body)
                     contentType(ContentType.Application.Json)
-                }.bodyAsText()
-                ApiResponse.Success(result)
+                }
+                if (response.status.value !in (200..299)) {
+                    throw Exception(response.bodyAsText())
+                }
+                ApiResponse.Success(response.bodyAsText())
             } catch (e: Exception) {
                 e.printStackTrace()
                 val error = NetworkError.ServerError(msg = "Error: ${e.message}")
@@ -93,33 +90,6 @@ class NetworkClientImpl @Inject constructor(
                     throw Exception(response.bodyAsText())
                 }
                 ApiResponse.Success(response.bodyAsText())
-            } catch (e: Exception) {
-                e.printStackTrace()
-                val error = NetworkError.ServerError(msg = "Error: ${e.message}")
-                ApiResponse.Error(error = error)
-            }
-        }
-    }
-
-    override suspend fun getMultipart(path: String): ApiResponse<List<ByteArray>> {
-        return withContext(dispatchersFactory.io) {
-            val url = buildUrl(path)
-            if (url.isEmpty()) {
-                return@withContext ApiResponse.Error(error = NetworkError.NoUrlError)
-            }
-            try {
-                val response = client.get(url)
-                val multipart = response.body<MultiPartData>()
-                val images = mutableListOf<ByteArray>()
-
-                multipart.forEachPart { part ->
-                    if (part is PartData.FileItem) {
-                        val bytes = part.provider().readRemaining().readByteArray()
-                        images.add(bytes)
-                    }
-                    part.dispose()
-                }
-                ApiResponse.Success(images)
             } catch (e: Exception) {
                 e.printStackTrace()
                 val error = NetworkError.ServerError(msg = "Error: ${e.message}")
