@@ -32,13 +32,14 @@ This document describes every HTTP endpoint exposed by the server, defined in
 | ------ | ---- | ----------- |
 | GET | `/ping` | Health check |
 | GET | `/devices` | List connected ADB devices |
-| POST | `/devices/{serial}/run_steps` | Queue one or more steps to run in order on a device |
+| POST | `/devices/{serial}/queue_steps` | Queue one or more steps to run in order on a device |
 | GET | `/library` | List image and action names in the library |
 | POST | `/save_image` | Crop and save a named template image into the library |
 | POST | `/save_action` | Save a named recorded gesture into the library |
 | DELETE | `/images/{name}` | Delete a library image |
 | DELETE | `/actions/{name}` | Delete a library action |
-| GET | `/scan` | Scan the current screen and return the landmarks found |
+| GET | `/devices/{serial}/scan` | Scan the current screen and return the landmarks found |
+| GET | `/devices/{serial}/rectangles` | Detect every rectangle on the current screen (for cropping and keyboard editing) |
 | GET | `/routes` | List saved route names |
 | GET | `/routes/{name}` | Get one saved route |
 | POST | `/routes` | Save or overwrite a route |
@@ -48,7 +49,7 @@ This document describes every HTTP endpoint exposed by the server, defined in
 | POST | `/devices/{serial}/edit_keyboard` | Override a keyboard key's rectangle |
 | GET | `/devices/{serial}/reset_keyboard` | Reset keyboard keys to defaults |
 | GET | `/devices/{serial}/delete_button` | Delete a keyboard key override |
-| POST | `/devices/{serial}/session` | Open a session: start scrcpy and the streaming sockets |
+| POST | `/devices/{serial}/session` | Open a session: start scrcpy and the video/control sockets |
 | GET | `/devices/{serial}/session` | Get the active session's ports |
 | DELETE | `/devices/{serial}/session` | Close the session |
 
@@ -111,7 +112,7 @@ bare landmark deterministically takes the first candidate on screen.
 | `type_text` | The **last landmark's `value` is the text to type**, typed via the CV keyboard (its `locale` = keyboard locale). Nothing is located on screen. |
 | any other name | The library event with that name is replayed: **offset into the found region** when landmarks are given (first touch moved into the last landmark's region, relative shape preserved), **verbatim** without them. |
 
-### `POST /devices/{serial}/run_steps`
+### `POST /devices/{serial}/queue_steps`
 
 Queues one or more steps to run in order on a device. If the device has no open
 session, one is opened automatically (scrcpy is started and the call waits up
@@ -222,13 +223,13 @@ Deletes `actions/<name>.json`.
 
 ## Scan
 
-### `GET /scan`
+### `GET /devices/{serial}/scan`
 
 Scans the device's current screen and returns everything the CV pipeline can
 name — the machine-readable structure of the screen, in the same landmark
 vocabulary that steps consume and in video-frame coordinates. If the device
 has no open session, one is opened automatically (scrcpy is started headless,
-like `/devices/{serial}/run_steps`); the server waits up to ~15s for the first
+like `/devices/{serial}/queue_steps`); the server waits up to ~15s for the first
 video frame.
 
 One frame, three passes: every YOLO detection, every OCR-readable text
@@ -236,8 +237,8 @@ One frame, three passes: every YOLO detection, every OCR-readable text
 listed in `images`** — omitted `images` means YOLO + text only. Results are
 sorted in reading order (top-to-bottom, left-to-right).
 
+- **Path params:** `serial` (required).
 - **Query params:**
-  - `serial` (required)
   - `images` — comma-separated library image names to search for; every name
     must exist in the library
   - `locale` — Tesseract language code for the OCR pass (default `eng`)
@@ -256,6 +257,27 @@ sorted in reading order (top-to-bottom, left-to-right).
   Tesseract code in `locale`.
 - **Errors:** `400` if `serial` is missing, `500` when a listed image is not
   in the library, the session couldn't be started, or no frame arrived.
+
+### `GET /devices/{serial}/rectangles`
+
+Returns every rectangle OpenCV's contour pass finds on the device's current
+screen — the raw shapes a client offers for cropping a template image or
+placing a keyboard key, not landmarks. One-shot: a client asks when it needs
+them (a refresh button); nothing streams and nothing runs between requests.
+If the device has no open session, one is opened automatically like `/devices/{serial}/scan`.
+
+- **Path params:** `serial` (required).
+- **Response `200`:**
+  ```json
+  {
+    "rectangles": [
+      { "left_x": 40, "right_x": 120, "top_y": 60, "bottom_y": 140 }
+    ]
+  }
+  ```
+  Video-frame coordinates; `[]` when nothing is found.
+- **Errors:** `400` if `serial` is missing, `500` when the session couldn't
+  be started, no frame arrived, or detection failed.
 
 ## Routes
 
@@ -294,7 +316,7 @@ Saves a route, overwriting an existing one with the same name.
   }
   ```
   `name` and a non-empty valid `steps` array are required; `prompt` is
-  optional. Steps validate like `/devices/{serial}/run_steps`: referenced
+  optional. Steps validate like `/devices/{serial}/queue_steps`: referenced
   library images and events must exist. `timeout` and `delay` are stored
   exactly as sent (an omitted key is `0`; the server never fills defaults).
   Saving stamps every step's `id`
@@ -312,7 +334,7 @@ Saves a route, overwriting an existing one with the same name.
 ### `GET /run_route`
 
 Loads a saved route and queues its steps on the device — exactly equivalent
-to `GET /routes/{name}` followed by `POST /devices/{serial}/run_steps` with
+to `GET /routes/{name}` followed by `POST /devices/{serial}/queue_steps` with
 the route's steps. With `start_id` the queue starts from the step carrying
 that id (inclusive), skipping everything before it — for rerunning a route
 from a known mid-flow point. Whichever step the run starts from gets
@@ -392,22 +414,23 @@ Deletes a saved keyboard key override.
 
 Opens a session: starts the scrcpy server on the device and opens the
 streaming/control sockets. On success the server returns the TCP ports the
-client should connect to, then asynchronously begins accepting the video, CV,
-and control connections on those ports.
+client should connect to, then asynchronously begins accepting the video and
+control connections on those ports.
 
 - **Path params:** `serial` (required).
 - **Response `200`:**
   ```json
   {
     "video_port": "3002",
-    "cv_port": "3003",
-    "control_port": "3004"
+    "control_port": "3003"
   }
   ```
   Ports are derived from the server's base socket port (`SOCKET_PORT` env,
-  default `3001`). The three ports are **raw TCP sockets**, not HTTP — the
-  client connects to them directly to receive the H.264 video stream, CV
-  results, and to send control commands.
+  default `3001`). The two ports are **raw TCP sockets**, not HTTP — the
+  client connects to them directly to receive the H.264 video stream and to
+  send control commands. CV results are never streamed: ask
+  [`GET /devices/{serial}/rectangles`](#get-devicesserialrectangles) or
+  [`GET /devices/{serial}/scan`](#get-devicesserialscan) when they are needed.
 - **Errors:** `500` if scrcpy could not be started (the session is then
   closed server-side).
 
@@ -425,7 +448,7 @@ Returns the session's status.
     the next step is queued.
 
   Every step carries an `id` — a route's saved id, or its 1-based position
-  in the `run_steps` batch — and both forms are prefixed with it:
+  in the `queue_steps` batch — and both forms are prefixed with it:
   `running step 3: tap on image catalog_cart_icon`,
   `step 3: unable to find ...` — so a failed route run can be retried with
   [`GET /run_route`](#get-run_route)`?start_id=3`.
@@ -488,7 +511,7 @@ Closes the session: stops the scrcpy server and tears down the sockets.
 
 | Field | JSON | Type | Notes |
 | ----- | ---- | ---- | ----- |
-| ID | `id` | int | omitempty; stamped automatically when a route is saved (position in the route, `1..N`, overwriting anything sent) — addressable via [`GET /run_route`](#get-run_route)'s `start_id`. `run_steps` fills a missing id with the step's 1-based position in the batch, so session statuses always name a step (`running step 3: ...`). |
+| ID | `id` | int | omitempty; stamped automatically when a route is saved (position in the route, `1..N`, overwriting anything sent) — addressable via [`GET /run_route`](#get-run_route)'s `start_id`. `queue_steps` fills a missing id with the step's 1-based position in the batch, so session statuses always name a step (`running step 3: ...`). |
 | Event | `event` | string | `tap`, `long_tap`, `type_text`, a generated swipe (`swipe_up`, `swipe_down`, `swipe_left`, `swipe_right`), the name of a library event, or **empty for a visibility check** |
 | Landmarks | `landmarks` | []Landmark | omitempty; the target chain — resolved in order on one frame, each landmark found nearest to the previous one, the event applies to the **last** one. Empty only for a target-less library event replay. |
 | Timeout | `timeout` | int | omitempty; milliseconds to locate the landmarks before failing — taken literally, no default: omitted or `0` means **one look** at the current frame, no waiting; otherwise the runner grabs the latest video frame and retries back to back until the deadline. Session auto-open waits for the first video frame (up to ~15s) before any step runs, so startup never counts against it. |
@@ -541,7 +564,7 @@ Closes the session: stops the scrcpy server and tears down the sockets.
 
 ### Scan landmark
 
-Returned by [`GET /scan`](#get-scan) (`FoundLandmark` in
+Returned by [`GET /devices/{serial}/scan`](#get-devicesserialscan) (`FoundLandmark` in
 `server/internal/usecases/scan_usecase.go`) — a [Landmark](#landmark) plus
 the rectangle where it was found, in video-frame coordinates.
 

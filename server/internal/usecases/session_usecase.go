@@ -83,7 +83,6 @@ func (i *interactorImpl) GetPortsJSON(serial string) map[string]string {
 	if result, ok := i.sessionsCache.Get(serial); ok {
 		return map[string]string{
 			"video_port":   fmt.Sprintf("%d", result.VideoPort),
-			"cv_port":      fmt.Sprintf("%d", result.CVPort),
 			"control_port": fmt.Sprintf("%d", result.ControlPort),
 		}
 	}
@@ -92,15 +91,13 @@ func (i *interactorImpl) GetPortsJSON(serial string) map[string]string {
 
 func (i *interactorImpl) initPorts(basePort int) *models.Session {
 	var videoPort = basePort + 1
-	var cvPort = videoPort + 1
-	var controlPort = cvPort + 1
+	var controlPort = videoPort + 1
 
 	var cacheMap = i.sessionsCache.GetMap()
 	if len(cacheMap) == 0 {
 		return &models.Session{
 			ServerPort:  basePort,
 			VideoPort:   videoPort,
-			CVPort:      cvPort,
 			ControlPort: controlPort,
 			Status:      models.StatusIdle,
 			DoneCh:      make(chan struct{}),
@@ -114,13 +111,11 @@ func (i *interactorImpl) initPorts(basePort int) *models.Session {
 
 	serverPort := biggestPort + 1
 	videoPort = serverPort + 1
-	cvPort = videoPort + 1
-	controlPort = cvPort + 1
+	controlPort = videoPort + 1
 
 	return &models.Session{
 		ServerPort:  serverPort,
 		VideoPort:   videoPort,
-		CVPort:      cvPort,
 		ControlPort: controlPort,
 		Status:      models.StatusIdle,
 		DoneCh:      make(chan struct{}),

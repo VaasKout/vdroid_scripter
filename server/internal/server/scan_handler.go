@@ -6,9 +6,10 @@ import (
 	"strings"
 )
 
-// Scan path
+// Scan paths
 const (
-	ScanPath = "/scan"
+	ScanPath       = Devices + "/{" + SerialKey + "}/scan"
+	RectanglesPath = Devices + "/{" + SerialKey + "}/rectangles"
 )
 
 // Scan query keys
@@ -25,12 +26,21 @@ func (s *serverImpl) handleScanFunctions() {
 		}
 		http.Error(w, "use GET method", http.StatusMethodNotAllowed)
 	})
+
+	http.HandleFunc(RectanglesPath, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			s.logURL(r)
+			s.handleRectangles(w, r)
+			return
+		}
+		http.Error(w, "use GET method", http.StatusMethodNotAllowed)
+	})
 }
 
 func (s *serverImpl) handleScan(w http.ResponseWriter, r *http.Request) {
-	var serial = r.URL.Query().Get(SerialKey)
+	var serial = r.PathValue(SerialKey)
 	if serial == "" {
-		http.Error(w, `"serial" query needed`, http.StatusBadRequest)
+		http.Error(w, `"serial" param required`, http.StatusBadRequest)
 		return
 	}
 
@@ -51,6 +61,26 @@ func (s *serverImpl) handleScan(w http.ResponseWriter, r *http.Request) {
 
 	var response = map[string]any{
 		"landmarks": landmarks,
+	}
+	s.setHeaders(w)
+	json.NewEncoder(w).Encode(response)
+}
+
+func (s *serverImpl) handleRectangles(w http.ResponseWriter, r *http.Request) {
+	var serial = r.PathValue(SerialKey)
+	if serial == "" {
+		http.Error(w, `"serial" param required`, http.StatusBadRequest)
+		return
+	}
+
+	rectangles, err := s.interactor.GetRectangles(serial, s.serverProps.SocketPort)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	var response = map[string]any{
+		"rectangles": rectangles,
 	}
 	s.setHeaders(w)
 	json.NewEncoder(w).Encode(response)

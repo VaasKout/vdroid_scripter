@@ -21,6 +21,7 @@ type ScanUseCase interface {
 		locale string,
 		basePort int,
 	) ([]FoundLandmark, error)
+	GetRectangles(serial string, basePort int) ([]models.Rectangle, error)
 }
 
 // FoundLandmark ...
@@ -76,6 +77,36 @@ func (i *interactorImpl) Scan(
 
 	sortLandmarksReadingOrder(landmarks)
 	return landmarks, nil
+}
+
+// GetRectangles ...
+func (i *interactorImpl) GetRectangles(
+	serial string,
+	basePort int,
+) ([]models.Rectangle, error) {
+	serial = strings.TrimSpace(serial)
+	if serial == "" {
+		return nil, errors.New(SerialIsEmptyError)
+	}
+
+	if err := i.ensureSessionIsRunning(serial, basePort); err != nil {
+		return nil, err
+	}
+
+	mat, err := i.scrcpy.GetMatFromLastFrame(serial, false)
+	if err != nil {
+		return nil, err
+	}
+	if mat == nil {
+		return nil, fmt.Errorf("no video frame received from %s", serial)
+	}
+	defer mat.Close()
+
+	rects, err := i.cv.FindAllRectangles(mat)
+	if err != nil {
+		return nil, err
+	}
+	return models.ImgRectanglesToDomain(rects), nil
 }
 
 func (i *interactorImpl) libraryImagePaths(images []string) (map[string]string, error) {

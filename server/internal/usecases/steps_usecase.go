@@ -454,9 +454,3 @@ func (i *interactorImpl) playEvent(
 		i.scrcpy.WriteControlData(serial, *data)
 	}
 }
-
-func sleepUntilNext(interval time.Duration) {
-	now := time.Now()
-	next := now.Truncate(interval).Add(interval)
-	time.Sleep(next.Sub(now))
-}

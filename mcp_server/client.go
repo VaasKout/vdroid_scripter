@@ -97,7 +97,6 @@ func (c *apiClient) getLibrary() (string, error) {
 
 func (c *apiClient) scan(serial string, images []string, locale string) (string, error) {
 	var query = url.Values{}
-	query.Set("serial", serial)
 	if len(images) > 0 {
 		query.Set("images", strings.Join(images, ","))
 	}
@@ -105,7 +104,12 @@ func (c *apiClient) scan(serial string, images []string, locale string) (string,
 		query.Set("locale", locale)
 	}
 
-	body, err := c.request(http.MethodGet, "/scan?"+query.Encode(), nil)
+	var path = "/devices/" + url.PathEscape(serial) + "/scan"
+	if encoded := query.Encode(); encoded != "" {
+		path += "?" + encoded
+	}
+
+	body, err := c.request(http.MethodGet, path, nil)
 	return string(body), err
 }
 
@@ -117,7 +121,7 @@ func (c *apiClient) queueSteps(serial string, steps []stepInput) error {
 	}
 	_, err = c.request(
 		http.MethodPost,
-		"/devices/"+url.PathEscape(serial)+"/run_steps",
+		"/devices/"+url.PathEscape(serial)+"/queue_steps",
 		bytes.NewReader(body),
 	)
 	return err

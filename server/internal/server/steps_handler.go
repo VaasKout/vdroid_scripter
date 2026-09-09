@@ -8,21 +8,21 @@ import (
 
 // Steps paths
 const (
-	RunSteps = Devices + "/{" + SerialKey + "}/run_steps"
+	QueueSteps = Devices + "/{" + SerialKey + "}/queue_steps"
 )
 
 func (s *serverImpl) handleStepsFunctions() {
-	http.HandleFunc(RunSteps, func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc(QueueSteps, func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPost {
 			s.logURL(r)
-			s.handleRunSteps(w, r)
+			s.handleQueueSteps(w, r)
 			return
 		}
 		http.Error(w, "use POST method", http.StatusMethodNotAllowed)
 	})
 }
 
-func (s *serverImpl) handleRunSteps(w http.ResponseWriter, r *http.Request) {
+func (s *serverImpl) handleQueueSteps(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 
 	var serial = r.PathValue(SerialKey)

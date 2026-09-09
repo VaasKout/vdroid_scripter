@@ -92,11 +92,6 @@ func (s *serverImpl) acceptSocketConnections(serial string) {
 
 	go func() {
 		defer cancel()
-		s.interactor.AcceptCvConnection(doneCtx, serial)
-	}()
-
-	go func() {
-		defer cancel()
 		s.interactor.AcceptControlConnection(doneCtx, serial)
 	}()
 
