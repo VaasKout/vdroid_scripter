@@ -19,10 +19,13 @@ data class DevicePicker(
     val itemName: String,
     val isLoading: Boolean = true,
     val devices: List<PickerDevice> = listOf(),
-    val lastSerial: String = "",
+    val selectedSerial: String = "",
 )
 
 data class PickerDevice(
     val device: AdbDevice,
     val status: SessionStatus,
-)
+) {
+    val busy: Boolean
+        get() = status is SessionStatus.Running
+}

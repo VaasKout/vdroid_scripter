@@ -61,7 +61,7 @@ internal fun LibraryItem(
                 )
             )
             Spacer(modifier = Modifier.width(4.dp))
-            if (item.canPlay && item.run == null) {
+            if (item.canPlay) {
                 Icon(
                     modifier = Modifier
                         .size(32.dp)

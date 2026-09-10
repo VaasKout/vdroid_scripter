@@ -127,26 +127,41 @@ internal class LibraryItemsInteractor @Inject constructor(
             val pickerDevices = devices.map { device ->
                 PickerDevice(device = device, status = sessionStatus(device.serial))
             }
+            val preselected = pickerDevices.firstOrNull {
+                it.device.serial == lastSerial && !it.busy
+            }
             _stateFlow.update { state ->
                 val picker = state.picker ?: return@update state
                 state.copy(
                     picker = picker.copy(
                         isLoading = false,
                         devices = pickerDevices,
-                        lastSerial = lastSerial,
+                        selectedSerial = preselected?.device?.serial ?: "",
                     )
                 )
             }
         }
     }
 
-    override fun onDeviceChosen(serial: String) {
+    override fun onDeviceSelected(serial: String) {
         val picker = currentState.picker ?: return
         val chosen = picker.devices.firstOrNull { it.device.serial == serial } ?: return
-        if (chosen.status is SessionStatus.Running) return
+        if (chosen.busy) return
+        _stateFlow.update { state ->
+            val current = state.picker ?: return@update state
+            state.copy(picker = current.copy(selectedSerial = serial))
+        }
+    }
+
+    override fun onPickerPlayClicked() {
+        val picker = currentState.picker ?: return
+        val chosen = picker.devices.firstOrNull {
+            it.device.serial == picker.selectedSerial
+        } ?: return
+        if (chosen.busy) return
         _stateFlow.update { it.copy(picker = null) }
         coroutineScope.launch {
-            dataStoreRepository.saveSerialNumber(serial)
+            dataStoreRepository.saveSerialNumber(chosen.device.serial)
             val result = runnerRepository.run(
                 type = currentState.type,
                 name = picker.itemName,

@@ -55,12 +55,14 @@ import androidx.compose.ui.unit.sp
 fun CustomButton(
     modifier: Modifier = Modifier,
     text: String,
+    enabled: Boolean = true,
     onClick: () -> Unit,
 ) {
     Button(
         modifier = modifier,
         shape = RoundedCornerShape(16.dp),
         elevation = ButtonDefaults.elevatedButtonElevation(),
+        enabled = enabled,
         onClick = onClick,
     ) {
         Text(

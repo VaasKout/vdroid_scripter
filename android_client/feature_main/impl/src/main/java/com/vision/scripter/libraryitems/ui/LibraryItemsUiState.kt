@@ -33,6 +33,7 @@ data class UiRun(
 data class UiDevicePicker(
     val isLoading: Boolean,
     val devices: ImmutableList<UiPickerDevice>,
+    val canPlay: Boolean,
 )
 
 @Immutable
@@ -41,5 +42,5 @@ data class UiPickerDevice(
     val label: String,
     val busy: Boolean,
     val statusText: String,
-    val lastUsed: Boolean,
+    val selected: Boolean,
 )

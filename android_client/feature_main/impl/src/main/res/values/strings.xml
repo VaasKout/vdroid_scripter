@@ -16,7 +16,6 @@
 
     <string name="pick_device">Run on</string>
     <string name="busy_device">Busy: %1$s</string>
-    <string name="last_used">Last used</string>
     <string name="running_on">on %1$s</string>
     <string name="play">Play</string>
     <string name="delete">Delete</string>

@@ -36,7 +36,8 @@ internal class LibraryItemsUiStateHolderPreview(
     override fun onDismissDelete() {}
     override fun onConfirmDelete() {}
     override fun onPlayClicked(name: String) {}
-    override fun onDeviceChosen(serial: String) {}
+    override fun onDeviceSelected(serial: String) {}
+    override fun onPickerPlayClicked() {}
     override fun onPickerDismissed() {}
     override fun onRunDismissed(name: String) {}
 }

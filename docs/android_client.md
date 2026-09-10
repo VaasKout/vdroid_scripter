@@ -61,10 +61,11 @@ That value is your local server IP.
 - **Library tab** — three cards: Images, Actions and Routes, each with a
   count. A card opens its list. Every row can be deleted; action and route
   rows have a play button.
-- **Play** — pick a device in the bottom sheet (the last one used is
-  preselected). A device that is already running something is grayed out
-  with its status. An action runs as a single verbatim gesture; a route runs
-  from its first step. The row then shows the live status and the device;
+- **Play** — tick a device in the bottom sheet (the last one used is
+  preselected) and press Play. A device that is already running something is
+  grayed out with its status and cannot be ticked. An action runs as a single
+  verbatim gesture; a route runs from its first step. The row then shows the live status and the device
+  while its play button stays available for other devices;
   on an error the server's text stays on the row until you tap it.
 - **Streaming screen** — the plus icon crops a template image or records a
   gesture, the eye shows the rectangles the server detects (fetched once per

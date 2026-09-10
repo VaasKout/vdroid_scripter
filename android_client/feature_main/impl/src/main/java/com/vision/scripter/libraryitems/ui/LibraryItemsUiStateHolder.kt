@@ -18,7 +18,8 @@ interface LibraryItemsUiStateHolder {
     fun onConfirmDelete()
 
     fun onPlayClicked(name: String)
-    fun onDeviceChosen(serial: String)
+    fun onDeviceSelected(serial: String)
+    fun onPickerPlayClicked()
     fun onPickerDismissed()
     fun onRunDismissed(name: String)
 }

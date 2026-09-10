@@ -81,7 +81,8 @@ internal fun LibraryItemsScreen(
     if (picker != null) {
         DevicePickerSheet(
             picker = picker,
-            onDeviceChosen = uiStateHolder::onDeviceChosen,
+            onDeviceSelected = uiStateHolder::onDeviceSelected,
+            onPlayClick = uiStateHolder::onPickerPlayClicked,
             onDismiss = uiStateHolder::onPickerDismissed,
         )
     }

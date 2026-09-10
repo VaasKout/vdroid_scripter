@@ -43,16 +43,20 @@ class LibraryItemsUiStateMapper @Inject constructor() {
         isError = status is SessionStatus.Error,
     )
 
-    private fun DevicePicker.toUi(): UiDevicePicker = UiDevicePicker(
-        isLoading = isLoading,
-        devices = devices.map {
+    private fun DevicePicker.toUi(): UiDevicePicker {
+        val uiDevices = devices.map {
             UiPickerDevice(
                 serial = it.device.serial,
                 label = it.device.label(),
-                busy = it.status is SessionStatus.Running,
+                busy = it.busy,
                 statusText = it.status.text,
-                lastUsed = it.device.serial == lastSerial,
+                selected = it.device.serial == selectedSerial,
             )
-        }.toImmutableList(),
-    )
+        }.toImmutableList()
+        return UiDevicePicker(
+            isLoading = isLoading,
+            devices = uiDevices,
+            canPlay = uiDevices.any { it.selected && !it.busy },
+        )
+    }
 }
