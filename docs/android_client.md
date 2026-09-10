@@ -69,8 +69,9 @@ That value is your local server IP.
   on an error the server's text stays on the row until you tap it.
 - **Streaming screen** — the plus icon crops a template image or records a
   gesture, the eye shows the rectangles the server detects (fetched once per
-  tap), the magnifying glass scans the screen for text, YOLO classes and,
-  optionally, your library images, the keyboard icon edits key zones.
+  tap), the magnifying glass scans the screen for text (green boxes), YOLO
+  classes (yellow) and, optionally, your library images (magenta), each box
+  labelled with its value, the keyboard icon edits key zones.
 
 ## Device Compatibility Notice
 

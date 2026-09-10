@@ -56,20 +56,14 @@ fun UsualMenu(
                 contentDescription = ""
             )
 
-            Icon(
-                modifier = Modifier
-                    .size(32.dp)
-                    .customClickable(onClick = uiStateHolder::onRectanglesClicked),
-                imageVector = if (menuType.rectsShown) Icons.Filled.Visibility
-                else Icons.Filled.VisibilityOff,
-                tint = if (menuType.rectsShown) Color.Red
-                else MaterialTheme.colorScheme.onSurface,
-                contentDescription = "",
-            )
-
             ScanIcon(
                 menuType = menuType,
                 onClick = uiStateHolder::onScanClicked,
+            )
+
+            RectanglesIcon(
+                menuType = menuType,
+                onClick = uiStateHolder::onRectanglesClicked,
             )
 
             Icon(
@@ -114,6 +108,27 @@ fun UsualMenu(
         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
         tint = MaterialTheme.colorScheme.onSurface,
         contentDescription = ""
+    )
+}
+
+@Composable
+private fun RectanglesIcon(
+    menuType: MenuType.Usual,
+    onClick: () -> Unit,
+) {
+    if (menuType.rectsAreLoading) {
+        CircularProgressIndicator(modifier = Modifier.size(32.dp))
+        return
+    }
+    Icon(
+        modifier = Modifier
+            .size(32.dp)
+            .customClickable(onClick = onClick),
+        imageVector = if (menuType.rectsShown) Icons.Filled.Visibility
+        else Icons.Filled.VisibilityOff,
+        tint = if (menuType.rectsShown) Color.Red
+        else MaterialTheme.colorScheme.onSurface,
+        contentDescription = "",
     )
 }
 

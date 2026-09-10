@@ -103,7 +103,7 @@ class MenuInteractor @Inject constructor(
 
         recordRepository.initData(name = trimmedName, itemType = itemType)
         if (itemType == ItemType.IMAGE) {
-            _menuState.update { it.copy(type = MenuType.SelectingCV) }
+            _menuState.update { it.copy(type = MenuType.SelectingCV()) }
             refreshRectangles()
             return
         }
@@ -115,7 +115,7 @@ class MenuInteractor @Inject constructor(
 
     override fun onRectanglesClicked() {
         val type = _menuState.value.type
-        if (type !is MenuType.Usual) return
+        if (type !is MenuType.Usual || type.rectsAreLoading) return
         if (type.rectsShown) {
             _menuState.update { it.copy(type = type.copy(rectsShown = false)) }
             cvRepository.clearOverlay()
@@ -126,6 +126,7 @@ class MenuInteractor @Inject constructor(
     }
 
     override fun onRefreshRectanglesClicked() {
+        if (rectanglesLoading()) return
         refreshRectangles()
     }
 
@@ -275,8 +276,36 @@ class MenuInteractor @Inject constructor(
     private fun refreshRectangles() {
         coroutineScope.launch {
             val screenSizes = videoRepository.observeScreenSizes().value ?: return@launch
+            setRectanglesLoading(true)
             val loaded = cvRepository.refreshRectangles(serial = serial, screenSizes = screenSizes)
-            if (!loaded) eventRepository.sendEvent(StreamingEvent.ShowNetworkError)
+            setRectanglesLoading(false)
+            if (loaded) return@launch
+            hideRectanglesOverlay()
+            eventRepository.sendEvent(StreamingEvent.ShowNetworkError)
+        }
+    }
+
+    private fun rectanglesLoading(): Boolean = when (val type = _menuState.value.type) {
+        is MenuType.Usual -> type.rectsAreLoading
+        is MenuType.SelectingCV -> type.rectsLoading
+        else -> false
+    }
+
+    private fun setRectanglesLoading(isLoading: Boolean) {
+        _menuState.update { state ->
+            when (val type = state.type) {
+                is MenuType.Usual -> state.copy(type = type.copy(rectsAreLoading = isLoading))
+                is MenuType.SelectingCV -> state.copy(type = type.copy(rectsLoading = isLoading))
+                else -> state
+            }
+        }
+    }
+
+    private fun hideRectanglesOverlay() {
+        _menuState.update { state ->
+            val type = state.type
+            if (type !is MenuType.Usual) return@update state
+            state.copy(type = type.copy(rectsShown = false))
         }
     }
 

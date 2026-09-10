@@ -16,15 +16,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.vision.scripter.data.api.models.CvRectangle
 import com.vision.scripter.data.api.models.RectangleWithText
-
-private val ScanColor = Color(0xFF2E7D32)
+import com.vision.scripter.streaming.impl.blocks.video.ui.UiRectangle
 
 @Composable
 fun RectanglesCanvas(
     modifier: Modifier = Modifier,
-    cvRectangles: List<CvRectangle>,
-    scanRectangles: List<CvRectangle>,
-    selectedRectangles: List<CvRectangle>,
+    rectangles: List<UiRectangle>,
     keyboardButtons: List<RectangleWithText>,
 ) {
     val textMeasurer = rememberTextMeasurer()
@@ -42,27 +39,11 @@ fun RectanglesCanvas(
             )
         }
 
-        cvRectangles.forEach {
+        rectangles.forEach {
             drawRectangle(
                 textMeasurer = textMeasurer,
-                rectangle = it,
-                color = Color.Red,
-            )
-        }
-
-        scanRectangles.forEach {
-            drawRectangle(
-                textMeasurer = textMeasurer,
-                rectangle = it,
-                color = ScanColor,
-            )
-        }
-
-        selectedRectangles.forEach {
-            drawRectangle(
-                textMeasurer = textMeasurer,
-                rectangle = it,
-                color = Color.Blue,
+                rectangle = it.rectangle,
+                color = it.color,
             )
         }
     }
@@ -108,7 +89,7 @@ private fun DrawScope.drawRectangle(
     if (rectangle.label.isEmpty()) return
     val measured = textMeasurer.measure(
         text = rectangle.label,
-        style = TextStyle(color = Color.White, fontSize = 10.sp),
+        style = TextStyle(color = Color.Black, fontSize = 10.sp),
     )
     val padding = 2.dp.toPx()
     val left = rectangle.leftX.toFloat()

@@ -23,9 +23,7 @@ fun VideoBlock(
 
     RectanglesCanvas(
         modifier = modifier,
-        cvRectangles = state.rectangles,
-        scanRectangles = state.scanRectangles,
-        selectedRectangles = state.selectedRectangles,
+        rectangles = state.rectangles,
         keyboardButtons = state.keyboardButtons,
     )
 }

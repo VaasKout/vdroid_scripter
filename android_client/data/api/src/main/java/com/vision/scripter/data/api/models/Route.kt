@@ -55,6 +55,16 @@ data class FoundLandmark(
     val rectangle: CvRectangle = CvRectangle(leftX = 0, rightX = 0, topY = 0, bottomY = 0),
 )
 
+enum class LandmarkType(val raw: String) {
+    IMAGE("image"),
+    TEXT("text"),
+    YOLO("yolo");
+
+    companion object {
+        fun parse(raw: String): LandmarkType? = entries.firstOrNull { it.raw == raw }
+    }
+}
+
 @Serializable
 data class LandmarksResponse(
     @SerialName("landmarks")

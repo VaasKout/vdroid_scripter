@@ -2,6 +2,7 @@ package com.vision.scripter.streaming.impl.data
 
 import com.vision.scripter.data.api.ScripterDataSource
 import com.vision.scripter.data.api.models.CvRectangle
+import com.vision.scripter.data.api.models.LandmarkType
 import com.vision.scripter.data.api.models.ScreenSizes
 import com.vision.scripter.data.api.models.adjustToClient
 import com.vision.scripter.data.api.models.smallestBy
@@ -41,10 +42,14 @@ class CvRepository @Inject constructor(
     ): Boolean {
         val result = scripterDataSource.scan(serial = serial, images = images, locale = locale)
         if (result !is ApiResponse.Success) return false
-        val labelled = result.data.map {
-            it.rectangle.copy(label = "${it.type} ${it.value}")
+        val found = result.data.mapNotNull {
+            val type = LandmarkType.parse(it.type) ?: return@mapNotNull null
+            ScanRectangle(
+                type = type,
+                rectangle = it.rectangle.copy(label = it.value).adjustToClient(screenSizes),
+            )
         }
-        _overlayFlow.value = CvOverlay(scan = labelled.adjustToClient(screenSizes))
+        _overlayFlow.value = CvOverlay(scan = found)
         return true
     }
 
@@ -72,5 +77,10 @@ class CvRepository @Inject constructor(
 
 data class CvOverlay(
     val rectangles: List<CvRectangle> = listOf(),
-    val scan: List<CvRectangle> = listOf(),
+    val scan: List<ScanRectangle> = listOf(),
+)
+
+data class ScanRectangle(
+    val type: LandmarkType,
+    val rectangle: CvRectangle,
 )

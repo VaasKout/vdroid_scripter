@@ -54,6 +54,7 @@ private fun MenuContent(
         is MenuType.SelectingCV -> {
             SelectingTemplateMenu(
                 modifier = modifier,
+                menuType = state.menuType,
                 uiStateHolder = uiStateHolder,
             )
         }
