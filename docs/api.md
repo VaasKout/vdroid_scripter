@@ -52,6 +52,7 @@ This document describes every HTTP endpoint exposed by the server, defined in
 | POST | `/devices/{serial}/session` | Open a session: start scrcpy and the video/control sockets |
 | GET | `/devices/{serial}/session` | Get the active session's ports |
 | DELETE | `/devices/{serial}/session` | Close the session |
+| POST | `/devices/{serial}/record` | Record a gesture performed on the device for 5 seconds and save it as a library action |
 
 ## Devices
 
@@ -141,7 +142,9 @@ status and clears the remaining queue.
   job.
 - **Response `200`:** `{ "status": "ok" }` — the steps were queued. Track
   execution via [`GET /devices/{serial}/session`](#get-devicesserialsession).
-- **Errors:** `400` on invalid JSON or an invalid step; `500` when a
+- **Errors:** `400` on invalid JSON or an invalid step; `409` while the
+  device is recording a gesture (see
+  [`POST /devices/{serial}/record`](#post-devicesserialrecord)); `500` when a
   referenced library image/action does not exist or the session could not be
   started.
 
@@ -441,6 +444,9 @@ Returns the session's status.
 - **Response `200`:** `{ "status": "<status>" }` where `<status>` is one of:
   - `closed` — no active session for this serial;
   - `idle` — session is open, step queue is empty;
+  - `recording` — a gesture is being recorded through
+    [`POST /devices/{serial}/record`](#post-devicesserialrecord); queueing
+    steps is refused meanwhile;
   - `running <step>` (e.g. `running tap on image catalog_cart_icon`) — a
     queued step is executing;
   - an error text (e.g. `unable to find <target type> <value> on screen`) —
@@ -458,6 +464,34 @@ Returns the session's status.
 Closes the session: stops the scrcpy server and tears down the sockets.
 
 - **Response `200`:** `{ "status": "ok" }`
+
+### `POST /devices/{serial}/record`
+
+Records a gesture the human performs on the device and saves it as a
+library action — the server-side counterpart of the Android client's
+recorder, made for clients without a screen of their own (the MCP). If the
+device has no open session, one is opened automatically (as for
+`queue_steps`). The session status becomes `recording`, the server listens
+to the touch panel through `adb shell getevent` for **5 seconds**, and the
+call blocks for that whole window — tell the human to perform the gesture
+right after sending the request. Only the first finger is kept; raw panel
+coordinates are scaled to the session's video frame size (the size every
+replayed touch must carry), the device's natural orientation is assumed, and
+the events are stored exactly like a client-recorded [`Action`](#action)
+with times relative to the first touch.
+While recording, `queue_steps` and `run_route` answer `409`, and the session
+worker does not start queued steps.
+
+- **Path params:** `serial` (required).
+- **Request body:** `{ "name": "shop_catalog_swipe_1" }` — the library
+  action name (trimmed, no path separators); an existing action with the
+  same name is overwritten.
+- **Response `200`:** `{ "status": "ok" }` — the action was saved.
+- **Response `204`:** no touch happened during the window; nothing was
+  saved.
+- **Errors:** `400` on invalid JSON or a bad `name`; `409` when the device is
+  running steps or already recording; `500` when the session could not be
+  started, adb failed, or the file could not be written.
 
 ## Data models
 

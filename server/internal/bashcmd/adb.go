@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 // Device properties contants
@@ -34,6 +35,13 @@ type AdbAPI interface {
 
 	PushFile(serial string, path string, dest string) error
 	ForwardTCPPort(serial string, port int, tag string) error
+
+	RecordTouches(
+		serial string,
+		duration time.Duration,
+		screenWidth int,
+		screenHeight int,
+	) (*models.Action, error)
 }
 
 func (c *cmdImpl) GetDevicesList() []string {
@@ -117,4 +125,43 @@ func (c *cmdImpl) ForwardTCPPort(serial string, port int, tag string) error {
 	var command = fmt.Sprintf("adb -s %s forward tcp:%d localabstract:%s", serial, port, tag)
 	_, err := c.ExecuteCommand(command)
 	return err
+}
+
+func (c *cmdImpl) RecordTouches(
+	serial string,
+	duration time.Duration,
+	screenWidth int,
+	screenHeight int,
+) (*models.Action, error) {
+	axesByDevice, err := c.touchAxes(serial)
+	if err != nil {
+		return nil, err
+	}
+
+	var command = fmt.Sprintf("adb -s %s shell getevent -lt", serial)
+	output, err := c.executeWithTimeout(command, duration)
+	if err != nil {
+		return nil, err
+	}
+	return &models.Action{
+		ScreenWidth:  screenWidth,
+		ScreenHeight: screenHeight,
+		Events:       parseTouches(output, axesByDevice, screenWidth, screenHeight),
+	}, nil
+}
+
+func (c *cmdImpl) touchAxes(serial string) (map[string]touchAxes, error) {
+	output, err := c.ExecuteCommand(fmt.Sprintf("adb -s %s shell getevent -p", serial))
+	if err != nil {
+		return nil, err
+	}
+	rangesByDevice := parseAxisRanges(output)
+	axes := pickAxes(rangesByDevice, absMtPositionX, absMtPositionY)
+	if len(axes) == 0 {
+		axes = pickAxes(rangesByDevice, absX, absY)
+	}
+	if len(axes) == 0 {
+		return nil, fmt.Errorf("no touch input device found on %s", serial)
+	}
+	return axes, nil
 }

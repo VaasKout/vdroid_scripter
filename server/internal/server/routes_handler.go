@@ -1,9 +1,11 @@
 package server
 
 import (
+	"android_vision_scripter/internal/usecases"
 	"android_vision_scripter/pkg/core/strutils"
 	"android_vision_scripter/pkg/models"
 	"encoding/json"
+	"errors"
 	"net/http"
 )
 
@@ -124,6 +126,10 @@ func (s *serverImpl) handleRunRoute(w http.ResponseWriter, r *http.Request) {
 	}
 
 	err := s.interactor.RunRoute(serial, name, startID, s.serverProps.SocketPort)
+	if errors.Is(err, usecases.ErrRecordingInProgress) {
+		http.Error(w, err.Error(), http.StatusConflict)
+		return
+	}
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

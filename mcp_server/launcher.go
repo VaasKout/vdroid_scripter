@@ -126,7 +126,7 @@ func (c *apiClient) waitForDevices() {
 }
 
 func (c *apiClient) hasDevices() bool {
-	body, err := c.send(http.MethodGet, "/devices", nil)
+	body, _, err := c.send(http.MethodGet, "/devices", nil)
 	if err != nil {
 		return false
 	}

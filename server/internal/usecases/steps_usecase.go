@@ -40,6 +40,9 @@ func (i *interactorImpl) RunSteps(
 	}
 	models.FillStepIDs(steps)
 
+	if i.GetSessionStatus(serial) == models.StatusRecording {
+		return ErrRecordingInProgress
+	}
 	if err := i.ensureSessionIsRunning(serial, basePort); err != nil {
 		return err
 	}

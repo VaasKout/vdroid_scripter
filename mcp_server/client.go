@@ -23,25 +23,30 @@ type apiClient struct {
 func newAPIClient(baseURL string) *apiClient {
 	return &apiClient{
 		baseURL:    baseURL,
-		client:     &http.Client{Timeout: 30 * time.Second},
+		client:     &http.Client{Timeout: 60 * time.Second},
 		pingClient: &http.Client{Timeout: pingTimeout},
 	}
 }
 
 func (c *apiClient) request(method string, path string, reqBody io.Reader) ([]byte, error) {
-	body, err := c.send(method, path, reqBody)
+	body, _, err := c.requestStatus(method, path, reqBody)
+	return body, err
+}
+
+func (c *apiClient) requestStatus(method string, path string, reqBody io.Reader) ([]byte, int, error) {
+	body, status, err := c.send(method, path, reqBody)
 	if err == nil {
-		return body, nil
+		return body, status, nil
 	}
 	started, recoverErr := c.recoverServer()
 	if recoverErr != nil {
-		return nil, recoverErr
+		return nil, 0, recoverErr
 	}
 	if !started {
-		return nil, err
+		return nil, 0, err
 	}
 	if err := rewind(reqBody); err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	return c.send(method, path, reqBody)
 }
@@ -55,10 +60,10 @@ func rewind(reqBody io.Reader) error {
 	return err
 }
 
-func (c *apiClient) send(method string, path string, reqBody io.Reader) ([]byte, error) {
+func (c *apiClient) send(method string, path string, reqBody io.Reader) ([]byte, int, error) {
 	req, err := http.NewRequest(method, c.baseURL+path, reqBody)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	if reqBody != nil {
 		req.Header.Set("Content-Type", "application/json")
@@ -66,18 +71,18 @@ func (c *apiClient) send(method string, path string, reqBody io.Reader) ([]byte,
 
 	resp, err := c.client.Do(req)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, err
+		return nil, resp.StatusCode, err
 	}
 	if resp.StatusCode >= http.StatusBadRequest {
-		return nil, fmt.Errorf("%s %s failed (%d): %s", method, path, resp.StatusCode, string(body))
+		return nil, resp.StatusCode, fmt.Errorf("%s %s failed (%d): %s", method, path, resp.StatusCode, string(body))
 	}
-	return body, nil
+	return body, resp.StatusCode, nil
 }
 
 func (c *apiClient) pingServer() error {
@@ -125,6 +130,19 @@ func (c *apiClient) queueSteps(serial string, steps []stepInput) error {
 		bytes.NewReader(body),
 	)
 	return err
+}
+
+func (c *apiClient) recordAction(serial string, name string) (bool, error) {
+	payload, err := json.Marshal(map[string]string{"name": name})
+	if err != nil {
+		return false, err
+	}
+	var path = "/devices/" + url.PathEscape(serial) + "/record"
+	_, status, err := c.requestStatus(http.MethodPost, path, bytes.NewReader(payload))
+	if err != nil {
+		return false, err
+	}
+	return status == http.StatusOK, nil
 }
 
 func (c *apiClient) closeSession(serial string) error {

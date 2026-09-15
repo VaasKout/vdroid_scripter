@@ -1,9 +1,18 @@
 package usecases
 
 import (
+	"android_vision_scripter/pkg/core/file"
 	"android_vision_scripter/pkg/models"
+	"errors"
 	"fmt"
+	"strings"
 	"time"
+)
+
+// Recording errors
+var (
+	ErrDeviceBusy          = errors.New("device is busy, wait for the session to become idle")
+	ErrRecordingInProgress = errors.New("device is recording a gesture, wait for it to finish")
 )
 
 // SessionUseCase ...
@@ -13,6 +22,7 @@ type SessionUseCase interface {
 	CloseAllSessions()
 	GetPortsJSON(serial string) map[string]string
 	GetSessionStatus(serial string) string
+	RecordAction(serial string, name string, basePort int) (bool, error)
 }
 
 func (i *interactorImpl) StartSession(serial string, basePort int) bool {
@@ -173,7 +183,7 @@ func (i *interactorImpl) addStepsToQueue(serial string, steps []models.Step) boo
 
 func (i *interactorImpl) popNextStep(serial string) (models.Step, bool) {
 	session, ok := i.sessionsCache.Get(serial)
-	if !ok || len(session.Query) == 0 {
+	if !ok || len(session.Query) == 0 || session.Status == models.StatusRecording {
 		return models.Step{}, false
 	}
 
@@ -197,6 +207,74 @@ func (i *interactorImpl) failSessionQueue(serial string, err error) {
 func (i *interactorImpl) finishSessionStep(serial string) {
 	session, ok := i.sessionsCache.Get(serial)
 	if !ok || len(session.Query) != 0 {
+		return
+	}
+	session.Status = models.StatusIdle
+	i.sessionsCache.Add(serial, session)
+}
+
+func (i *interactorImpl) RecordAction(serial string, name string, basePort int) (bool, error) {
+	serial = strings.TrimSpace(serial)
+	name = strings.TrimSpace(name)
+	if serial == "" {
+		return false, errors.New(SerialIsEmptyError)
+	}
+	if !file.ValidName(name) {
+		return false, errors.New("invalid action name")
+	}
+	if err := i.ensureSessionIsRunning(serial, basePort); err != nil {
+		return false, err
+	}
+	if !i.startRecording(serial) {
+		return false, ErrDeviceBusy
+	}
+	defer i.finishRecording(serial)
+
+	i.logger.Info(fmt.Sprintf(
+		"recording %s on %s for %ds... ⏳", name, serial, models.RecordDurationSeconds,
+	))
+	width, height, err := i.scrcpy.GetScreenSize(serial)
+	if err != nil {
+		return false, err
+	}
+	action, err := i.cmd.RecordTouches(
+		serial,
+		time.Duration(models.RecordDurationSeconds)*time.Second,
+		width,
+		height,
+	)
+	if err != nil {
+		return false, err
+	}
+
+	action.Name = name
+	if action.IsEmpty() {
+		i.logger.Info(fmt.Sprintf("nothing recorded for %s on %s", name, serial))
+		return false, nil
+	}
+	if !i.SaveAction(action) {
+		return false, fmt.Errorf("couldn't save action %s", name)
+	}
+	i.logger.Info(fmt.Sprintf("recorded %s with %d events ✅", name, len(action.Events)))
+	return true, nil
+}
+
+func (i *interactorImpl) startRecording(serial string) bool {
+	session, ok := i.sessionsCache.Get(serial)
+	if !ok || len(session.Query) != 0 {
+		return false
+	}
+	if session.Status == models.StatusRecording || models.IsRunningStatus(session.Status) {
+		return false
+	}
+	session.Status = models.StatusRecording
+	i.sessionsCache.Add(serial, session)
+	return true
+}
+
+func (i *interactorImpl) finishRecording(serial string) {
+	session, ok := i.sessionsCache.Get(serial)
+	if !ok || session.Status != models.StatusRecording {
 		return
 	}
 	session.Status = models.StatusIdle

@@ -39,7 +39,7 @@ Perception: scan is the ONLY way to observe the screen — there are no screensh
 
 Routes: a route is a saved flow — a name, the user's dictation as its prompt, and the exact steps that ran to success. When the user asks to save or remember a flow as <name>, call save_route with the name, the user's dictation VERBATIM as the prompt (conditions included), and the steps that actually succeeded in order; a duplicate name overwrites. The prompt may be absent on routes saved elsewhere (the Android client saves routes without one) — treat such a route as a plain script with no recorded intent. To run a saved route: run_route, then wait_for_session once — 'idle' means the whole route succeeded. Saving stamps every step with an id (1..N, its position) and stores delay and timeout exactly as sent (this MCP fills omitted ones the same way as for queue_steps, so a route's first step gets delay 0); run_route accepts an optional start_id to start mid-route from that step id — use it when the user asks to run a route from a specific point, or to rerun the unchanged remainder after a recovered failure; an id the route does not contain is an error and nothing runs, and whichever step a run starts from gets delay 0 regardless of the stored value. To extend a route: get_route, append the new steps, call save_route with the full list — nothing executes. If a route step fails, the error status names the failed step's id (queue_steps batches get 1-based position ids the same way); recover from that point guided by the route's prompt: scan, decide, then either queue adjusted steps with queue_steps or, when the remaining steps need no changes, run_route with start_id of the failed step — and after a recovered run ask the user whether to update the route with the steps that worked. Never create or modify routes without being asked.
 
-Curation: library images and actions are created by the human with the Android client. There are no tools here to create them. Ask the user to add a library item ONLY when the target truly cannot be reached any other way — no readable text for a text landmark, no yolo class, no generated swipe that gets there. Never request curation for something written on the screen.
+Curation: library images are created by the human with the Android client — there is no tool here to create them. Library actions can be recorded from here: when the user asks to record a gesture as <name>, call record_action and tell them to perform the gesture on the device immediately — the device listens for 5 seconds from the moment of the call and the call blocks until the window ends; 'nothing recorded' means no touch happened, ask them to try again. Never call record_action on your own initiative. Ask the user to add a library item ONLY when the target truly cannot be reached any other way — no readable text for a text landmark, no yolo class, no generated swipe that gets there. Never request curation for something written on the screen.
 
 Rules: NEVER drive the device with adb directly — no adb shell input tap, input swipe, input text, keyevent, or any other adb command, no matter what. Every interaction is a step executed through queue_steps: tap/long_tap to touch a target, a library event to gesture, type_text to type, and an EMPTY event to find or verify an element. There is no separate lookup tool — finding an element and acting on it are both steps; scan exists only for the failure, conditional and what-is-on-screen cases described above.
 
@@ -122,6 +122,11 @@ type runRouteInput struct {
 	Serial  string `json:"serial" jsonschema:"device serial number, get it from list_devices"`
 	Name    string `json:"name" jsonschema:"route name from get_routes"`
 	StartID int    `json:"start_id,omitempty" jsonschema:"id of the step to start from (route steps carry ids 1..N, see get_route); omit to run the whole route; an id the route does not contain is an error and nothing runs"`
+}
+
+type recordActionInput struct {
+	Serial string `json:"serial" jsonschema:"device serial number, get it from list_devices"`
+	Name   string `json:"name" jsonschema:"library action name to save the gesture under, <app>_<screen>_<what>[_variant] convention; a duplicate name overwrites"`
 }
 
 func (s *stepInput) describe() string {
@@ -272,6 +277,17 @@ func (s *Server) registerTools() {
 			"route succeeded; an error status names the step id that failed — " +
 			"recover from that point guided by the route's prompt.",
 	}, s.handleRunRoute)
+
+	mcp.AddTool(s.mcp, &mcp.Tool{
+		Name: "record_action",
+		Description: "Record a gesture the HUMAN performs on the device and save it " +
+			"as library action <name>. Call ONLY when the user asks to record a " +
+			"gesture. The device listens for 5 seconds from the moment of the " +
+			"call, so tell the user to perform the gesture on the device right " +
+			"away; the call blocks for the whole window and replies 'saved' or " +
+			"'nothing recorded' (ask the user to try again). Only the first " +
+			"finger is kept. Fails with 409 while the device is running steps.",
+	}, s.handleRecordAction)
 }
 
 func textResult(text string) *mcp.CallToolResult {
@@ -515,6 +531,26 @@ func (s *Server) handleRunRoute(
 		in.Name,
 	)
 	return textResult(text), nil, nil
+}
+
+func (s *Server) handleRecordAction(
+	ctx context.Context,
+	req *mcp.CallToolRequest,
+	in recordActionInput,
+) (*mcp.CallToolResult, any, error) {
+	if in.Serial == "" || in.Name == "" {
+		return nil, nil, fmt.Errorf("serial and name are required")
+	}
+	recorded, err := s.api.recordAction(in.Serial, in.Name)
+	if err != nil {
+		return nil, nil, err
+	}
+	if !recorded {
+		var text = "nothing recorded: no touch happened on the device during the " +
+			"5 second window; ask the user to perform the gesture again"
+		return textResult(text), nil, nil
+	}
+	return textResult("saved action " + in.Name), nil, nil
 }
 
 func sleepCtx(ctx context.Context, duration time.Duration) error {

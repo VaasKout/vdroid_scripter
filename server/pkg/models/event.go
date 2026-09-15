@@ -65,6 +65,25 @@ type Event struct {
 // ControlBytes ...
 type ControlBytes []byte
 
+// NewTouchEvent ...
+func NewTouchEvent(
+	timeMs int64,
+	action byte,
+	x int,
+	y int,
+	screenWidth int,
+	screenHeight int,
+) Event {
+	pressure := PressureMax
+	if action == ActionUp {
+		pressure = 0
+	}
+	return Event{
+		Time: timeMs,
+		Data: generateTouchData(action, x, y, screenWidth, screenHeight, pressure),
+	}
+}
+
 // GenerateTapEvents ...
 func GenerateTapEvents(screenWidth int, screenHeight int) []Event {
 	actionUpMs := int64(TapDurationMinMs + rand.IntN(TapDurationGapMs))
