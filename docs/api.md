@@ -108,7 +108,7 @@ bare landmark deterministically takes the first candidate on screen.
 | ------- | -------- |
 | *(empty)* | Visibility check of the landmark chain — no touch. Landmarks required. |
 | `tap` / `long_tap` | Generated tap pair placed at a random point inside the last landmark's region. Landmarks required. |
-| `swipe_up` / `swipe_down` / `swipe_left` / `swipe_right` | Generated human-like swipe named by the finger's direction: fixed length (half the screen dimension), curved Bézier path with per-point jitter, eased 300–500ms timing, random start point on screen (10% edge margin). With landmarks, the swipe starts inside the last landmark's region instead. Reserved names — a library action with the same name is shadowed. Landmarks optional. |
+| `swipe_up` / `swipe_down` / `swipe_left` / `swipe_right` | Generated human-like swipe named by the finger's direction: fixed length (half the screen dimension), curved Bézier path with per-point jitter, eased 300–500ms timing, random start point inside the middle half of the screen (25% start margin) with the end point kept at least 5% from the screen edge. With landmarks, the swipe starts inside the last landmark's region instead. Reserved names — a library action with the same name is shadowed. Landmarks optional. |
 | `type_text` | The **last landmark's `value` is the text to type**, typed via the CV keyboard (its `locale` = keyboard locale). Nothing is located on screen. |
 | any other name | The library event with that name is replayed: **offset into the found region** when landmarks are given (first touch moved into the last landmark's region, relative shape preserved), **verbatim** without them. |
 

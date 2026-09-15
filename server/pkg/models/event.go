@@ -30,7 +30,8 @@ const (
 	SwipeDurationJitterMs = 200
 	SwipeMoveIntervalMs   = 12
 	SwipeLengthRatio      = 0.5
-	SwipeEdgeMarginRatio  = 0.1
+	SwipeStartMarginRatio = 0.25
+	SwipeEndMarginRatio   = 0.05
 	SwipeBowRatioMin      = 0.02
 	SwipeBowRatioMax      = 0.04
 	SwipeJitterPx         = 2
@@ -125,28 +126,43 @@ func GenerateSwipeEvents(direction string, screenWidth int, screenHeight int) []
 }
 
 func swipeEndpoints(direction string, screenWidth int, screenHeight int) (image.Point, image.Point) {
-	marginX := int(float64(screenWidth) * SwipeEdgeMarginRatio)
-	marginY := int(float64(screenHeight) * SwipeEdgeMarginRatio)
 	lengthX := int(float64(screenWidth) * SwipeLengthRatio)
 	lengthY := int(float64(screenHeight) * SwipeLengthRatio)
 
 	switch direction {
 	case SwipeUpEvent:
-		x := randRange(marginX, screenWidth-marginX)
-		y := randRange(marginY+lengthY, screenHeight-marginY)
+		x := swipeCrossCoord(screenWidth)
+		y := swipeStartTowardZero(screenHeight, lengthY)
 		return image.Pt(x, y), image.Pt(x, y-lengthY)
 	case SwipeDownEvent:
-		x := randRange(marginX, screenWidth-marginX)
-		y := randRange(marginY, screenHeight-marginY-lengthY)
+		x := swipeCrossCoord(screenWidth)
+		y := swipeStartTowardEnd(screenHeight, lengthY)
 		return image.Pt(x, y), image.Pt(x, y+lengthY)
 	case SwipeLeftEvent:
-		x := randRange(marginX+lengthX, screenWidth-marginX)
-		y := randRange(marginY, screenHeight-marginY)
+		x := swipeStartTowardZero(screenWidth, lengthX)
+		y := swipeCrossCoord(screenHeight)
 		return image.Pt(x, y), image.Pt(x-lengthX, y)
 	}
-	x := randRange(marginX, screenWidth-marginX-lengthX)
-	y := randRange(marginY, screenHeight-marginY)
+	x := swipeStartTowardEnd(screenWidth, lengthX)
+	y := swipeCrossCoord(screenHeight)
 	return image.Pt(x, y), image.Pt(x+lengthX, y)
+}
+
+func swipeCrossCoord(size int) int {
+	margin := int(float64(size) * SwipeStartMarginRatio)
+	return randRange(margin, size-margin)
+}
+
+func swipeStartTowardZero(size int, length int) int {
+	startMargin := int(float64(size) * SwipeStartMarginRatio)
+	endMargin := int(float64(size) * SwipeEndMarginRatio)
+	return randRange(max(startMargin, endMargin+length), size-startMargin)
+}
+
+func swipeStartTowardEnd(size int, length int) int {
+	startMargin := int(float64(size) * SwipeStartMarginRatio)
+	endMargin := int(float64(size) * SwipeEndMarginRatio)
+	return randRange(startMargin, min(size-startMargin, size-endMargin-length))
 }
 
 func swipeControlPoint(start image.Point, end image.Point) image.Point {
