@@ -148,7 +148,7 @@ build_server() {
   if [ "$PLATFORM" = "macos" ]; then
     export PKG_CONFIG_PATH="$(brew --prefix opencv@4)/lib/pkgconfig:$(brew --prefix ffmpeg)/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
   fi
-  (cd "$SERVER_DIR" && go mod download && CGO_ENABLED=1 go build -o "$BUILD_OUTPUT" ./cmd)
+  (cd "$SERVER_DIR" && go mod download && CGO_ENABLED=1 go build -a -o "$BUILD_OUTPUT" ./cmd)
 }
 
 install_binary() {
