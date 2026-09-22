@@ -3,25 +3,12 @@ package filesdb
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 )
 
 // Delete ...
 type Delete interface {
-	DeletePathInKeyboardDir(args ...string) bool
 	DeleteFileByName(dir string, name string) bool
 	DeleteDirByName(dir string, name string) bool
-}
-
-// DeletePathInDBDir ...
-func (f *filesDBImpl) DeletePathInKeyboardDir(args ...string) bool {
-	var filePath = filepath.Join(f.filesProps.Keyboards, filepath.Join(args...))
-	err := os.RemoveAll(filePath)
-	if err != nil {
-		fmt.Printf("Couldn't delete file %s - %s\n", filePath, err.Error())
-		return false
-	}
-	return true
 }
 
 // DeleteFileByName ...

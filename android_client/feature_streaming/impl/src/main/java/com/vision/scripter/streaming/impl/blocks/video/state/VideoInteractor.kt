@@ -13,7 +13,6 @@ import com.vision.scripter.streaming.impl.blocks.video.ui.VideoUiState
 import com.vision.scripter.streaming.impl.blocks.video.ui.VideoUiStateHolder
 import com.vision.scripter.streaming.impl.data.CvRepository
 import com.vision.scripter.streaming.impl.data.ItemType
-import com.vision.scripter.streaming.impl.data.KeyboardRepository
 import com.vision.scripter.streaming.impl.data.RecordRepository
 import com.vision.scripter.streaming.impl.data.VideoStreamerRepository
 import com.vision.scripter.streaming.impl.screen.StreamingEvent
@@ -45,7 +44,6 @@ class VideoInteractor @Inject constructor(
     private val videoRepository: VideoStreamerRepository,
     private val controlStreamer: ControlStreamer,
     private val cvRepository: CvRepository,
-    private val keyboardRepository: KeyboardRepository,
     private val recordRepository: RecordRepository,
     private val eventsHolder: StreamingEventsHolder,
 ) : VideoUiStateHolder {
@@ -81,15 +79,13 @@ class VideoInteractor @Inject constructor(
             cvRepository.observeOverlay(),
             cvRepository.observeSelectedRectangles(),
             videoRepository.observeScreenSizes(),
-            keyboardRepository.observeKeyboardButtons(),
             recordRepository.observeRecord(),
-        ) { overlay, selectedRects, screenSizes, keyboardButtons, record ->
+        ) { overlay, selectedRects, screenSizes, record ->
             _stateFlow.update {
                 it.copy(
                     overlay = overlay,
                     selectedRectangles = selectedRects,
                     screenSizes = screenSizes,
-                    keyboardButtons = keyboardButtons,
                     record = record,
                 )
             }
@@ -184,9 +180,6 @@ class VideoInteractor @Inject constructor(
                         }
                         return@launch
                     }
-
-                    val newButton = keyboardRepository.handleTouchEvent(event)
-                    if (newButton != null) return@launch
 
                     val bytesArray = controlStreamer.sendControlData(
                         screenSizes = screenSizes,

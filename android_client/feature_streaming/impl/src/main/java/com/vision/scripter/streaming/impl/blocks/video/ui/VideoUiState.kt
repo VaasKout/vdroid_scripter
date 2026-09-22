@@ -3,7 +3,6 @@ package com.vision.scripter.streaming.impl.blocks.video.ui
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.graphics.Color
 import com.vision.scripter.data.api.models.CvRectangle
-import com.vision.scripter.data.api.models.RectangleWithText
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
 
@@ -11,7 +10,6 @@ import kotlinx.collections.immutable.persistentListOf
 data class VideoUiState(
     val streamingIsLoading: Boolean = true,
     val rectangles: ImmutableList<UiRectangle> = persistentListOf(),
-    val keyboardButtons: ImmutableList<RectangleWithText> = persistentListOf(),
 )
 
 @Immutable

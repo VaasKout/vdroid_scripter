@@ -3,7 +3,6 @@ package com.vision.scripter.streaming.impl.blocks.video.state
 import android.annotation.SuppressLint
 import android.media.MediaFormat
 import com.vision.scripter.data.api.models.CvRectangle
-import com.vision.scripter.data.api.models.RectangleWithText
 import com.vision.scripter.data.api.models.ScreenSizes
 import com.vision.scripter.data.api.models.StreamingData
 import com.vision.scripter.streaming.impl.data.CvOverlay
@@ -20,7 +19,6 @@ data class VideoState(
 
     val overlay: CvOverlay = CvOverlay(),
     val selectedRectangles: List<CvRectangle> = listOf(),
-    val keyboardButtons: List<RectangleWithText> = listOf(),
     val record: Record = Record(),
 )
 

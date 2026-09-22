@@ -26,11 +26,8 @@ const (
 
 	phraseMaxGapHeights = 3
 
-	PsmText  = 11
-	PsmChars = 7
-
-	OemText  = 3
-	OemChars = 0
+	PsmText = 11
+	OemText = 3
 )
 
 // TesseractLocaleMap converts adb system locales
@@ -176,20 +173,21 @@ type TextHandler interface {
 	) ([]OCRResult, error)
 }
 
+// TesseractLang ...
+func TesseractLang(locale string) string {
+	if result, ok := TesseractLocaleMap[locale]; ok {
+		return result
+	}
+	return DefaultOCRLanguage
+}
+
 // InitOcrParams ...
 func InitOcrParams(text string, lang string, psm int, oem int) *OcrParams {
 	var ocrParams = new(OcrParams)
 	ocrParams.Text = text
 	ocrParams.Psm = psm
 	ocrParams.Oem = oem
-
-	if result, ok := TesseractLocaleMap[lang]; ok {
-		ocrParams.Lang = result
-	}
-
-	if ocrParams.Lang == "" {
-		ocrParams.Lang = DefaultOCRLanguage
-	}
+	ocrParams.Lang = TesseractLang(lang)
 
 	if psm == 0 {
 		ocrParams.Psm = 11

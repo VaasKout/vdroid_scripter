@@ -4,13 +4,10 @@ import com.vision.scripter.data.api.ScripterDataSource
 import com.vision.scripter.data.api.models.AdbDevice
 import com.vision.scripter.data.api.models.AdbDevicesResponse
 import com.vision.scripter.data.api.models.CvRectangle
-import com.vision.scripter.data.api.models.EditKeyboardRequest
 import com.vision.scripter.data.api.models.Event
 import com.vision.scripter.data.api.models.FoundLandmark
-import com.vision.scripter.data.api.models.KeyboardButtons
 import com.vision.scripter.data.api.models.LandmarksResponse
 import com.vision.scripter.data.api.models.Library
-import com.vision.scripter.data.api.models.RectangleWithText
 import com.vision.scripter.data.api.models.RectanglesResponse
 import com.vision.scripter.data.api.models.Route
 import com.vision.scripter.data.api.models.RoutesResponse
@@ -120,66 +117,6 @@ class ScripterDataSourceImpl @Inject constructor(
     override suspend fun deleteAction(name: String): Boolean {
         if (name.isEmpty()) return false
         val result = networkClient.delete("actions/${encodePath(name)}")
-        return result is ApiResponse.Success
-    }
-
-    override suspend fun resetKeyboard(
-        serial: String,
-        locale: String
-    ): ApiResponse<List<RectangleWithText>> {
-        return when (val result =
-            networkClient.get("/devices/$serial/reset_keyboard?locale=$locale")) {
-            is ApiResponse.Success -> {
-                val json = result.data
-                val keyboardButtons = if (json.isEmpty()) KeyboardButtons()
-                else Json.decodeFromString<KeyboardButtons>(result.data)
-                ApiResponse.Success(keyboardButtons.buttons)
-            }
-
-            is ApiResponse.Error -> result
-        }
-    }
-
-    override suspend fun getKeyboard(
-        serial: String,
-        locale: String
-    ): ApiResponse<List<RectangleWithText>> {
-        return when (val result =
-            networkClient.get("/devices/$serial/keyboard?locale=$locale")) {
-            is ApiResponse.Success -> {
-                val json = result.data
-                val keyboardButtons = if (json.isEmpty()) KeyboardButtons()
-                else Json.decodeFromString<KeyboardButtons>(result.data)
-                ApiResponse.Success(keyboardButtons.buttons)
-            }
-
-            is ApiResponse.Error -> result
-        }
-    }
-
-    override suspend fun editKeyboard(
-        serial: String,
-        locale: String,
-        name: String,
-        rectangle: CvRectangle?,
-    ): Boolean {
-        if (serial.isEmpty() || name.isEmpty() || rectangle.isEmpty()) return false
-        val request = EditKeyboardRequest(
-            serial = serial,
-            locale = locale,
-            name = name,
-            rectangle = rectangle,
-        )
-        val body = Json.encodeToString(request)
-        val result = networkClient.post("/devices/$serial/edit_keyboard", body)
-        return result is ApiResponse.Success
-    }
-
-    override suspend fun deleteButton(serial: String, locale: String, name: String): Boolean {
-        if (serial.isEmpty() || name.isEmpty()) return false
-        val result = networkClient.get(
-            "/devices/$serial/delete_button?locale=$locale&name=${encodeQuery(name)}",
-        )
         return result is ApiResponse.Success
     }
 

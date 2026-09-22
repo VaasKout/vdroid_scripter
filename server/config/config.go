@@ -11,7 +11,6 @@ import (
 const (
 	BasePath       = "vdroid_scripter"
 	LogsDir        = "logs"
-	KeyboardDir    = "keyboards"
 	ScrcpyDir      = "scrcpy"
 	YoloDir        = "yolo"
 	ImagesDir      = "images"
@@ -37,13 +36,12 @@ type ServerProps struct {
 
 // FilesProps ...
 type FilesProps struct {
-	Logs      string
-	Keyboards string
-	Scrcpy    string
-	Yolo      string
-	Images    string
-	Actions   string
-	Routes    string
+	Logs    string
+	Scrcpy  string
+	Yolo    string
+	Images  string
+	Actions string
+	Routes  string
 }
 
 // ScrcpyProps ...
@@ -82,11 +80,6 @@ func New() *Config {
 		logsDir = LogsDir
 	}
 
-	keyboardsDir := os.Getenv("KEYBOARDS_DIR")
-	if keyboardsDir == "" {
-		keyboardsDir = KeyboardDir
-	}
-
 	scrcpyDir := os.Getenv("SCRCPY_DIR")
 	if scrcpyDir == "" {
 		scrcpyDir = ScrcpyDir
@@ -123,13 +116,12 @@ func New() *Config {
 			SocketPort: baseSocketPort,
 		},
 		FilesProps: &FilesProps{
-			Logs:      filepath.Join(cachePath, logsDir),
-			Keyboards: filepath.Join(cachePath, keyboardsDir),
-			Scrcpy:    filepath.Join(cachePath, scrcpyDir),
-			Yolo:      filepath.Join(cachePath, yoloDir),
-			Images:    filepath.Join(cachePath, imagesDir),
-			Actions:   filepath.Join(cachePath, actionsDir),
-			Routes:    filepath.Join(cachePath, routesDir),
+			Logs:    filepath.Join(cachePath, logsDir),
+			Scrcpy:  filepath.Join(cachePath, scrcpyDir),
+			Yolo:    filepath.Join(cachePath, yoloDir),
+			Images:  filepath.Join(cachePath, imagesDir),
+			Actions: filepath.Join(cachePath, actionsDir),
+			Routes:  filepath.Join(cachePath, routesDir),
 		},
 		ScrcpyProps: &ScrcpyProps{
 			ScrcpyVersion: scrcpyVersion,

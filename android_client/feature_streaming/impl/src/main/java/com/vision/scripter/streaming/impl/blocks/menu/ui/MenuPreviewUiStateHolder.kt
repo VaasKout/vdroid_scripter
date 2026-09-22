@@ -19,14 +19,10 @@ internal class MenuPreviewUiStateHolder(state: MenuUiState) : MenuUiStateHolder 
     override fun onRefreshRectanglesClicked() {}
     override fun onScanClicked() {}
     override fun onScanConfirmed(locale: String, includeImages: Boolean) {}
-    override fun onKeyboardClicked() {}
-    override fun onKeyboardModeClicked() {}
-    override fun onEditKeyboardButtonSaved(oldKey: String, newKey: String) {}
     override fun onRecordingClicked() {}
     override fun onSaveClicked() {}
     override fun onExpandClicked() {}
     override fun onCancelClicked() {}
     override fun onExitClicked() {}
-    override fun onSaveLocale(locale: String) {}
     override fun onDialogDismissed() {}
 }

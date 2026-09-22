@@ -9,11 +9,8 @@ import com.vision.scripter.streaming.impl.blocks.menu.commandobservers.MenuComma
 import com.vision.scripter.streaming.impl.blocks.menu.state.DialogState
 import com.vision.scripter.streaming.impl.blocks.menu.state.MenuType
 import com.vision.scripter.streaming.impl.blocks.menu.ui.dialogs.AddItemDialog
-import com.vision.scripter.streaming.impl.blocks.menu.ui.dialogs.EditKeyboardDialog
-import com.vision.scripter.streaming.impl.blocks.menu.ui.dialogs.KeyboardDialog
 import com.vision.scripter.streaming.impl.blocks.menu.ui.dialogs.ScanDialog
 import com.vision.scripter.streaming.impl.blocks.menu.ui.menu.CustomActionMenu
-import com.vision.scripter.streaming.impl.blocks.menu.ui.menu.KeyboardMenu
 import com.vision.scripter.streaming.impl.blocks.menu.ui.menu.SelectingTemplateMenu
 import com.vision.scripter.streaming.impl.blocks.menu.ui.menu.UsualMenu
 
@@ -66,14 +63,6 @@ private fun MenuContent(
                 uiStateHolder = uiStateHolder,
             )
         }
-
-        is MenuType.Keyboard -> {
-            KeyboardMenu(
-                modifier = modifier,
-                menuType = state.menuType,
-                uiStateHolder = uiStateHolder,
-            )
-        }
     }
 
     when (state.dialogState) {
@@ -89,21 +78,6 @@ private fun MenuContent(
         is DialogState.Scan -> {
             ScanDialog(
                 onScan = uiStateHolder::onScanConfirmed,
-                onDismiss = uiStateHolder::onDialogDismissed,
-            )
-        }
-
-        is DialogState.Keyboard -> {
-            KeyboardDialog(
-                onSaveLocale = uiStateHolder::onSaveLocale,
-                onDismiss = uiStateHolder::onDialogDismissed,
-            )
-        }
-
-        is DialogState.EditKeyboard -> {
-            EditKeyboardDialog(
-                oldKey = state.dialogState.oldKey,
-                onSave = uiStateHolder::onEditKeyboardButtonSaved,
                 onDismiss = uiStateHolder::onDialogDismissed,
             )
         }

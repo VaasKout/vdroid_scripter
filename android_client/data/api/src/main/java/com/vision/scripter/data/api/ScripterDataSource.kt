@@ -5,7 +5,6 @@ import com.vision.scripter.data.api.models.CvRectangle
 import com.vision.scripter.data.api.models.Event
 import com.vision.scripter.data.api.models.FoundLandmark
 import com.vision.scripter.data.api.models.Library
-import com.vision.scripter.data.api.models.RectangleWithText
 import com.vision.scripter.data.api.models.Route
 import com.vision.scripter.data.api.models.SessionStatus
 import com.vision.scripter.data.api.models.Step
@@ -50,20 +49,4 @@ interface ScripterDataSource {
     ): ApiResponse<List<FoundLandmark>>
 
     suspend fun getRectangles(serial: String): ApiResponse<List<CvRectangle>>
-
-    suspend fun resetKeyboard(serial: String, locale: String): ApiResponse<List<RectangleWithText>>
-    suspend fun getKeyboard(serial: String, locale: String): ApiResponse<List<RectangleWithText>>
-
-    suspend fun editKeyboard(
-        serial: String,
-        locale: String,
-        name: String,
-        rectangle: CvRectangle?,
-    ): Boolean
-
-    suspend fun deleteButton(
-        serial: String,
-        locale: String,
-        name: String,
-    ): Boolean
 }

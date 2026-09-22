@@ -22,16 +22,11 @@ interface MenuUiStateHolder {
     fun onScanClicked()
     fun onScanConfirmed(locale: String, includeImages: Boolean)
 
-    fun onKeyboardClicked()
-    fun onKeyboardModeClicked()
-    fun onEditKeyboardButtonSaved(oldKey: String, newKey: String)
-
     fun onRecordingClicked()
     fun onSaveClicked()
     fun onExpandClicked()
     fun onCancelClicked()
     fun onExitClicked()
 
-    fun onSaveLocale(locale: String)
     fun onDialogDismissed()
 }

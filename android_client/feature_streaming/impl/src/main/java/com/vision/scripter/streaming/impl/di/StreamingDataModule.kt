@@ -1,7 +1,6 @@
 package com.vision.scripter.streaming.impl.di
 
 import com.vision.scripter.streaming.impl.data.CvRepository
-import com.vision.scripter.streaming.impl.data.KeyboardRepository
 import com.vision.scripter.streaming.impl.data.RecordRepository
 import com.vision.scripter.streaming.impl.screen.StreamingEventsHolder
 import com.vision.scripter.streaming.impl.data.VideoStreamerRepository
@@ -17,7 +16,6 @@ import dagger.hilt.android.components.ViewModelComponent
 interface StreamingDataEntryPoint {
     fun videoStreamerRepository(): VideoStreamerRepository
     fun cvRepository(): CvRepository
-    fun keyboardRepository(): KeyboardRepository
     fun recordRepository(): RecordRepository
     fun streamingEventRepository(): StreamingEventsHolder
 }
@@ -35,11 +33,6 @@ object StreamingDataModule {
     fun provideCvRepository(
         manager: StreamingComponentManager,
     ): CvRepository = entryPoint(manager).cvRepository()
-
-    @Provides
-    fun provideKeyboardRepository(
-        manager: StreamingComponentManager,
-    ): KeyboardRepository = entryPoint(manager).keyboardRepository()
 
     @Provides
     fun provideRecordRepository(

@@ -7,6 +7,4 @@
     <string name="add_custom_action">Custom action</string>
     <string name="scan_screen">Scan the screen</string>
     <string name="include_library_images">Include library images</string>
-    <string name="choose_locale">Choose locale</string>
-    <string name="set_button">Set button</string>
 </resources>

@@ -11,7 +11,6 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Keyboard
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
@@ -64,15 +63,6 @@ fun UsualMenu(
             RectanglesIcon(
                 menuType = menuType,
                 onClick = uiStateHolder::onRectanglesClicked,
-            )
-
-            Icon(
-                modifier = Modifier
-                    .size(32.dp)
-                    .customClickable(onClick = uiStateHolder::onKeyboardClicked),
-                imageVector = Icons.Filled.Keyboard,
-                tint = MaterialTheme.colorScheme.onSurface,
-                contentDescription = "",
             )
 
             Icon(

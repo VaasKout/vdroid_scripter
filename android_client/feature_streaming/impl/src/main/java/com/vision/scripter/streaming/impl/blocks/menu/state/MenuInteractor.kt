@@ -9,13 +9,10 @@ import com.vision.scripter.streaming.impl.blocks.menu.ui.MenuUiState
 import com.vision.scripter.streaming.impl.blocks.menu.ui.MenuUiStateHolder
 import com.vision.scripter.streaming.impl.data.CvRepository
 import com.vision.scripter.streaming.impl.data.ItemType
-import com.vision.scripter.streaming.impl.data.KeyboardRepository
 import com.vision.scripter.streaming.impl.data.RecordRepository
 import com.vision.scripter.streaming.impl.data.VideoStreamerRepository
 import com.vision.scripter.streaming.impl.screen.StreamingEvent
 import com.vision.scripter.streaming.impl.screen.StreamingEventsHolder
-import com.vision.scripter.streaming.impl.screen.state.KeyboardMode
-import com.vision.scripter.streaming.impl.screen.state.increment
 import com.vision.scripter.ui.CommandFlow
 import dagger.hilt.android.scopes.ViewModelScoped
 import kotlinx.coroutines.CoroutineScope
@@ -38,7 +35,6 @@ class MenuInteractor @Inject constructor(
     uiStateMapper: MenuUiStateMapper,
     private val scripterDataSource: ScripterDataSource,
     private val cvRepository: CvRepository,
-    private val keyboardRepository: KeyboardRepository,
     private val recordRepository: RecordRepository,
     private val videoRepository: VideoStreamerRepository,
     private val eventRepository: StreamingEventsHolder,
@@ -85,10 +81,6 @@ class MenuInteractor @Inject constructor(
                 if (type !is MenuType.CustomAction) return@update it
                 it.copy(type = type.copy(recording = record.recording))
             }
-        }.launchIn(coroutineScope)
-
-        keyboardRepository.observeSelectedButton().onEach { oldKey ->
-            onEditKeyboardRectangleSelected(oldKey)
         }.launchIn(coroutineScope)
     }
 
@@ -157,10 +149,6 @@ class MenuInteractor @Inject constructor(
         }
     }
 
-    override fun onKeyboardClicked() {
-        _dialogState.update { DialogState.Keyboard }
-    }
-
     override fun onExpandClicked() {
         val type = _menuState.value.type
         if (type is MenuType.Usual) {
@@ -174,25 +162,8 @@ class MenuInteractor @Inject constructor(
         recordRepository.switchRecording()
     }
 
-    override fun onKeyboardModeClicked() {
-        val type = _menuState.value.type
-        if (type !is MenuType.Keyboard) return
-
-        val newMode = type.mode.increment()
-        _menuState.update { it.copy(type = type.copy(mode = newMode)) }
-        changeKeyboardState(newMode)
-    }
-
-    override fun onEditKeyboardButtonSaved(oldKey: String, newKey: String) {
-        val type = _menuState.value.type
-        if (type !is MenuType.Keyboard) return
-        hideDialog()
-        editKeyboardKey(oldKey = oldKey, newKey = newKey)
-    }
-
     override fun onSaveClicked() {
         when (_menuState.value.type) {
-            is MenuType.Keyboard -> exitKeyboard()
             is MenuType.SelectingCV -> saveImage()
             is MenuType.CustomAction -> saveAction()
             else -> Unit
@@ -200,11 +171,7 @@ class MenuInteractor @Inject constructor(
     }
 
     override fun onCancelClicked() {
-        when (_menuState.value.type) {
-            is MenuType.Keyboard -> exitKeyboard()
-            else -> _menuState.update { it.copy(type = MenuType.Usual(expanded = true)) }
-        }
-
+        _menuState.update { it.copy(type = MenuType.Usual(expanded = true)) }
         coroutineScope.launch {
             recordRepository.clear()
             dropState()
@@ -213,13 +180,6 @@ class MenuInteractor @Inject constructor(
 
     override fun onExitClicked() {
         uiCommandsFlow.tryEmit(MenuUiCommand.ExitCommand)
-    }
-
-    override fun onSaveLocale(locale: String) {
-        hideDialog()
-        if (_menuState.value.type !is MenuType.Usual) return
-        _menuState.update { it.copy(type = MenuType.Keyboard(mode = KeyboardMode.EDIT)) }
-        openKeyboard(locale)
     }
 
     override fun onDialogDismissed() {
@@ -327,79 +287,9 @@ class MenuInteractor @Inject constructor(
         }
     }
 
-    private fun changeKeyboardState(keyboardMode: KeyboardMode) {
-        coroutineScope.launch {
-            keyboardRepository.updateKeyboardState(keyboardMode)
-            cvRepository.clearSelectedRectangles()
-            if (keyboardMode == KeyboardMode.ADD_NEW) {
-                refreshRectangles()
-                return@launch
-            }
-            cvRepository.clearOverlay()
-        }
-    }
-
-    private fun editKeyboardKey(oldKey: String, newKey: String) {
-        coroutineScope.launch {
-            val screenSizes = videoRepository.observeScreenSizes().value ?: return@launch
-            val tmpZone =
-                cvRepository.observeSelectedRectangles().value.firstOrNull() ?: return@launch
-            val success = keyboardRepository.editKeyboardKey(
-                serial = serial,
-                oldName = oldKey,
-                newName = newKey,
-                rectangle = tmpZone.adjustToServer(screenSizes),
-            )
-            cvRepository.clearSelectedRectangles()
-            if (success) {
-                getOrResetKeyboard()
-                return@launch
-            }
-            eventRepository.sendEvent(StreamingEvent.ShowNetworkError)
-        }
-    }
-
-    private fun openKeyboard(locale: String) {
-        coroutineScope.launch {
-            keyboardRepository.updateKeyboardLocale(locale)
-            getOrResetKeyboard()
-        }
-    }
-
-    private suspend fun getOrResetKeyboard() {
-        val screenSizes = videoRepository.observeScreenSizes().value ?: return
-        setKeyboardLoading(true)
-        val loaded = keyboardRepository.getOrResetKeyboard(
-            serial = serial,
-            screenSizes = screenSizes,
-        )
-        setKeyboardLoading(false)
-        if (!loaded) eventRepository.sendEvent(StreamingEvent.ShowNetworkError)
-    }
-
     private fun dropState() {
         cvRepository.clearSelectedRectangles()
         cvRepository.clearOverlay()
-        keyboardRepository.clear()
-    }
-
-    private fun setKeyboardLoading(isLoading: Boolean) {
-        val type = _menuState.value.type
-        if (type is MenuType.Keyboard) {
-            _menuState.update { it.copy(type = type.copy(isLoading = isLoading)) }
-        }
-    }
-
-    private fun exitKeyboard() {
-        _menuState.update { it.copy(type = MenuType.Usual(expanded = true)) }
-        dropState()
-    }
-
-    private fun onEditKeyboardRectangleSelected(oldKey: String) {
-        val type = _menuState.value.type
-        if (type is MenuType.Keyboard) {
-            _dialogState.update { DialogState.EditKeyboard(oldKey) }
-        }
     }
 
     private fun hideDialog() {

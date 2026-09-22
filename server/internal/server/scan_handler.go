@@ -15,6 +15,7 @@ const (
 // Scan query keys
 const (
 	ImagesKey = "images"
+	LocaleKey = "locale"
 )
 
 func (s *serverImpl) handleScanFunctions() {

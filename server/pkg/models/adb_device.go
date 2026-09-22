@@ -2,7 +2,6 @@
 package models
 
 import (
-	"fmt"
 	"strings"
 )
 
@@ -29,12 +28,4 @@ func (a *AdbDevice) FilterLocales() {
 		return
 	}
 	a.Locale = systemLocales[0]
-}
-
-// ToModelOs ...
-func (a *AdbDevice) ToModelOs() string {
-	if a == nil || a.Model == "" || a.OsVersion == "" {
-		return ""
-	}
-	return fmt.Sprintf("%s_%s", a.Model, a.OsVersion)
 }

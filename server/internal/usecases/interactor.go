@@ -23,7 +23,6 @@ const (
 type Interactor interface {
 	CmdUseCase
 	ScrcpyUseCase
-	KeyboardUseCase
 	SessionUseCase
 	LibraryUseCase
 	ScanUseCase

@@ -78,6 +78,34 @@ func Recognize(
 	oem int,
 	whitelist string,
 ) ([]Word, error) {
+	return recognize(pixels, width, height, stride, lang, psm, oem, whitelist, C.RIL_WORD)
+}
+
+// RecognizeSymbols ...
+func RecognizeSymbols(
+	pixels []byte,
+	width int,
+	height int,
+	stride int,
+	lang string,
+	psm int,
+	oem int,
+	whitelist string,
+) ([]Word, error) {
+	return recognize(pixels, width, height, stride, lang, psm, oem, whitelist, C.RIL_SYMBOL)
+}
+
+func recognize(
+	pixels []byte,
+	width int,
+	height int,
+	stride int,
+	lang string,
+	psm int,
+	oem int,
+	whitelist string,
+	level C.TessPageIteratorLevel,
+) ([]Word, error) {
 	if width <= 0 || height <= 0 || stride < width {
 		return nil, fmt.Errorf("invalid image %dx%d with stride %d", width, height, stride)
 	}
@@ -122,18 +150,18 @@ func Recognize(
 	pageIterator := C.TessResultIteratorGetPageIterator(iterator)
 	words := []Word{}
 	for {
-		cText := C.TessResultIteratorGetUTF8Text(iterator, C.RIL_WORD)
+		cText := C.TessResultIteratorGetUTF8Text(iterator, level)
 		if cText != nil {
 			var left, top, right, bottom C.int
-			C.TessPageIteratorBoundingBox(pageIterator, C.RIL_WORD, &left, &top, &right, &bottom)
+			C.TessPageIteratorBoundingBox(pageIterator, level, &left, &top, &right, &bottom)
 			words = append(words, Word{
 				Text:       C.GoString(cText),
-				Confidence: float32(C.TessResultIteratorConfidence(iterator, C.RIL_WORD)),
+				Confidence: float32(C.TessResultIteratorConfidence(iterator, level)),
 				Rect:       image.Rect(int(left), int(top), int(right), int(bottom)),
 			})
 			C.TessDeleteText(cText)
 		}
-		if C.TessPageIteratorNext(pageIterator, C.RIL_WORD) == 0 {
+		if C.TessPageIteratorNext(pageIterator, level) == 0 {
 			break
 		}
 	}

@@ -14,7 +14,6 @@ class VideoUiStateMapper @Inject constructor() {
         return VideoUiState(
             streamingIsLoading = state.streamingData == null,
             rectangles = state.uiRectangles().toPersistentList(),
-            keyboardButtons = state.keyboardButtons.toPersistentList(),
         )
     }
 

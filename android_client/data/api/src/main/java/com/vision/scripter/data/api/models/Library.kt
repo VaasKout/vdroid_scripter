@@ -38,9 +38,3 @@ data class Event(
     @SerialName("data")
     val data: UByteArray? = null,
 )
-
-@Serializable
-data class KeyboardButtons(
-    @SerialName("buttons")
-    val buttons: List<RectangleWithText> = listOf(),
-)

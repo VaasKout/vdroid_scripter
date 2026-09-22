@@ -111,6 +111,16 @@ func ImageRectIsEmpty(r *image.Rectangle) bool {
 	return r == nil || (r.Dy() == 0 && r.Dx() == 0)
 }
 
+// CenterX ...
+func CenterX(rect image.Rectangle) int {
+	return (rect.Min.X + rect.Max.X) / 2
+}
+
+// CenterY ...
+func CenterY(rect image.Rectangle) int {
+	return (rect.Min.Y + rect.Max.Y) / 2
+}
+
 // ClosestRect ...
 func ClosestRect(rects []image.Rectangle, target *image.Rectangle) *image.Rectangle {
 	if len(rects) == 0 {

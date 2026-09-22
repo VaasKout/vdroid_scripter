@@ -69,11 +69,13 @@ The `event` decides what happens at the target:
 | ----- | ------ |
 | `tap`, `long_tap` | A generated touch at a random point inside the found region |
 | `swipe_up`, `swipe_down`, `swipe_left`, `swipe_right` | A generated human-like swipe, named by the finger's direction. Landmarks are optional |
-| `type_text` | Types the last landmark's `value` on the on-screen keyboard, which the server locates by CV |
+| `type_text` | Types the last landmark's `value` on the open on-screen keyboard. The landmark's `locale` names the keyboard language |
 | a library action name | Replays that recorded gesture, moved into the found region when the step has a target, verbatim otherwise |
 | empty | A pure visibility check of the target, no touch |
 
 `delay` is slept before the step acts and `timeout` is how long the server keeps looking for the target. Both are milliseconds and both are taken literally.
+
+Typing is dynamic: nothing about keyboards is stored. When a `type_text` step runs, the keyboard must already be open (tap the field first). The server reads the keyboard's letter rows off the live frame, recognises them by the row patterns of the landmark's `locale` (QWERTY for `eng`, AZERTY for `fra`, QWERTZ for `deu`, ЙЦУКЕН for `rus`, and the other European layouts), and taps the keys. Letters, space and, when the keyboard shows a number row, digits can be typed, and capitals go through Shift. Punctuation and symbols are not supported yet and fail the step. The keyboard has to be showing the language of the step; switching languages is up to the flow.
 
 ### Sessions and the queue
 
@@ -163,7 +165,6 @@ Everything is optional. Settings are read from a `.env` file in the working dire
 | `IMAGES_DIR` | `images` | Library images |
 | `ACTIONS_DIR` | `actions` | Library actions |
 | `ROUTES_DIR` | `routes` | Saved routes |
-| `KEYBOARDS_DIR` | `keyboards` | Keyboard key templates |
 | `YOLO_DIR` | `yolo` | YOLO model files |
 | `SCRCPY_DIR` | `scrcpy` | Downloaded scrcpy-server binaries |
 | `LOGS` | `logs` | Log files |
@@ -206,7 +207,7 @@ ifconfig    # macOS, look for "inet 192.168.x.x" on en0
 * **Devices tab.** Every device the server sees over ADB, with a Streaming button that opens the live screen. Streaming a device restarts its session and cancels whatever is running on it. This is the emergency stop for a route that must not continue.
 * **Library tab.** Three cards: Images, Actions and Routes, each with a count. A card opens its list. Every row can be deleted, and action and route rows have a play button.
 * **Play.** Tick a device in the bottom sheet and press Play. The last device used is preselected. A device that is already running something is grayed out with its status and cannot be ticked. An action runs as a single verbatim gesture, a route runs from its first step. The row then shows the live status and the device, while its play button stays available for other devices. On an error the server's text stays on the row until you tap it.
-* **Streaming screen.** The plus icon crops a template image or records a gesture. The magnifying glass scans the screen for text (green boxes), YOLO classes (yellow) and, optionally, your library images (magenta), each box labelled with its value. The eye shows the rectangles the server detects, fetched once per tap. The keyboard icon edits the on-screen keyboard's key zones.
+* **Streaming screen.** The plus icon crops a template image or records a gesture. The magnifying glass scans the screen for text (green boxes), YOLO classes (yellow) and, optionally, your library images (magenta), each box labelled with its value. The eye shows the rectangles the server detects, fetched once per tap.
 
 ## MCP server
 
@@ -290,7 +291,7 @@ A library action can be recorded in two ways.
 
 ## API reference
 
-The server exposes an HTTP API for devices, steps, the library, scan, routes, the on-screen keyboard, sessions and recording. See [docs/api.md](docs/api.md) for every endpoint, the request and response formats, and the data models.
+The server exposes an HTTP API for devices, steps, the library, scan, routes, sessions and recording. See [docs/api.md](docs/api.md) for every endpoint, the request and response formats, and the data models.
 
 ## Device compatibility
 

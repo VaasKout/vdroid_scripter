@@ -4,7 +4,6 @@ import (
 	"android_vision_scripter/internal/cv"
 	"android_vision_scripter/pkg/core/file"
 	"android_vision_scripter/pkg/core/numutils"
-	"android_vision_scripter/pkg/core/strutils"
 	"android_vision_scripter/pkg/models"
 	"errors"
 	"fmt"
@@ -15,6 +14,14 @@ import (
 	"unicode"
 
 	"gocv.io/x/gocv"
+)
+
+// Typing constants
+const (
+	KeyPressMinDelayMs  = 100
+	KeyPressMaxDelayMs  = 300
+	KeyboardSettleMs    = 400
+	MaxKeyboardSwitches = 3
 )
 
 // StepsUseCase ...
@@ -186,7 +193,8 @@ func (i *interactorImpl) typeTextStep(serial string, step *models.Step) error {
 	}
 
 	tapEvents := models.GenerateTapEvents(width, height)
-	return i.typeText(serial, step.GetTimeout(), last.Value, last.Locale, tapEvents)
+	lang := cv.TesseractLang(last.Locale)
+	return i.typeText(serial, step.GetTimeout(), last.Value, lang, tapEvents)
 }
 
 func (i *interactorImpl) playCustomEvent(serial string, step *models.Step) error {
@@ -328,7 +336,7 @@ func (i *interactorImpl) typeText(
 	serial string,
 	timeout time.Duration,
 	text string,
-	locale string,
+	lang string,
 	tapEvents []models.Event,
 ) error {
 	if text == "" {
@@ -336,103 +344,107 @@ func (i *interactorImpl) typeText(
 	}
 
 	deadline := time.Now().Add(timeout)
+	runes := []rune(text)
+	var keyboard *cv.Keyboard
+	switches := 0
+	index := 0
+	for index < len(runes) {
+		if keyboard == nil {
+			detected, err := i.detectKeyboard(serial, lang, deadline)
+			if err != nil {
+				return err
+			}
+			keyboard = detected
+		}
+
+		ch := runes[index]
+		if shiftNeeded(keyboard, ch) {
+			if !keyboard.HasShift() {
+				return fmt.Errorf("shift key not found for %q", ch)
+			}
+			if switches >= MaxKeyboardSwitches {
+				return fmt.Errorf("unable to switch shift for %q", ch)
+			}
+			i.pressKey(serial, keyboard.Shift, tapEvents)
+			switches++
+			keyboard = nil
+			i.settleKeyboard()
+			continue
+		}
+
+		key, err := keyToPress(keyboard, ch)
+		if err != nil {
+			return err
+		}
+		i.pressKey(serial, key, tapEvents)
+		switches = 0
+		index++
+		if unicode.IsUpper(ch) {
+			keyboard = nil
+			i.settleKeyboard()
+		}
+	}
+	return nil
+}
+
+func shiftNeeded(keyboard *cv.Keyboard, ch rune) bool {
+	return unicode.IsLetter(ch) && unicode.IsUpper(ch) != keyboard.Shifted
+}
+
+func keyToPress(keyboard *cv.Keyboard, ch rune) (image.Rectangle, error) {
+	if unicode.IsSpace(ch) {
+		return keyboard.Space, nil
+	}
+	key, found := keyboard.Key(unicode.ToLower(ch))
+	if !found {
+		return image.Rectangle{}, fmt.Errorf("char %q not found on keyboard", ch)
+	}
+	return key, nil
+}
+
+func (i *interactorImpl) pressKey(
+	serial string,
+	key image.Rectangle,
+	tapEvents []models.Event,
+) {
+	i.playEvent(serial, &key, tapEvents)
+	time.Sleep(numutils.RandDelay(KeyPressMinDelayMs, KeyPressMaxDelayMs) * time.Millisecond)
+}
+
+func (i *interactorImpl) settleKeyboard() {
+	time.Sleep(KeyboardSettleMs * time.Millisecond)
+}
+
+func (i *interactorImpl) detectKeyboard(
+	serial string,
+	lang string,
+	deadline time.Time,
+) (*cv.Keyboard, error) {
 	for {
-		keysToPress, err := i.findKeysToPress(serial, text, locale)
+		keyboard, err := i.detectKeyboardOnLastFrame(serial, lang)
 		if err == nil {
-			i.pressKeys(serial, keysToPress, tapEvents)
-			return nil
+			return keyboard, nil
 		}
 		i.logger.Error(err.Error())
 		if !time.Now().Before(deadline) {
-			return fmt.Errorf("unable to type %q", text)
+			return nil, err
 		}
 	}
 }
 
-func (i *interactorImpl) findKeysToPress(
+func (i *interactorImpl) detectKeyboardOnLastFrame(
 	serial string,
-	text string,
-	locale string,
-) ([]cv.OCRResult, error) {
-	keyboardKeys, err := i.getKeyboardKeys(serial, text, locale)
+	lang string,
+) (*cv.Keyboard, error) {
+	mat, err := i.scrcpy.GetMatFromLastFrame(serial, true)
 	if err != nil {
 		return nil, err
 	}
-
-	chars := []rune(strings.ToLower(text))
-	keysToPress := make([]cv.OCRResult, len(chars))
-	for index, ch := range chars {
-		key, found := findKeyboardKey(keyboardKeys, ch)
-		if !found {
-			return nil, fmt.Errorf("char %c not found", ch)
-		}
-		keysToPress[index] = key
-	}
-	return keysToPress, nil
-}
-
-func findKeyboardKey(keys []cv.OCRResult, ch rune) (cv.OCRResult, bool) {
-	for _, key := range keys {
-		if key.Text == "" {
-			continue
-		}
-		if []rune(key.Text)[0] == ch {
-			return key, true
-		}
-		if key.Text == cv.Space && unicode.IsSpace(ch) {
-			return key, true
-		}
-	}
-	return cv.OCRResult{}, false
-}
-
-func (i *interactorImpl) pressKeys(
-	serial string,
-	keys []cv.OCRResult,
-	tapEvents []models.Event,
-) {
-	for _, key := range keys {
-		var imgRect = key.Rectangle.ToImageRectangle()
-		i.playEvent(serial, imgRect, tapEvents)
-		time.Sleep(numutils.RandDelay(100, 300) * time.Millisecond)
-	}
-}
-
-func (i *interactorImpl) getKeyboardKeys(
-	serial string,
-	text string,
-	locale string,
-) ([]cv.OCRResult, error) {
-	mat, err := i.scrcpy.GetMatFromLastFrame(serial, true)
-	if err != nil {
-		i.logger.Error(err.Error())
-		return []cv.OCRResult{}, err
-	}
 	if mat == nil {
-		return []cv.OCRResult{}, fmt.Errorf("mat is nil")
+		return nil, fmt.Errorf("no video frame received from %s", serial)
 	}
 	defer mat.Close()
-
-	modelOS := i.GetDevice(serial).ToModelOs()
-	keyboardDir := i.filesDB.CreateKeyboardDir(modelOS, locale)
-	keyboardButtons := i.filesDB.GetFiles(keyboardDir)
-
-	chars := strutils.GetUniqueChars(text)
-
-	filteredButtons := []string{}
-	for _, button := range keyboardButtons {
-		for _, ch := range chars {
-			if string(ch) == file.GetFileName(button) {
-				filteredButtons = append(filteredButtons, button)
-			}
-		}
-	}
-
-	if len(filteredButtons) == 0 {
-		return []cv.OCRResult{}, fmt.Errorf("buttons not found")
-	}
-
-	return i.cv.GetKeyboardKeys(filteredButtons, *mat), nil
+	return i.cv.DetectKeyboard(mat, lang)
 }
 
 func (i *interactorImpl) playEvent(

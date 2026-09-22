@@ -15,30 +15,15 @@ import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.vision.scripter.data.api.models.CvRectangle
-import com.vision.scripter.data.api.models.RectangleWithText
 import com.vision.scripter.streaming.impl.blocks.video.ui.UiRectangle
 
 @Composable
 fun RectanglesCanvas(
     modifier: Modifier = Modifier,
     rectangles: List<UiRectangle>,
-    keyboardButtons: List<RectangleWithText>,
 ) {
     val textMeasurer = rememberTextMeasurer()
     Canvas(modifier = modifier) {
-        keyboardButtons.forEach {
-            drawRectangle(
-                textMeasurer = textMeasurer,
-                rectangle = it.rectangle,
-                color = Color.Red
-            )
-            drawTextInRectangle(
-                textMeasurer = textMeasurer,
-                rectangle = it.rectangle,
-                text = it.text,
-            )
-        }
-
         rectangles.forEach {
             drawRectangle(
                 textMeasurer = textMeasurer,
@@ -47,27 +32,6 @@ fun RectanglesCanvas(
             )
         }
     }
-}
-
-private fun DrawScope.drawTextInRectangle(
-    textMeasurer: TextMeasurer,
-    rectangle: CvRectangle?,
-    text: String,
-) {
-    rectangle ?: return
-
-    val x = (rectangle.leftX + 12).toFloat()
-    val y = (rectangle.topY + 12).toFloat()
-
-    drawText(
-        textMeasurer = textMeasurer,
-        text = text,
-        topLeft = Offset(x, y),
-        style = TextStyle(
-            color = Color.Red,
-            fontSize = 12.sp,
-        )
-    )
 }
 
 private fun DrawScope.drawRectangle(

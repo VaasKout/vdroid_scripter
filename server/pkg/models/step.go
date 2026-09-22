@@ -120,7 +120,10 @@ func (s *Step) Valid() bool {
 		return s.ValidLandmarks()
 	case TypeTextEvent:
 		last := s.LastLandmark()
-		return last != nil && strings.TrimSpace(last.Value) != ""
+		if last == nil || strings.TrimSpace(last.Value) == "" {
+			return false
+		}
+		return strings.TrimSpace(last.Locale) != ""
 	}
 	if s.IsCheckEvent() {
 		return s.ValidLandmarks()

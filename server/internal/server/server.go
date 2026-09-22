@@ -49,7 +49,6 @@ func New(
 func (s *serverImpl) ListenAndServe() {
 	s.handleDeviceFunctions()
 	s.handleStepsFunctions()
-	s.handleKeyboardFunctions()
 	s.handleSessionFunctions()
 	s.handleLibraryFunctions()
 	s.handleScanFunctions()

@@ -39,16 +39,12 @@ This document describes every HTTP endpoint exposed by the server, defined in
 | DELETE | `/images/{name}` | Delete a library image |
 | DELETE | `/actions/{name}` | Delete a library action |
 | GET | `/devices/{serial}/scan` | Scan the current screen and return the landmarks found |
-| GET | `/devices/{serial}/rectangles` | Detect every rectangle on the current screen (for cropping and keyboard editing) |
+| GET | `/devices/{serial}/rectangles` | Detect every rectangle on the current screen (for cropping) |
 | GET | `/routes` | List saved route names |
 | GET | `/routes/{name}` | Get one saved route |
 | POST | `/routes` | Save or overwrite a route |
 | DELETE | `/routes/{name}` | Delete a route |
 | GET | `/run_route` | Queue a saved route's steps on a device |
-| GET | `/devices/{serial}/keyboard` | Detect on-screen keyboard keys |
-| POST | `/devices/{serial}/edit_keyboard` | Override a keyboard key's rectangle |
-| GET | `/devices/{serial}/reset_keyboard` | Reset keyboard keys to defaults |
-| GET | `/devices/{serial}/delete_button` | Delete a keyboard key override |
 | POST | `/devices/{serial}/session` | Open a session: start scrcpy and the video/control sockets |
 | GET | `/devices/{serial}/session` | Get the active session's ports |
 | DELETE | `/devices/{serial}/session` | Close the session |
@@ -92,8 +88,8 @@ A **step** is the unit of execution: an **event** applied to a chain of
 CV-located **landmarks**. Steps compose the [library](#library) at runtime —
 each landmark (`type` + `value`) locates a region on the live screen (a library
 image, OCR text, or a YOLO class) and the event acts on the **last** landmark's
-region (generated taps, CV keyboard typing, or a recorded gesture from the
-library).
+region (generated taps, typing on the on-screen keyboard, or a recorded
+gesture from the library).
 
 The chain resolves on a single video frame: the first landmark picks its best
 match on screen, every following landmark picks the candidate of its value
@@ -110,7 +106,7 @@ bare landmark deterministically takes the first candidate on screen.
 | *(empty)* | Visibility check of the landmark chain — no touch. Landmarks required. |
 | `tap` / `long_tap` | Generated tap pair placed at a random point inside the last landmark's region. Landmarks required. |
 | `swipe_up` / `swipe_down` / `swipe_left` / `swipe_right` | Generated human-like swipe named by the finger's direction: fixed length (half the screen dimension), curved Bézier path with per-point jitter, eased 300–500ms timing, random start point inside the middle half of the screen (25% start margin) with the end point kept at least 5% from the screen edge. With landmarks, the swipe starts inside the last landmark's region instead. Reserved names — a library action with the same name is shadowed. Landmarks optional. |
-| `type_text` | The **last landmark's `value` is the text to type**, typed via the CV keyboard (its `locale` = keyboard locale). Nothing is located on screen. |
+| `type_text` | The **last landmark's `value` is the text to type** and its `locale` (required) is the keyboard language. The keyboard must already be open: the server reads its letter rows off the live frame, matches them against the layout of that language (QWERTY, AZERTY, QWERTZ, ЙЦУКЕН and the other European layouts), and taps the keys. Letters, space and, when the keyboard shows a number row, digits are typed; capitals go through Shift. Any other character fails the step. Nothing about keyboards is stored. |
 | any other name | The library event with that name is replayed: **offset into the found region** when landmarks are given (first touch moved into the last landmark's region, relative shape preserved), **verbatim** without them. |
 
 ### `POST /devices/{serial}/queue_steps`
@@ -264,8 +260,8 @@ sorted in reading order (top-to-bottom, left-to-right).
 ### `GET /devices/{serial}/rectangles`
 
 Returns every rectangle OpenCV's contour pass finds on the device's current
-screen — the raw shapes a client offers for cropping a template image or
-placing a keyboard key, not landmarks. One-shot: a client asks when it needs
+screen — the raw shapes a client offers for cropping a template image, not
+landmarks. One-shot: a client asks when it needs
 them (a refresh button); nothing streams and nothing runs between requests.
 If the device has no open session, one is opened automatically like `/devices/{serial}/scan`.
 
@@ -353,63 +349,6 @@ action to settle.
   integer, `500` when the route doesn't exist, no step carries the given
   `start_id` (nothing is queued), a referenced asset is gone, or the
   session couldn't be started.
-
-## Keyboard
-
-### `GET /devices/{serial}/keyboard`
-
-Detects on-screen keyboard keys via template matching / OCR.
-
-- **Path params:** `serial` (required).
-- **Query params:** `locale`.
-- **Response `200`:**
-  ```json
-  { "buttons": [ { "text": "a", "rectangle": { "left_x": 0, "right_x": 50, "top_y": 1500, "bottom_y": 1560 } } ] }
-  ```
-  `buttons` is `[]` when nothing is detected.
-- **Errors:** `400` if `serial` is empty.
-
-### `POST /devices/{serial}/edit_keyboard`
-
-Overrides the rectangle for a single keyboard key.
-
-> Note: `serial` is taken from the **request body**, not the path, for this
-> endpoint (the path `serial` is ignored by the handler).
-
-- **Request body:**
-  ```json
-  {
-    "serial": "ABCD1234",
-    "locale": "en",
-    "name": "a",
-    "rectangle": { "left_x": 0, "right_x": 50, "top_y": 1500, "bottom_y": 1560 }
-  }
-  ```
-  `serial`, `name`, and a non-empty `rectangle` are required.
-- **Response `200`:** `{ "status": "ok" }`
-- **Errors:** `400` on invalid JSON or missing fields, `500` if the edit fails.
-
-### `GET /devices/{serial}/reset_keyboard`
-
-Resets keyboard keys to their detected defaults.
-
-- **Path params:** `serial` (required).
-- **Query params:**
-  - `locale`
-  - `upper_case` — `true` to reset the upper-case layout (any other value = false).
-- **Response `200`:** `{ "buttons": [ OCRResult, ... ] }`
-- **Errors:** `400` if `serial` is empty.
-
-### `GET /devices/{serial}/delete_button`
-
-Deletes a saved keyboard key override.
-
-- **Path params:** `serial` (required).
-- **Query params:**
-  - `locale`
-  - `name` — key name to delete.
-- **Response `200`:** `{ "status": "ok" }`
-- **Errors:** `400` if `serial` is empty, `500` if the deletion fails.
 
 ## Session / streaming
 
@@ -557,7 +496,7 @@ worker does not start queued steps.
 | ----- | ---- | ---- | ----- |
 | Type | `type` | string | `image` (template match against `images/<value>.png`), `text` (OCR), or `yolo` (detection class) |
 | Value | `value` | string | Library image name, OCR text, or YOLO class name — for `type_text`'s last landmark, the text to type |
-| Locale | `locale` | string | omitempty; OCR language for `text` landmarks, keyboard locale for `type_text` |
+| Locale | `locale` | string | OCR language for `text` landmarks (omitempty, default `eng`); required on `type_text`'s last landmark, where it selects the keyboard layout |
 
 ### Event
 

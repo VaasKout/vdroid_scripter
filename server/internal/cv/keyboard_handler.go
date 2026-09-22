@@ -1,214 +1,441 @@
 package cv
 
 import (
-	"android_vision_scripter/pkg/core/file"
 	"android_vision_scripter/pkg/models"
+	"android_vision_scripter/pkg/tesseract"
+	"errors"
+	"fmt"
 	"image"
-	"path/filepath"
+	"sort"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 
 	"gocv.io/x/gocv"
 )
 
-// Keyboard consts
+// Keyboard detection constants
 const (
-	SideMinDiff = -5
-	SideMaxDiff = 5
+	KeyboardAreaRatio     = 0.5
+	KeyboardRowMatchRatio = 0.5
+	KeyboardRowMinMatches = 3
+	KeyboardRowSkip       = 1
+	KeyboardGlyphMinRatio = 0.6
+	KeyboardRowGapRatio   = 0.6
+	KeyboardKeyFillRatio  = 0.7
+	KeyboardSpaceKeyWidth = 2.0
 )
 
-// Keyboard special symbols
-const (
-	Space = "space"
-)
-
-var keyboardSizeMap = map[string]int{
-	Numbers: 10,
-	Phone:   10,
-	"eng":   26,
-	"rus":   32,
-}
+// ErrKeyboardNotFound ...
+var ErrKeyboardNotFound = errors.New("keyboard not found")
 
 // KeyboardHandler ...
 type KeyboardHandler interface {
-	GetKeyboardKeys(
-		keyboardButtons []string,
-		img gocv.Mat,
-	) []OCRResult
-	ResetKeyboardKeys(
-		keyboardDir string,
-		screenshot string,
-		lang string,
-		upperCase bool,
-	) []OCRResult
+	DetectKeyboard(img *gocv.Mat, lang string) (*Keyboard, error)
 }
 
-func (c *cvImpl) GetKeyboardKeys(
-	keyboardButtons []string,
-	img gocv.Mat,
-) []OCRResult {
-	var ocrResult = []OCRResult{}
-	for _, buttonPath := range keyboardButtons {
-		rects, err := c.FindImages(&img, buttonPath)
-		if err != nil || len(rects) == 0 {
-			continue
-		}
-
-		var imgRectangle = models.ImgRectangleToDomain(&rects[0])
-		if imgRectangle.IsEmpty() {
-			continue
-		}
-
-		var result = OCRResult{
-			Text:      file.GetFileName(buttonPath),
-			Rectangle: *imgRectangle,
-		}
-		ocrResult = append(ocrResult, result)
-	}
-	return ocrResult
+// Keyboard ...
+type Keyboard struct {
+	Shifted bool
+	Shift   image.Rectangle
+	Space   image.Rectangle
+	keys    map[rune]image.Rectangle
 }
 
-func (c *cvImpl) ResetKeyboardKeys(
-	keyboardDir string,
-	screenshot string,
-	lang string,
-	upperCase bool,
-) []OCRResult {
-	var result = []OCRResult{}
-
-	img := gocv.IMRead(screenshot, gocv.IMReadColor)
-	defer img.Close()
-	if img.Empty() {
-		return result
+// Key ...
+func (k *Keyboard) Key(ch rune) (image.Rectangle, bool) {
+	if k == nil {
+		return image.Rectangle{}, false
 	}
-
-	gray := gocv.NewMat()
-	defer gray.Close()
-	gocv.CvtColor(img, &gray, gocv.ColorBGRToGray)
-
-	rectangles, err := c.FindAllRectangles(&gray)
-	if err != nil {
-		c.logAPI.Error(err.Error())
-		return result
-	}
-
-	rectMatrix := c.sortRectanglesBySize(rectangles)
-	keyboardRects := c.findKeyboardRectangles(rectMatrix, lang)
-
-	var ocrParams = InitOcrParams(
-		"",
-		lang,
-		PsmChars,
-		OemChars,
-	)
-
-	for _, rect := range keyboardRects {
-		cropped := img.Region(rect)
-		ocrResult, err := c.FindTextRectangles(&cropped, ocrParams)
-		if err != nil || len(ocrResult) == 0 {
-			cropped.Close()
-			continue
-		}
-
-		text := strings.TrimSpace(ocrResult[0].Text)
-		if text == "" {
-			cropped.Close()
-			continue
-		}
-		if upperCase {
-			text = strings.ToUpper(text)
-		} else {
-			text = strings.ToLower(text)
-		}
-
-		keyPath := filepath.Join(keyboardDir, text+file.PngExt)
-		if file.Exists(keyPath) {
-			cropped.Close()
-			continue
-		}
-
-		gocv.IMWrite(keyPath, cropped)
-		cropped.Close()
-
-		var domainRect = models.ImgRectangleToDomain(&rect)
-		var outputOCRResult = OCRResult{Text: text, Rectangle: *domainRect}
-		result = append(result, outputOCRResult)
-	}
-
-	return result
+	rect, ok := k.keys[ch]
+	return rect, ok
 }
 
-func (c *cvImpl) sortRectanglesBySize(rectangles []image.Rectangle) [][]image.Rectangle {
-	var matrix = [][]image.Rectangle{}
-mainLoop:
-	for _, rect := range rectangles {
-		if models.ImageRectIsEmpty(&rect) {
-			continue
-		}
-		for index, line := range matrix {
-			if len(line) > 0 {
-				if c.ApproximatelyEqualRects(&line[0], &rect) {
-					var updatedLine = append(line, rect)
-					matrix[index] = updatedLine
-					continue mainLoop
-				}
-			}
-		}
-		matrix = append(matrix, []image.Rectangle{rect})
-	}
-	return matrix
+// HasShift ...
+func (k *Keyboard) HasShift() bool {
+	return k != nil && !models.ImageRectIsEmpty(&k.Shift)
 }
 
-func (c *cvImpl) findKeyboardRectangles(
-	matrix [][]image.Rectangle,
-	key string,
-) []image.Rectangle {
-	requiredSize, ok := keyboardSizeMap[key]
+type glyph struct {
+	char  rune
+	upper bool
+	rect  image.Rectangle
+}
+
+type matchedGlyph struct {
+	index int
+	glyph glyph
+}
+
+type keyboardRow struct {
+	letters []rune
+	glyphs  []matchedGlyph
+	origin  float64
+	y       int
+}
+
+func (c *cvImpl) DetectKeyboard(img *gocv.Mat, lang string) (*Keyboard, error) {
+	layout, ok := KeyboardLayoutFor(lang)
 	if !ok {
-		requiredSize = keyboardSizeMap[DefaultOCRLanguage]
+		return nil, fmt.Errorf("no keyboard layout for %s", lang)
+	}
+	if img == nil || img.Empty() {
+		return nil, errors.New("keyboard img empty")
 	}
 
-	var lines = [][]image.Rectangle{}
-	for _, line := range matrix {
-		if len(line) >= requiredSize {
-			lines = append(lines, line)
-		}
+	glyphs, err := c.readKeyboardGlyphs(img, lang)
+	if err != nil {
+		return nil, err
 	}
 
-	if len(lines) == 1 {
-		return lines[0]
+	ocrRows := groupGlyphRows(glyphs)
+	rows, err := matchLayoutRows(ocrRows, layout.Rows)
+	if err != nil {
+		return nil, err
 	}
 
-	var lineIndexWithLowestY = 0 // keyboard is always in the bottom
-	var lowestY = 0
-	if len(lines) > 1 {
-		for lineIndex, line := range lines {
-			for _, rect := range line {
-				if rect.Max.Y > lowestY {
-					lineIndexWithLowestY = lineIndex
-					lowestY = rect.Max.Y
-				}
-			}
-		}
-		return lines[lineIndexWithLowestY]
+	pitch := keyPitch(rows)
+	if pitch <= 0 {
+		return nil, ErrKeyboardNotFound
+	}
+	setOrigins(rows, pitch)
+	spacing := rowSpacing(rows)
+	if spacing <= 0 {
+		return nil, ErrKeyboardNotFound
 	}
 
-	return []image.Rectangle{}
+	numbers := matchNumberRow(ocrRows, rows[0], pitch, spacing)
+	keyboard := buildKeyboard(rows, numbers, pitch, spacing)
+	keyboard.Shifted = shiftedByCase(rows, layout.CaseGlyphs)
+	return keyboard, nil
 }
 
-func (c *cvImpl) ApproximatelyEqualRects(rect1 *image.Rectangle, rect2 *image.Rectangle) bool {
-	if models.ImageRectIsEmpty(rect1) || models.ImageRectIsEmpty(rect2) {
+func (c *cvImpl) readKeyboardGlyphs(img *gocv.Mat, lang string) ([]glyph, error) {
+	top := int(float64(img.Rows()) * (1 - KeyboardAreaRatio))
+	region := img.Region(image.Rect(0, top, img.Cols(), img.Rows()))
+	defer region.Close()
+
+	edges, err := c.createEdges(&region)
+	defer edges.Close()
+	if err != nil {
+		return nil, err
+	}
+
+	symbols, err := tesseract.RecognizeSymbols(
+		edges.ToBytes(),
+		edges.Cols(),
+		edges.Rows(),
+		edges.Cols(),
+		lang,
+		PsmText,
+		OemText,
+		"",
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	glyphs := []glyph{}
+	for _, symbol := range symbols {
+		first, _ := utf8.DecodeRuneInString(strings.TrimSpace(symbol.Text))
+		if first == utf8.RuneError {
+			continue
+		}
+		glyphs = append(glyphs, glyph{
+			char:  unicode.ToLower(first),
+			upper: unicode.IsUpper(first),
+			rect:  symbol.Rect.Add(image.Pt(0, top)),
+		})
+	}
+	return glyphs, nil
+}
+
+func groupGlyphRows(glyphs []glyph) [][]glyph {
+	glyphs = dropSmallGlyphs(glyphs)
+	if len(glyphs) == 0 {
+		return nil
+	}
+	sort.Slice(glyphs, func(a, b int) bool {
+		return models.CenterY(glyphs[a].rect) < models.CenterY(glyphs[b].rect)
+	})
+
+	gap := int(float64(medianHeight(glyphs)) * KeyboardRowGapRatio)
+	rows := [][]glyph{}
+	row := []glyph{glyphs[0]}
+	for _, current := range glyphs[1:] {
+		previous := row[len(row)-1]
+		if models.CenterY(current.rect)-models.CenterY(previous.rect) > gap {
+			rows = append(rows, sortedByX(row))
+			row = []glyph{}
+		}
+		row = append(row, current)
+	}
+	rows = append(rows, sortedByX(row))
+	return rows
+}
+
+func dropSmallGlyphs(glyphs []glyph) []glyph {
+	if len(glyphs) == 0 {
+		return glyphs
+	}
+	minHeight := int(float64(medianHeight(glyphs)) * KeyboardGlyphMinRatio)
+	kept := []glyph{}
+	for _, current := range glyphs {
+		if current.rect.Dy() < minHeight {
+			continue
+		}
+		kept = append(kept, current)
+	}
+	return kept
+}
+
+func sortedByX(row []glyph) []glyph {
+	sort.Slice(row, func(a, b int) bool {
+		return models.CenterX(row[a].rect) < models.CenterX(row[b].rect)
+	})
+	return row
+}
+
+func matchLayoutRows(ocrRows [][]glyph, layoutRows []string) ([]keyboardRow, error) {
+	for bottom := len(ocrRows) - 1; bottom >= len(layoutRows)-1; bottom-- {
+		rows, ok := matchRowsUpward(ocrRows, layoutRows, bottom)
+		if ok {
+			return rows, nil
+		}
+	}
+	return nil, ErrKeyboardNotFound
+}
+
+func matchRowsUpward(ocrRows [][]glyph, layoutRows []string, bottom int) ([]keyboardRow, bool) {
+	rows := make([]keyboardRow, len(layoutRows))
+	from := bottom
+	for layoutIndex := len(layoutRows) - 1; layoutIndex >= 0; layoutIndex-- {
+		row, found, ok := matchRowNear(ocrRows, []rune(layoutRows[layoutIndex]), from)
+		if !ok {
+			return nil, false
+		}
+		rows[layoutIndex] = row
+		from = found - 1
+	}
+	return rows, true
+}
+
+func matchRowNear(ocrRows [][]glyph, letters []rune, from int) (keyboardRow, int, bool) {
+	for index := from; index >= 0 && index >= from-KeyboardRowSkip; index-- {
+		matches := matchGlyphs(ocrRows[index], letters)
+		if !enoughMatches(matches, letters) {
+			continue
+		}
+		row := keyboardRow{letters: letters, glyphs: matches, y: medianMatchedY(matches)}
+		return row, index, true
+	}
+	return keyboardRow{}, 0, false
+}
+
+func matchGlyphs(row []glyph, letters []rune) []matchedGlyph {
+	table := make([][]int, len(row)+1)
+	for index := range table {
+		table[index] = make([]int, len(letters)+1)
+	}
+	for a := len(row) - 1; a >= 0; a-- {
+		for b := len(letters) - 1; b >= 0; b-- {
+			if row[a].char == letters[b] {
+				table[a][b] = table[a+1][b+1] + 1
+				continue
+			}
+			table[a][b] = max(table[a+1][b], table[a][b+1])
+		}
+	}
+
+	matches := []matchedGlyph{}
+	a, b := 0, 0
+	for a < len(row) && b < len(letters) {
+		if row[a].char == letters[b] {
+			matches = append(matches, matchedGlyph{index: b, glyph: row[a]})
+			a++
+			b++
+			continue
+		}
+		if table[a+1][b] >= table[a][b+1] {
+			a++
+			continue
+		}
+		b++
+	}
+	return matches
+}
+
+func enoughMatches(matches []matchedGlyph, letters []rune) bool {
+	if len(matches) < KeyboardRowMinMatches {
 		return false
 	}
-	var width1 = rect1.Dx()
-	var height1 = rect1.Dy()
+	return float64(len(matches)) >= float64(len(letters))*KeyboardRowMatchRatio
+}
 
-	var width2 = rect2.Dx()
-	var height2 = rect2.Dy()
+func keyPitch(rows []keyboardRow) float64 {
+	ratios := []float64{}
+	for _, row := range rows {
+		for pair := 1; pair < len(row.glyphs); pair++ {
+			previous := row.glyphs[pair-1]
+			current := row.glyphs[pair]
+			dx := float64(models.CenterX(current.glyph.rect) - models.CenterX(previous.glyph.rect))
+			ratios = append(ratios, dx/float64(current.index-previous.index))
+		}
+	}
+	return medianFloat(ratios)
+}
 
-	var widthDiff = width1 - width2
-	var heightDiff = height1 - height2
+func setOrigins(rows []keyboardRow, pitch float64) {
+	for index := range rows {
+		rows[index].origin = rowOrigin(rows[index], pitch)
+	}
+}
 
-	var isApproximateWidth = widthDiff >= SideMinDiff && widthDiff <= SideMaxDiff
-	var isApproximateHeight = heightDiff >= SideMinDiff && heightDiff <= SideMaxDiff
-	return isApproximateWidth && isApproximateHeight
+func rowOrigin(row keyboardRow, pitch float64) float64 {
+	origins := []float64{}
+	for _, match := range row.glyphs {
+		origins = append(origins, float64(models.CenterX(match.glyph.rect))-float64(match.index)*pitch)
+	}
+	return medianFloat(origins)
+}
+
+func rowSpacing(rows []keyboardRow) int {
+	diffs := []int{}
+	for index := 1; index < len(rows); index++ {
+		diffs = append(diffs, rows[index].y-rows[index-1].y)
+	}
+	return medianInt(diffs)
+}
+
+func matchNumberRow(
+	ocrRows [][]glyph,
+	top keyboardRow,
+	pitch float64,
+	spacing int,
+) *keyboardRow {
+	digits := []rune(NumberRow)
+	minHeight := int(float64(matchedHeight(top)) * KeyboardGlyphMinRatio)
+	for _, ocrRow := range ocrRows {
+		matches := matchGlyphs(ocrRow, digits)
+		if !enoughMatches(matches, digits) {
+			continue
+		}
+		row := keyboardRow{letters: digits, glyphs: matches, y: medianMatchedY(matches)}
+		if row.y >= top.y || top.y-row.y > spacing*3/2 {
+			continue
+		}
+		if matchedHeight(row) < minHeight {
+			continue
+		}
+		row.origin = rowOrigin(row, pitch)
+		return &row
+	}
+	return nil
+}
+
+func buildKeyboard(
+	rows []keyboardRow,
+	numbers *keyboardRow,
+	pitch float64,
+	spacing int,
+) *Keyboard {
+	keyboard := &Keyboard{keys: map[rune]image.Rectangle{}}
+	for _, row := range rows {
+		addRowKeys(keyboard, row, pitch, spacing)
+	}
+	if numbers != nil {
+		addRowKeys(keyboard, *numbers, pitch, spacing)
+	}
+
+	left := rows[0].origin - pitch/2
+	right := rows[0].origin + float64(len(rows[0].letters))*pitch - pitch/2
+	for _, row := range rows[1:] {
+		left = min(left, row.origin-pitch/2)
+		right = max(right, row.origin+float64(len(row.letters))*pitch-pitch/2)
+	}
+
+	last := rows[len(rows)-1]
+	firstLetterLeft := last.origin - pitch/2
+	if firstLetterLeft-left >= pitch/2 {
+		keyboard.Shift = keyRect((left+firstLetterLeft)/2, float64(last.y), firstLetterLeft-left, float64(spacing))
+	}
+	keyboard.Space = keyRect((left+right)/2, float64(last.y+spacing), pitch*KeyboardSpaceKeyWidth, float64(spacing))
+	return keyboard
+}
+
+func addRowKeys(keyboard *Keyboard, row keyboardRow, pitch float64, spacing int) {
+	for index, ch := range row.letters {
+		keyboard.keys[ch] = keyRect(row.origin+float64(index)*pitch, float64(row.y), pitch, float64(spacing))
+	}
+}
+
+func keyRect(centerX float64, centerY float64, width float64, height float64) image.Rectangle {
+	halfWidth := width * KeyboardKeyFillRatio / 2
+	halfHeight := height * KeyboardKeyFillRatio / 2
+	return image.Rect(
+		int(centerX-halfWidth),
+		int(centerY-halfHeight),
+		int(centerX+halfWidth),
+		int(centerY+halfHeight),
+	)
+}
+
+func shiftedByCase(rows []keyboardRow, caseGlyphs string) bool {
+	upper := 0
+	lower := 0
+	for _, row := range rows {
+		for _, match := range row.glyphs {
+			if !strings.ContainsRune(caseGlyphs, match.glyph.char) {
+				continue
+			}
+			if match.glyph.upper {
+				upper++
+				continue
+			}
+			lower++
+		}
+	}
+	return upper > lower
+}
+
+func medianMatchedY(matches []matchedGlyph) int {
+	values := make([]int, 0, len(matches))
+	for _, match := range matches {
+		values = append(values, models.CenterY(match.glyph.rect))
+	}
+	return medianInt(values)
+}
+
+func matchedHeight(row keyboardRow) int {
+	values := make([]int, 0, len(row.glyphs))
+	for _, match := range row.glyphs {
+		values = append(values, match.glyph.rect.Dy())
+	}
+	return medianInt(values)
+}
+
+func medianHeight(glyphs []glyph) int {
+	values := make([]int, 0, len(glyphs))
+	for _, current := range glyphs {
+		values = append(values, current.rect.Dy())
+	}
+	return medianInt(values)
+}
+
+func medianInt(values []int) int {
+	if len(values) == 0 {
+		return 0
+	}
+	sorted := append([]int{}, values...)
+	sort.Ints(sorted)
+	return sorted[len(sorted)/2]
+}
+
+func medianFloat(values []float64) float64 {
+	if len(values) == 0 {
+		return 0
+	}
+	sorted := append([]float64{}, values...)
+	sort.Float64s(sorted)
+	return sorted[len(sorted)/2]
 }
