@@ -345,7 +345,7 @@ func (i *interactorImpl) typeText(
 
 	deadline := time.Now().Add(timeout)
 	runes := []rune(text)
-	var keyboard *cv.Keyboard
+	var keyboard *models.Keyboard
 	switches := 0
 	index := 0
 	for index < len(runes) {
@@ -358,7 +358,7 @@ func (i *interactorImpl) typeText(
 		}
 
 		ch := runes[index]
-		if shiftNeeded(keyboard, ch) {
+		if keyboard.ShiftNeeded(ch) {
 			if !keyboard.HasShift() {
 				return fmt.Errorf("shift key not found for %q", ch)
 			}
@@ -372,7 +372,7 @@ func (i *interactorImpl) typeText(
 			continue
 		}
 
-		key, err := keyToPress(keyboard, ch)
+		key, err := keyboard.KeyToPress(ch)
 		if err != nil {
 			return err
 		}
@@ -385,21 +385,6 @@ func (i *interactorImpl) typeText(
 		}
 	}
 	return nil
-}
-
-func shiftNeeded(keyboard *cv.Keyboard, ch rune) bool {
-	return unicode.IsLetter(ch) && unicode.IsUpper(ch) != keyboard.Shifted
-}
-
-func keyToPress(keyboard *cv.Keyboard, ch rune) (image.Rectangle, error) {
-	if unicode.IsSpace(ch) {
-		return keyboard.Space, nil
-	}
-	key, found := keyboard.Key(unicode.ToLower(ch))
-	if !found {
-		return image.Rectangle{}, fmt.Errorf("char %q not found on keyboard", ch)
-	}
-	return key, nil
 }
 
 func (i *interactorImpl) pressKey(
@@ -419,7 +404,7 @@ func (i *interactorImpl) detectKeyboard(
 	serial string,
 	lang string,
 	deadline time.Time,
-) (*cv.Keyboard, error) {
+) (*models.Keyboard, error) {
 	for {
 		keyboard, err := i.detectKeyboardOnLastFrame(serial, lang)
 		if err == nil {
@@ -435,7 +420,7 @@ func (i *interactorImpl) detectKeyboard(
 func (i *interactorImpl) detectKeyboardOnLastFrame(
 	serial string,
 	lang string,
-) (*cv.Keyboard, error) {
+) (*models.Keyboard, error) {
 	mat, err := i.scrcpy.GetMatFromLastFrame(serial, true)
 	if err != nil {
 		return nil, err

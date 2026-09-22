@@ -9,6 +9,7 @@ import (
 	"android_vision_scripter/pkg/models"
 	"fmt"
 	"image"
+	"image/color"
 	"path/filepath"
 	"time"
 
@@ -250,5 +251,52 @@ func TestFindTemplate(t *testing.T) {
 	params := []int{gocv.IMWriteJpegQuality, 90}
 	if ok := gocv.IMWriteWithParams(screenshotWithRects, img, params); !ok {
 		fmt.Println("could not write image " + screenshot)
+	}
+}
+
+func TestDetectKeyboard(t *testing.T) {
+	var fileProps = &config.FilesProps{
+		Logs: "./logs",
+	}
+	var logAPI = logger.New(logger.INFO, true)
+	var filesDB = filesdb.New(fileProps)
+	var cmdRunner = bashcmd.New(filesDB, logAPI)
+	var cvAPI = cv.New(logAPI)
+
+	screenshot := cmdRunner.ScreenShot(TestSerial)
+	if screenshot == "" {
+		t.Fatal("screenshot is empty")
+	}
+	img := gocv.IMRead(screenshot, gocv.IMReadColor)
+	if img.Empty() {
+		t.Fatal("could not read screenshot image")
+	}
+	defer img.Close()
+
+	start := time.Now()
+	keyboard, err := cvAPI.DetectKeyboard(&img, TestLocale)
+	if err != nil {
+		t.Fatal(err)
+	}
+	keys := keyboard.Keys
+	t.Logf("detected %d keys in %d ms, shifted: %v", len(keys), time.Since(start).Milliseconds(), keyboard.Shifted)
+
+	var blueColor = color.RGBA{B: 255, A: 255}
+	rectangles := []image.Rectangle{keyboard.Space}
+	if keyboard.HasShift() {
+		rectangles = append(rectangles, keyboard.Shift)
+	}
+	for ch, rect := range keys {
+		rectangles = append(rectangles, rect)
+		gocv.PutText(&img, string(ch), image.Pt(rect.Min.X, rect.Min.Y), gocv.FontHersheySimplex, 1, blueColor, 2)
+	}
+
+	err = cvAPI.DrawRectangles(img, rectangles, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var screenshotWithKeys = filepath.Join(filesDB.CreateLogsDir(TestSerial), "keyboard.png")
+	if ok := gocv.IMWrite(screenshotWithKeys, img); !ok {
+		t.Fatal("could not write image " + screenshotWithKeys)
 	}
 }

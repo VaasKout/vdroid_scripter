@@ -1,6 +1,7 @@
 package cv
 
 import (
+	"android_vision_scripter/pkg/core/numutils"
 	"android_vision_scripter/pkg/models"
 	"android_vision_scripter/pkg/tesseract"
 	"errors"
@@ -31,29 +32,7 @@ var ErrKeyboardNotFound = errors.New("keyboard not found")
 
 // KeyboardHandler ...
 type KeyboardHandler interface {
-	DetectKeyboard(img *gocv.Mat, lang string) (*Keyboard, error)
-}
-
-// Keyboard ...
-type Keyboard struct {
-	Shifted bool
-	Shift   image.Rectangle
-	Space   image.Rectangle
-	keys    map[rune]image.Rectangle
-}
-
-// Key ...
-func (k *Keyboard) Key(ch rune) (image.Rectangle, bool) {
-	if k == nil {
-		return image.Rectangle{}, false
-	}
-	rect, ok := k.keys[ch]
-	return rect, ok
-}
-
-// HasShift ...
-func (k *Keyboard) HasShift() bool {
-	return k != nil && !models.ImageRectIsEmpty(&k.Shift)
+	DetectKeyboard(img *gocv.Mat, lang string) (*models.Keyboard, error)
 }
 
 type glyph struct {
@@ -74,7 +53,7 @@ type keyboardRow struct {
 	y       int
 }
 
-func (c *cvImpl) DetectKeyboard(img *gocv.Mat, lang string) (*Keyboard, error) {
+func (c *cvImpl) DetectKeyboard(img *gocv.Mat, lang string) (*models.Keyboard, error) {
 	layout, ok := KeyboardLayoutFor(lang)
 	if !ok {
 		return nil, fmt.Errorf("no keyboard layout for %s", lang)
@@ -282,7 +261,7 @@ func keyPitch(rows []keyboardRow) float64 {
 			ratios = append(ratios, dx/float64(current.index-previous.index))
 		}
 	}
-	return medianFloat(ratios)
+	return numutils.MedianFloat(ratios)
 }
 
 func setOrigins(rows []keyboardRow, pitch float64) {
@@ -296,7 +275,7 @@ func rowOrigin(row keyboardRow, pitch float64) float64 {
 	for _, match := range row.glyphs {
 		origins = append(origins, float64(models.CenterX(match.glyph.rect))-float64(match.index)*pitch)
 	}
-	return medianFloat(origins)
+	return numutils.MedianFloat(origins)
 }
 
 func rowSpacing(rows []keyboardRow) int {
@@ -304,7 +283,7 @@ func rowSpacing(rows []keyboardRow) int {
 	for index := 1; index < len(rows); index++ {
 		diffs = append(diffs, rows[index].y-rows[index-1].y)
 	}
-	return medianInt(diffs)
+	return numutils.MedianInt(diffs)
 }
 
 func matchNumberRow(
@@ -338,8 +317,8 @@ func buildKeyboard(
 	numbers *keyboardRow,
 	pitch float64,
 	spacing int,
-) *Keyboard {
-	keyboard := &Keyboard{keys: map[rune]image.Rectangle{}}
+) *models.Keyboard {
+	keyboard := models.NewKeyboard()
 	for _, row := range rows {
 		addRowKeys(keyboard, row, pitch, spacing)
 	}
@@ -363,9 +342,9 @@ func buildKeyboard(
 	return keyboard
 }
 
-func addRowKeys(keyboard *Keyboard, row keyboardRow, pitch float64, spacing int) {
+func addRowKeys(keyboard *models.Keyboard, row keyboardRow, pitch float64, spacing int) {
 	for index, ch := range row.letters {
-		keyboard.keys[ch] = keyRect(row.origin+float64(index)*pitch, float64(row.y), pitch, float64(spacing))
+		keyboard.Keys[ch] = keyRect(row.origin+float64(index)*pitch, float64(row.y), pitch, float64(spacing))
 	}
 }
 
@@ -403,7 +382,7 @@ func medianMatchedY(matches []matchedGlyph) int {
 	for _, match := range matches {
 		values = append(values, models.CenterY(match.glyph.rect))
 	}
-	return medianInt(values)
+	return numutils.MedianInt(values)
 }
 
 func matchedHeight(row keyboardRow) int {
@@ -411,7 +390,7 @@ func matchedHeight(row keyboardRow) int {
 	for _, match := range row.glyphs {
 		values = append(values, match.glyph.rect.Dy())
 	}
-	return medianInt(values)
+	return numutils.MedianInt(values)
 }
 
 func medianHeight(glyphs []glyph) int {
@@ -419,23 +398,5 @@ func medianHeight(glyphs []glyph) int {
 	for _, current := range glyphs {
 		values = append(values, current.rect.Dy())
 	}
-	return medianInt(values)
-}
-
-func medianInt(values []int) int {
-	if len(values) == 0 {
-		return 0
-	}
-	sorted := append([]int{}, values...)
-	sort.Ints(sorted)
-	return sorted[len(sorted)/2]
-}
-
-func medianFloat(values []float64) float64 {
-	if len(values) == 0 {
-		return 0
-	}
-	sorted := append([]float64{}, values...)
-	sort.Float64s(sorted)
-	return sorted[len(sorted)/2]
+	return numutils.MedianInt(values)
 }

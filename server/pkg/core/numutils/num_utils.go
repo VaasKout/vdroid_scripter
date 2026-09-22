@@ -3,6 +3,7 @@ package numutils
 
 import (
 	"math/rand"
+	"sort"
 	"time"
 )
 
@@ -19,4 +20,24 @@ func RandDelay(minNum int, maxNum int) time.Duration {
 // GetPercentValue ...
 func GetPercentValue(number int, percent int) int {
 	return (number / 100) * percent
+}
+
+// MedianInt ...
+func MedianInt(values []int) int {
+	if len(values) == 0 {
+		return 0
+	}
+	sorted := append([]int{}, values...)
+	sort.Ints(sorted)
+	return sorted[len(sorted)/2]
+}
+
+// MedianFloat ...
+func MedianFloat(values []float64) float64 {
+	if len(values) == 0 {
+		return 0
+	}
+	sorted := append([]float64{}, values...)
+	sort.Float64s(sorted)
+	return sorted[len(sorted)/2]
 }
