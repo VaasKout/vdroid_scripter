@@ -14,8 +14,6 @@ import (
 // Tesseract contants
 const (
 	DefaultOCRLanguage = "eng"
-	Numbers            = "numbers"
-	Phone              = "phone"
 	MaxThreshHold      = 255
 
 	darkRegionMinAreaRatio = 0.0025
@@ -26,15 +24,13 @@ const (
 
 	phraseMaxGapHeights = 3
 
-	PsmText = 11
-	OemText = 3
+	PsmText  = 11
+	PsmBlock = 6
+	OemText  = 3
 )
 
 // TesseractLocaleMap converts adb system locales
 var TesseractLocaleMap = map[string]string{
-	Numbers: "eng",
-	Phone:   "eng",
-
 	"af": "afr", "af-ZA": "afr", "afr": "afr",
 	"am": "amh", "am-ET": "amh", "amh": "amh",
 	"ar": "ara", "ar-AE": "ara", "ar-EG": "ara", "ar-SA": "ara", "ara": "ara",
@@ -191,10 +187,6 @@ func InitOcrParams(text string, lang string, psm int, oem int) *OcrParams {
 
 	if psm == 0 {
 		ocrParams.Psm = 11
-	}
-
-	if lang == Numbers || lang == Phone {
-		ocrParams.WhiteList = "0123456789"
 	}
 
 	return ocrParams

@@ -17,14 +17,17 @@ import (
 
 // Keyboard detection constants
 const (
-	KeyboardAreaRatio     = 0.5
-	KeyboardRowMatchRatio = 0.5
-	KeyboardRowMinMatches = 3
-	KeyboardRowSkip       = 1
-	KeyboardGlyphMinRatio = 0.6
-	KeyboardRowGapRatio   = 0.6
-	KeyboardKeyFillRatio  = 0.7
-	KeyboardSpaceKeyWidth = 2.0
+	KeyboardRowMatchRatio  = 0.5
+	KeyboardRowMinMatches  = 2
+	KeyboardRowSkip        = 1
+	KeyboardGlyphMinRatio  = 0.6
+	KeyboardRowHeightRatio = 0.5
+	KeyboardRowGapRatio    = 0.6
+	KeyboardKeyFillRatio   = 0.7
+	KeyboardSpaceKeyWidth  = 2.0
+	KeyboardZeroColumn     = 1
+	KeyboardOcrWidth       = 540.0
+	NumericWhitelist       = "0123456789"
 )
 
 // ErrKeyboardNotFound ...
@@ -32,7 +35,7 @@ var ErrKeyboardNotFound = errors.New("keyboard not found")
 
 // KeyboardHandler ...
 type KeyboardHandler interface {
-	DetectKeyboard(img *gocv.Mat, lang string) (*models.Keyboard, error)
+	DetectKeyboard(img *gocv.Mat, locale string) (*models.Keyboard, error)
 }
 
 type glyph struct {
@@ -53,16 +56,20 @@ type keyboardRow struct {
 	y       int
 }
 
-func (c *cvImpl) DetectKeyboard(img *gocv.Mat, lang string) (*models.Keyboard, error) {
-	layout, ok := KeyboardLayoutFor(lang)
+func (c *cvImpl) DetectKeyboard(img *gocv.Mat, locale string) (*models.Keyboard, error) {
+	layout, ok := KeyboardLayoutFor(locale)
 	if !ok {
-		return nil, fmt.Errorf("no keyboard layout for %s", lang)
+		return nil, fmt.Errorf("no keyboard layout for %s", locale)
 	}
 	if img == nil || img.Empty() {
 		return nil, errors.New("keyboard img empty")
 	}
 
-	glyphs, err := c.readKeyboardGlyphs(img, lang)
+	whitelist := ""
+	if layout.Numeric {
+		whitelist = NumericWhitelist
+	}
+	glyphs, err := c.readKeyboardGlyphs(img, TesseractLang(locale), whitelist)
 	if err != nil {
 		return nil, err
 	}
@@ -77,10 +84,14 @@ func (c *cvImpl) DetectKeyboard(img *gocv.Mat, lang string) (*models.Keyboard, e
 	if pitch <= 0 {
 		return nil, ErrKeyboardNotFound
 	}
-	setOrigins(rows, pitch)
+	setOrigins(rows, pitch, layout.Numeric)
 	spacing := rowSpacing(rows)
 	if spacing <= 0 {
 		return nil, ErrKeyboardNotFound
+	}
+
+	if layout.Numeric {
+		return buildNumericKeyboard(rows, pitch, spacing), nil
 	}
 
 	numbers := matchNumberRow(ocrRows, rows[0], pitch, spacing)
@@ -89,12 +100,16 @@ func (c *cvImpl) DetectKeyboard(img *gocv.Mat, lang string) (*models.Keyboard, e
 	return keyboard, nil
 }
 
-func (c *cvImpl) readKeyboardGlyphs(img *gocv.Mat, lang string) ([]glyph, error) {
-	top := int(float64(img.Rows()) * (1 - KeyboardAreaRatio))
-	region := img.Region(image.Rect(0, top, img.Cols(), img.Rows()))
-	defer region.Close()
+func (c *cvImpl) readKeyboardGlyphs(img *gocv.Mat, lang string, whitelist string) ([]glyph, error) {
+	scale := min(1, KeyboardOcrWidth/float64(img.Cols()))
+	scaled := gocv.NewMat()
+	defer scaled.Close()
+	err := gocv.Resize(*img, &scaled, image.Point{}, scale, scale, gocv.InterpolationArea)
+	if err != nil {
+		return nil, err
+	}
 
-	edges, err := c.createEdges(&region)
+	edges, err := c.createEdges(&scaled)
 	defer edges.Close()
 	if err != nil {
 		return nil, err
@@ -106,9 +121,9 @@ func (c *cvImpl) readKeyboardGlyphs(img *gocv.Mat, lang string) ([]glyph, error)
 		edges.Rows(),
 		edges.Cols(),
 		lang,
-		PsmText,
+		PsmBlock,
 		OemText,
-		"",
+		whitelist,
 	)
 	if err != nil {
 		return nil, err
@@ -123,7 +138,7 @@ func (c *cvImpl) readKeyboardGlyphs(img *gocv.Mat, lang string) ([]glyph, error)
 		glyphs = append(glyphs, glyph{
 			char:  unicode.ToLower(first),
 			upper: unicode.IsUpper(first),
-			rect:  symbol.Rect.Add(image.Pt(0, top)),
+			rect:  models.UnscaledRect(symbol.Rect, scale),
 		})
 	}
 	return glyphs, nil
@@ -188,27 +203,41 @@ func matchLayoutRows(ocrRows [][]glyph, layoutRows []string) ([]keyboardRow, err
 func matchRowsUpward(ocrRows [][]glyph, layoutRows []string, bottom int) ([]keyboardRow, bool) {
 	rows := make([]keyboardRow, len(layoutRows))
 	from := bottom
+	height := 0
 	for layoutIndex := len(layoutRows) - 1; layoutIndex >= 0; layoutIndex-- {
-		row, found, ok := matchRowNear(ocrRows, []rune(layoutRows[layoutIndex]), from)
+		row, found, ok := matchRowNear(ocrRows, []rune(layoutRows[layoutIndex]), from, height)
 		if !ok {
 			return nil, false
 		}
 		rows[layoutIndex] = row
 		from = found - 1
+		height = matchedHeight(row)
 	}
 	return rows, true
 }
 
-func matchRowNear(ocrRows [][]glyph, letters []rune, from int) (keyboardRow, int, bool) {
+func matchRowNear(ocrRows [][]glyph, letters []rune, from int, height int) (keyboardRow, int, bool) {
 	for index := from; index >= 0 && index >= from-KeyboardRowSkip; index-- {
 		matches := matchGlyphs(ocrRows[index], letters)
 		if !enoughMatches(matches, letters) {
 			continue
 		}
 		row := keyboardRow{letters: letters, glyphs: matches, y: medianMatchedY(matches)}
+		if !similarHeight(matchedHeight(row), height) {
+			continue
+		}
 		return row, index, true
 	}
 	return keyboardRow{}, 0, false
+}
+
+func similarHeight(height int, reference int) bool {
+	if reference == 0 {
+		return true
+	}
+	low := float64(min(height, reference))
+	high := float64(max(height, reference))
+	return low >= high*KeyboardRowHeightRatio
 }
 
 func matchGlyphs(row []glyph, letters []rune) []matchedGlyph {
@@ -264,18 +293,31 @@ func keyPitch(rows []keyboardRow) float64 {
 	return numutils.MedianFloat(ratios)
 }
 
-func setOrigins(rows []keyboardRow, pitch float64) {
+func setOrigins(rows []keyboardRow, pitch float64, shared bool) {
+	if shared {
+		origin := numutils.MedianFloat(glyphOrigins(rows, pitch))
+		for index := range rows {
+			rows[index].origin = origin
+		}
+		return
+	}
 	for index := range rows {
 		rows[index].origin = rowOrigin(rows[index], pitch)
 	}
 }
 
 func rowOrigin(row keyboardRow, pitch float64) float64 {
+	return numutils.MedianFloat(glyphOrigins([]keyboardRow{row}, pitch))
+}
+
+func glyphOrigins(rows []keyboardRow, pitch float64) []float64 {
 	origins := []float64{}
-	for _, match := range row.glyphs {
-		origins = append(origins, float64(models.CenterX(match.glyph.rect))-float64(match.index)*pitch)
+	for _, row := range rows {
+		for _, match := range row.glyphs {
+			origins = append(origins, float64(models.CenterX(match.glyph.rect))-float64(match.index)*pitch)
+		}
 	}
-	return numutils.MedianFloat(origins)
+	return origins
 }
 
 func rowSpacing(rows []keyboardRow) int {
@@ -339,6 +381,18 @@ func buildKeyboard(
 		keyboard.Shift = keyRect((left+firstLetterLeft)/2, float64(last.y), firstLetterLeft-left, float64(spacing))
 	}
 	keyboard.Space = keyRect((left+right)/2, float64(last.y+spacing), pitch*KeyboardSpaceKeyWidth, float64(spacing))
+	return keyboard
+}
+
+func buildNumericKeyboard(rows []keyboardRow, pitch float64, spacing int) *models.Keyboard {
+	keyboard := models.NewKeyboard()
+	for _, row := range rows {
+		addRowKeys(keyboard, row, pitch, spacing)
+	}
+
+	last := rows[len(rows)-1]
+	zeroX := last.origin + float64(KeyboardZeroColumn)*pitch
+	keyboard.Keys['0'] = keyRect(zeroX, float64(last.y+spacing), pitch, float64(spacing))
 	return keyboard
 }
 

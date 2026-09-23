@@ -255,6 +255,14 @@ func TestFindTemplate(t *testing.T) {
 }
 
 func TestDetectKeyboard(t *testing.T) {
+	detectKeyboardAndDraw(t, TestLocale, "keyboard.png")
+}
+
+func TestDetectNumericKeyboard(t *testing.T) {
+	detectKeyboardAndDraw(t, cv.Numeric, "keyboard_numeric.png")
+}
+
+func detectKeyboardAndDraw(t *testing.T, locale string, output string) {
 	var fileProps = &config.FilesProps{
 		Logs: "./logs",
 	}
@@ -274,7 +282,7 @@ func TestDetectKeyboard(t *testing.T) {
 	defer img.Close()
 
 	start := time.Now()
-	keyboard, err := cvAPI.DetectKeyboard(&img, TestLocale)
+	keyboard, err := cvAPI.DetectKeyboard(&img, locale)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -282,7 +290,10 @@ func TestDetectKeyboard(t *testing.T) {
 	t.Logf("detected %d keys in %d ms, shifted: %v", len(keys), time.Since(start).Milliseconds(), keyboard.Shifted)
 
 	var blueColor = color.RGBA{B: 255, A: 255}
-	rectangles := []image.Rectangle{keyboard.Space}
+	rectangles := []image.Rectangle{}
+	if !models.ImageRectIsEmpty(&keyboard.Space) {
+		rectangles = append(rectangles, keyboard.Space)
+	}
 	if keyboard.HasShift() {
 		rectangles = append(rectangles, keyboard.Shift)
 	}
@@ -295,7 +306,7 @@ func TestDetectKeyboard(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var screenshotWithKeys = filepath.Join(filesDB.CreateLogsDir(TestSerial), "keyboard.png")
+	var screenshotWithKeys = filepath.Join(filesDB.CreateLogsDir(TestSerial), output)
 	if ok := gocv.IMWrite(screenshotWithKeys, img); !ok {
 		t.Fatal("could not write image " + screenshotWithKeys)
 	}

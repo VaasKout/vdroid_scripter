@@ -106,7 +106,7 @@ bare landmark deterministically takes the first candidate on screen.
 | *(empty)* | Visibility check of the landmark chain — no touch. Landmarks required. |
 | `tap` / `long_tap` | Generated tap pair placed at a random point inside the last landmark's region. Landmarks required. |
 | `swipe_up` / `swipe_down` / `swipe_left` / `swipe_right` | Generated human-like swipe named by the finger's direction: fixed length (half the screen dimension), curved Bézier path with per-point jitter, eased 300–500ms timing, random start point inside the middle half of the screen (25% start margin) with the end point kept at least 5% from the screen edge. With landmarks, the swipe starts inside the last landmark's region instead. Reserved names — a library action with the same name is shadowed. Landmarks optional. |
-| `type_text` | The **last landmark's `value` is the text to type** and its `locale` (required) is the keyboard language. The keyboard must already be open: the server reads its letter rows off the live frame, matches them against the layout of that language (QWERTY, AZERTY, QWERTZ, ЙЦУКЕН and the other European layouts), and taps the keys. Letters, space and, when the keyboard shows a number row, digits are typed; capitals go through Shift. Any other character fails the step. Nothing about keyboards is stored. |
+| `type_text` | The **last landmark's `value` is the text to type** and its `locale` (required) is the keyboard language. The keyboard must already be open: the server reads its letter rows off the live frame, matches them against the layout of that language (QWERTY, AZERTY, QWERTZ, ЙЦУКЕН and the other European layouts), and taps the keys. Letters, space and, when the keyboard shows a number row, digits are typed; capitals go through Shift. Any other character fails the step. A `locale` of `numeric` selects the numeric keypad instead (the `123`, `456`, `789` rows with `0` below), for number and phone fields and for dial pads drawn by the app itself. Nothing about keyboards is stored. |
 | any other name | The library event with that name is replayed: **offset into the found region** when landmarks are given (first touch moved into the last landmark's region, relative shape preserved), **verbatim** without them. |
 
 ### `POST /devices/{serial}/queue_steps`
@@ -496,7 +496,7 @@ worker does not start queued steps.
 | ----- | ---- | ---- | ----- |
 | Type | `type` | string | `image` (template match against `images/<value>.png`), `text` (OCR), or `yolo` (detection class) |
 | Value | `value` | string | Library image name, OCR text, or YOLO class name — for `type_text`'s last landmark, the text to type |
-| Locale | `locale` | string | OCR language for `text` landmarks (omitempty, default `eng`); required on `type_text`'s last landmark, where it selects the keyboard layout |
+| Locale | `locale` | string | OCR language for `text` landmarks (omitempty, default `eng`); required on `type_text`'s last landmark, where it selects the keyboard layout (`numeric` = the numeric keypad) |
 
 ### Event
 

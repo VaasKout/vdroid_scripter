@@ -74,6 +74,10 @@ func (i *interactorImpl) checkStepAssets(steps []models.Step) error {
 		}
 
 		if step.Event == models.TypeTextEvent {
+			locale := step.LastLandmark().Locale
+			if _, ok := cv.KeyboardLayoutFor(locale); !ok {
+				return fmt.Errorf("no keyboard layout for locale: %s", locale)
+			}
 			continue
 		}
 
@@ -193,8 +197,7 @@ func (i *interactorImpl) typeTextStep(serial string, step *models.Step) error {
 	}
 
 	tapEvents := models.GenerateTapEvents(width, height)
-	lang := cv.TesseractLang(last.Locale)
-	return i.typeText(serial, step.GetTimeout(), last.Value, lang, tapEvents)
+	return i.typeText(serial, step.GetTimeout(), last.Value, last.Locale, tapEvents)
 }
 
 func (i *interactorImpl) playCustomEvent(serial string, step *models.Step) error {
@@ -336,7 +339,7 @@ func (i *interactorImpl) typeText(
 	serial string,
 	timeout time.Duration,
 	text string,
-	lang string,
+	locale string,
 	tapEvents []models.Event,
 ) error {
 	if text == "" {
@@ -350,7 +353,7 @@ func (i *interactorImpl) typeText(
 	index := 0
 	for index < len(runes) {
 		if keyboard == nil {
-			detected, err := i.detectKeyboard(serial, lang, deadline)
+			detected, err := i.detectKeyboard(serial, locale, deadline)
 			if err != nil {
 				return err
 			}
@@ -402,11 +405,11 @@ func (i *interactorImpl) settleKeyboard() {
 
 func (i *interactorImpl) detectKeyboard(
 	serial string,
-	lang string,
+	locale string,
 	deadline time.Time,
 ) (*models.Keyboard, error) {
 	for {
-		keyboard, err := i.detectKeyboardOnLastFrame(serial, lang)
+		keyboard, err := i.detectKeyboardOnLastFrame(serial, locale)
 		if err == nil {
 			return keyboard, nil
 		}
@@ -419,7 +422,7 @@ func (i *interactorImpl) detectKeyboard(
 
 func (i *interactorImpl) detectKeyboardOnLastFrame(
 	serial string,
-	lang string,
+	locale string,
 ) (*models.Keyboard, error) {
 	mat, err := i.scrcpy.GetMatFromLastFrame(serial, true)
 	if err != nil {
@@ -429,7 +432,7 @@ func (i *interactorImpl) detectKeyboardOnLastFrame(
 		return nil, fmt.Errorf("no video frame received from %s", serial)
 	}
 	defer mat.Close()
-	return i.cv.DetectKeyboard(mat, lang)
+	return i.cv.DetectKeyboard(mat, locale)
 }
 
 func (i *interactorImpl) playEvent(

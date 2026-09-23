@@ -4,6 +4,7 @@ package cv
 type KeyboardLayout struct {
 	Rows       []string
 	CaseGlyphs string
+	Numeric    bool
 }
 
 // Letters whose upper and lower case glyphs differ in shape, not only in size
@@ -14,14 +15,19 @@ const (
 	NumberRow          = "1234567890"
 )
 
+// Numeric keypad locale
+const Numeric = "numeric"
+
 var (
-	qwertyRows = []string{"qwertyuiop", "asdfghjkl", "zxcvbnm"}
-	qwertzRows = []string{"qwertzuiop", "asdfghjkl", "yxcvbnm"}
-	balkanRows = []string{"qwertzuiopšđ", "asdfghjklčć", "yxcvbnmž"}
-	nordicRows = []string{"qwertyuiopå", "asdfghjklöä", "zxcvbnm"}
+	qwertyRows  = []string{"qwertyuiop", "asdfghjkl", "zxcvbnm"}
+	qwertzRows  = []string{"qwertzuiop", "asdfghjkl", "yxcvbnm"}
+	balkanRows  = []string{"qwertzuiopšđ", "asdfghjklčć", "yxcvbnmž"}
+	nordicRows  = []string{"qwertyuiopå", "asdfghjklöä", "zxcvbnm"}
+	numericRows = []string{"123", "456", "789"}
 )
 
 var keyboardLayouts = map[string]KeyboardLayout{
+	Numeric:    {Rows: numericRows, Numeric: true},
 	"eng":      {Rows: qwertyRows, CaseGlyphs: LatinCaseGlyphs},
 	"ita":      {Rows: qwertyRows, CaseGlyphs: LatinCaseGlyphs},
 	"nld":      {Rows: qwertyRows, CaseGlyphs: LatinCaseGlyphs},
@@ -58,7 +64,11 @@ var keyboardLayouts = map[string]KeyboardLayout{
 }
 
 // KeyboardLayoutFor ...
-func KeyboardLayoutFor(lang string) (KeyboardLayout, bool) {
-	layout, ok := keyboardLayouts[lang]
+func KeyboardLayoutFor(locale string) (KeyboardLayout, bool) {
+	layout, ok := keyboardLayouts[locale]
+	if ok {
+		return layout, true
+	}
+	layout, ok = keyboardLayouts[TesseractLang(locale)]
 	return layout, ok
 }

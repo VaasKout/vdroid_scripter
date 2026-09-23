@@ -44,6 +44,9 @@ func (k *Keyboard) KeyToPress(ch rune) (image.Rectangle, error) {
 		return image.Rectangle{}, fmt.Errorf("keyboard is nil")
 	}
 	if unicode.IsSpace(ch) {
+		if ImageRectIsEmpty(&k.Space) {
+			return image.Rectangle{}, fmt.Errorf("space key not found on keyboard")
+		}
 		return k.Space, nil
 	}
 	key, found := k.Key(unicode.ToLower(ch))

@@ -121,6 +121,16 @@ func CenterY(rect image.Rectangle) int {
 	return (rect.Min.Y + rect.Max.Y) / 2
 }
 
+// UnscaledRect ...
+func UnscaledRect(rect image.Rectangle, scale float64) image.Rectangle {
+	return image.Rect(
+		int(float64(rect.Min.X)/scale),
+		int(float64(rect.Min.Y)/scale),
+		int(float64(rect.Max.X)/scale),
+		int(float64(rect.Max.Y)/scale),
+	)
+}
+
 // ClosestRect ...
 func ClosestRect(rects []image.Rectangle, target *image.Rectangle) *image.Rectangle {
 	if len(rects) == 0 {
