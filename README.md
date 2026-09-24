@@ -97,7 +97,7 @@ From the project root, run:
 ./install.sh
 ```
 
-The script installs the system dependencies (Go, ADB, FFmpeg, Tesseract OCR, CMake and Ninja), builds OpenCV from source as static libraries into `build/deps`, builds the server against them, and installs the `vdroid-scripter` binary to `/usr/local/bin`. The OpenCV build runs once (several minutes) and is reused by later runs. Supported out of the box: macOS (Homebrew), Arch, Debian/Ubuntu, and Fedora.
+The script installs the build toolchain and ADB (Go, ADB, pkg-config, CMake, Ninja, NASM and a C++ compiler), builds OpenCV, FFmpeg, Leptonica and Tesseract from pinned source releases as static libraries into `build/deps`, builds the server against them, and installs the `vdroid-scripter` binary to `/usr/local/bin`. The library builds run once (ten to fifteen minutes on a modern machine) and are reused by later runs. Supported out of the box: macOS (Homebrew), Arch, Debian/Ubuntu, and Fedora. On another distribution install the toolchain yourself and run `VDROID_SKIP_PACKAGES=1 ./install.sh`.
 
 By default the binary goes to `/usr/local/bin`, and the script uses `sudo` only if that directory is not writable. Set `PREFIX` to install somewhere else. The binary is placed in `$PREFIX/bin`:
 
@@ -109,9 +109,9 @@ If `$PREFIX/bin` is not on your `PATH`, the script prints the `export PATH=...` 
 
 ### Notes on the native dependencies
 
-* The server needs **OpenCV 4**, because gocv does not support OpenCV 5 yet, and distributions have started moving to 5 (Arch and Homebrew ship it as `opencv`). So the script does not use the distribution's OpenCV at all: it downloads OpenCV 4.14.0, builds the modules gocv needs as static libraries with no OpenEXR, FFmpeg or GUI support, and links them into the server binary. The result depends on no OpenCV package and is unaffected by distribution upgrades. The build lives in `build/deps` (override with `VDROID_DEPS`) and needs CMake, Ninja and a C++ compiler, which the script installs.
-* OCR runs in-process against libtesseract and Leptonica, so their headers are a build dependency too. The Homebrew and Arch `tesseract` packages pull them in. Debian/Ubuntu needs `libtesseract-dev` and `libleptonica-dev`, Fedora needs `tesseract-devel` and `leptonica-devel`. The script installs these.
-* Any recent FFmpeg major works. The server binds only libavcodec's stable decode core.
+* The server binary is self-contained. `install.sh` does not use the distribution's OpenCV, FFmpeg or Tesseract packages: it downloads pinned source releases (OpenCV 4.14.0, FFmpeg 9.0.2, Leptonica 1.87.0, Tesseract 5.5.3), builds each as static libraries with only what the server uses, and links them into `vdroid-scripter`. `ldd` or `otool -L` on the result shows system libraries only, so a distribution upgrade that changes an OpenCV, OpenEXR or FFmpeg version cannot break it. The reason this matters: gocv needs OpenCV 4 while Arch and Homebrew now ship OpenCV 5 as `opencv`, and community packages of OpenCV 4 broke whenever a library they were built against moved on.
+* The builds live in `build/deps` (override with `VDROID_DEPS`). OpenCV contains the modules gocv's wrapper compiles against, with no OpenEXR, FFmpeg, GUI or contrib support; FFmpeg is libavcodec with the H.264 decoder only; Leptonica and Tesseract are built without image codecs, libarchive or curl. Bump a version constant at the top of `install.sh` and re-run it to rebuild one of them.
+* Tesseract language files live in `$PREFIX/share/vdroid_scripter/tessdata` (`/usr/local/share/vdroid_scripter/tessdata` by default); that path is compiled into the server, so it needs no environment variable. The script downloads `eng` and `rus` from the [tessdata](https://github.com/tesseract-ocr/tessdata) repository (about 20 MB each). Set `VDROID_TESSDATA_LANGS="eng deu fra"` before running the script to fetch other languages, or drop any `<lang>.traineddata` into that directory later. `TESSDATA_PREFIX` in the environment overrides the directory at run time, as with any Tesseract build. Changing `PREFIX` rebuilds Tesseract, because the path is baked in.
 
 ## Preparing the Android device
 
@@ -146,13 +146,11 @@ It listens on port `8080`. If you use the MCP server you can skip this step, bec
 cd server && go run cmd/main.go
 ```
 
-Building or running from source needs the static OpenCV that `install.sh` built on the pkg-config path (run the script once first) and, on macOS, the Homebrew `ffmpeg` formula. `install.sh` exports this itself when it builds:
+Building or running from source needs the static libraries that `install.sh` built on the pkg-config path, so run the script once first. `install.sh` exports this itself when it builds:
 
 ```bash
-export PKG_CONFIG_PATH="$PWD/build/deps/lib/pkgconfig:$(brew --prefix ffmpeg)/lib/pkgconfig:$PKG_CONFIG_PATH"
+export PKG_CONFIG_PATH="$PWD/build/deps/lib/pkgconfig"
 ```
-
-On Linux only the first entry is needed.
 
 ### Configuration
 

@@ -10,14 +10,24 @@ BUILD_OUTPUT=""
 
 OPENCV_VERSION="4.14.0"
 OPENCV_MODULES="core,imgproc,imgcodecs,highgui,videoio,features2d,calib3d,objdetect,photo,video,dnn,flann"
+FFMPEG_VERSION="9.0.2"
+LEPTONICA_VERSION="1.87.0"
+TESSERACT_VERSION="5.5.3"
+TESSDATA_LANGS="${VDROID_TESSDATA_LANGS:-eng rus}"
+TESSDATA_URL="https://github.com/tesseract-ocr/tessdata/raw/main"
 
 main() {
   detect_platform
+  check_prefix
   install_dependencies
   require_go
   build_opencv
+  build_ffmpeg
+  build_leptonica
+  build_tesseract
   build_server
   install_binary
+  install_tessdata
   print_summary
 }
 
@@ -31,6 +41,20 @@ need_cmd() {
 
 version_ge() {
   [ "$(printf '%s\n%s\n' "$1" "$2" | sort -V | head -n1)" = "$2" ]
+}
+
+check_prefix() {
+  case "$PREFIX" in
+    *" "*) die "PREFIX must not contain spaces: $PREFIX" ;;
+  esac
+}
+
+tessdata_prefix() {
+  printf '%s/share/%s' "$PREFIX" "vdroid_scripter"
+}
+
+job_count() {
+  nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4
 }
 
 detect_platform() {
@@ -51,7 +75,11 @@ detect_linux_distro() {
 }
 
 install_dependencies() {
-  log "Installing system dependencies"
+  if [ -n "${VDROID_SKIP_PACKAGES:-}" ]; then
+    log "Skipping package installation (VDROID_SKIP_PACKAGES is set)"
+    return
+  fi
+  log "Installing the build toolchain and ADB"
   if [ "$PLATFORM" = "macos" ]; then
     install_macos
   else
@@ -61,17 +89,7 @@ install_dependencies() {
 
 install_macos() {
   need_cmd brew
-  brew install go android-platform-tools ffmpeg tesseract tesseract-lang cmake ninja
-  install_macos_legacy_tessdata
-}
-
-install_macos_legacy_tessdata() {
-  local tessdata
-  tessdata="$(brew --prefix)/share/tessdata"
-  mkdir -p "$tessdata"
-  log "Replacing the tessdata_fast eng model with the full eng.traineddata for better OCR accuracy"
-  curl -fL https://github.com/tesseract-ocr/tessdata/raw/main/eng.traineddata \
-    -o "$tessdata/eng.traineddata"
+  brew install go android-platform-tools pkgconf cmake ninja nasm
 }
 
 install_linux() {
@@ -88,28 +106,21 @@ install_linux_by_family() {
     *arch*) install_arch ;;
     *debian*) install_apt ;;
     *fedora* | *rhel*) install_dnf ;;
-    *) die "unsupported Linux distribution: ${DISTRO_ID:-unknown}. Install Go, adb, ffmpeg, tesseract, cmake, ninja and a C++ compiler manually, then run this script's build steps by hand: see the README." ;;
+    *) die "unsupported Linux distribution: ${DISTRO_ID:-unknown}. Install Go, adb, pkg-config, cmake, ninja, make, nasm, curl and a C++ compiler manually, then run: VDROID_SKIP_PACKAGES=1 ./install.sh" ;;
   esac
 }
 
 install_arch() {
-  sudo pacman -S --needed --noconfirm go android-tools ffmpeg tesseract cmake ninja gcc curl
-  sudo pacman -S --needed --noconfirm $(pacman -Sl extra | grep tesseract-data | awk '{print $2}')
+  sudo pacman -S --needed --noconfirm go android-tools pkgconf gcc make cmake ninja nasm curl
 }
 
 install_apt() {
   sudo apt-get update
-  sudo apt-get install -y \
-    golang-go adb ffmpeg pkg-config build-essential cmake ninja-build curl \
-    libavcodec-dev libavutil-dev \
-    tesseract-ocr libtesseract-dev libleptonica-dev tesseract-ocr-eng tesseract-ocr-rus
+  sudo apt-get install -y golang-go adb pkg-config build-essential cmake ninja-build nasm curl
 }
 
 install_dnf() {
-  sudo dnf install -y \
-    golang android-tools ffmpeg-free pkgconf-pkg-config gcc-c++ cmake ninja-build curl \
-    libavcodec-free-devel libavutil-free-devel \
-    tesseract tesseract-devel leptonica-devel tesseract-langpack-eng tesseract-langpack-rus
+  sudo dnf install -y golang android-tools pkgconf-pkg-config gcc-c++ make cmake ninja-build nasm curl
 }
 
 require_go() {
@@ -123,23 +134,63 @@ require_go() {
   fi
 }
 
+dependency_built() {
+  local name="$1" version="$2" pc="$3" detail="${4:-}"
+  local stamp="$DEPS_DIR/stamps/$name-$version"
+  [ -f "$stamp" ] && [ -f "$DEPS_DIR/lib/pkgconfig/$pc" ] && [ "$(cat "$stamp")" = "$detail" ]
+}
+
+mark_built() {
+  local name="$1" version="$2" detail="${3:-}"
+  mkdir -p "$DEPS_DIR/stamps"
+  printf '%s' "$detail" > "$DEPS_DIR/stamps/$name-$version"
+}
+
+fetch_source() {
+  local url="$1" tarball="$2" dir="$3"
+  if [ -d "$dir" ]; then
+    return
+  fi
+  need_cmd curl
+  mkdir -p "$DEPS_DIR/src"
+  log "Downloading $(basename "$tarball")"
+  curl -fL "$url" -o "$tarball"
+  tar -xzf "$tarball" -C "$DEPS_DIR/src"
+}
+
+merge_private_libs() {
+  local pc="$1" tmp
+  tmp="$(mktemp)"
+  awk '
+    function trim(text) { sub(/^[ \t]+/, "", text); sub(/[ \t,]+$/, "", text); return text }
+    /^Libs:/ { libs = trim(substr($0, 6)); has_libs = 1; next }
+    /^Libs.private:/ { part = trim(substr($0, 14)); if (part != "") libs = libs " " part; has_libs = 1; next }
+    /^Requires:/ { requires = trim(substr($0, 10)); has_requires = 1; next }
+    /^Requires.private:/ {
+      part = trim(substr($0, 18))
+      if (part != "" && requires != "") requires = requires ", "
+      requires = requires part
+      has_requires = 1
+      next
+    }
+    { print }
+    END {
+      if (has_requires && requires != "") print "Requires: " requires
+      if (has_libs) print "Libs: " libs
+    }
+  ' "$pc" > "$tmp"
+  mv "$tmp" "$pc"
+}
+
 build_opencv() {
-  local stamp="$DEPS_DIR/stamps/opencv-$OPENCV_VERSION"
-  if [ -f "$stamp" ] && [ -f "$DEPS_DIR/lib/pkgconfig/opencv4.pc" ]; then
+  if dependency_built opencv "$OPENCV_VERSION" opencv4.pc; then
     log "OpenCV $OPENCV_VERSION is already built in $DEPS_DIR"
     return
   fi
   need_cmd cmake
   need_cmd ninja
-  need_cmd curl
   local src="$DEPS_DIR/src/opencv-$OPENCV_VERSION"
-  local tarball="$DEPS_DIR/src/opencv-$OPENCV_VERSION.tar.gz"
-  mkdir -p "$DEPS_DIR/src" "$DEPS_DIR/stamps"
-  if [ ! -d "$src" ]; then
-    log "Downloading OpenCV $OPENCV_VERSION"
-    curl -fL "https://github.com/opencv/opencv/archive/refs/tags/$OPENCV_VERSION.tar.gz" -o "$tarball"
-    tar -xzf "$tarball" -C "$DEPS_DIR/src"
-  fi
+  fetch_source "https://github.com/opencv/opencv/archive/refs/tags/$OPENCV_VERSION.tar.gz" "$DEPS_DIR/src/opencv-$OPENCV_VERSION.tar.gz" "$src"
   log "Building OpenCV $OPENCV_VERSION as static libraries in $DEPS_DIR (this takes several minutes)"
   cmake -S "$src" -B "$src/build" -G Ninja \
     -DCMAKE_BUILD_TYPE=Release \
@@ -164,19 +215,81 @@ build_opencv() {
   cmake --install "$src/build"
   merge_private_libs "$DEPS_DIR/lib/pkgconfig/opencv4.pc"
   rm -rf "$src"
-  touch "$stamp"
+  mark_built opencv "$OPENCV_VERSION"
 }
 
-merge_private_libs() {
-  local pc="$1" tmp
-  tmp="$(mktemp)"
-  awk '
-    /^Libs:/ { libs = $0; next }
-    /^Libs.private:/ { sub(/^Libs.private:/, ""); private = $0; next }
-    { print }
-    END { print libs private }
-  ' "$pc" > "$tmp"
-  mv "$tmp" "$pc"
+build_ffmpeg() {
+  if dependency_built ffmpeg "$FFMPEG_VERSION" libavcodec.pc; then
+    log "FFmpeg $FFMPEG_VERSION is already built in $DEPS_DIR"
+    return
+  fi
+  need_cmd make
+  local src="$DEPS_DIR/src/ffmpeg-$FFMPEG_VERSION"
+  fetch_source "https://ffmpeg.org/releases/ffmpeg-$FFMPEG_VERSION.tar.gz" "$DEPS_DIR/src/ffmpeg-$FFMPEG_VERSION.tar.gz" "$src"
+  log "Building FFmpeg $FFMPEG_VERSION (libavcodec with only the H.264 decoder) as static libraries in $DEPS_DIR"
+  (
+    cd "$src"
+    ./configure --prefix="$DEPS_DIR" --disable-shared --enable-static --enable-pic \
+      --disable-everything --enable-decoder=h264 --enable-parser=h264 \
+      --disable-programs --disable-doc --disable-network --disable-autodetect --disable-debug \
+      --disable-avdevice --disable-avformat --disable-avfilter --disable-swscale
+    make -j"$(job_count)"
+    make install
+  )
+  merge_private_libs "$DEPS_DIR/lib/pkgconfig/libavcodec.pc"
+  merge_private_libs "$DEPS_DIR/lib/pkgconfig/libavutil.pc"
+  merge_private_libs "$DEPS_DIR/lib/pkgconfig/libswresample.pc"
+  rm -rf "$src"
+  mark_built ffmpeg "$FFMPEG_VERSION"
+}
+
+build_leptonica() {
+  if dependency_built leptonica "$LEPTONICA_VERSION" lept.pc; then
+    log "Leptonica $LEPTONICA_VERSION is already built in $DEPS_DIR"
+    return
+  fi
+  need_cmd cmake
+  need_cmd ninja
+  local src="$DEPS_DIR/src/leptonica-$LEPTONICA_VERSION"
+  fetch_source "https://github.com/DanBloomberg/leptonica/releases/download/$LEPTONICA_VERSION/leptonica-$LEPTONICA_VERSION.tar.gz" "$DEPS_DIR/src/leptonica-$LEPTONICA_VERSION.tar.gz" "$src"
+  log "Building Leptonica $LEPTONICA_VERSION as a static library in $DEPS_DIR"
+  cmake -S "$src" -B "$src/build" -G Ninja \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_INSTALL_PREFIX="$DEPS_DIR" \
+    -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
+    -DBUILD_SHARED_LIBS=OFF -DBUILD_PROG=OFF -DSW_BUILD=OFF \
+    -DENABLE_ZLIB=OFF -DENABLE_PNG=OFF -DENABLE_GIF=OFF -DENABLE_JPEG=OFF -DENABLE_TIFF=OFF -DENABLE_WEBP=OFF -DENABLE_OPENJPEG=OFF
+  cmake --build "$src/build"
+  cmake --install "$src/build"
+  merge_private_libs "$DEPS_DIR/lib/pkgconfig/lept.pc"
+  rm -rf "$src"
+  mark_built leptonica "$LEPTONICA_VERSION"
+}
+
+build_tesseract() {
+  if dependency_built tesseract "$TESSERACT_VERSION" tesseract.pc "$(tessdata_prefix)"; then
+    log "Tesseract $TESSERACT_VERSION is already built in $DEPS_DIR"
+    return
+  fi
+  need_cmd cmake
+  need_cmd ninja
+  local src="$DEPS_DIR/src/tesseract-$TESSERACT_VERSION"
+  fetch_source "https://github.com/tesseract-ocr/tesseract/archive/refs/tags/$TESSERACT_VERSION.tar.gz" "$DEPS_DIR/src/tesseract-$TESSERACT_VERSION.tar.gz" "$src"
+  log "Building Tesseract $TESSERACT_VERSION as a static library in $DEPS_DIR (language files under $(tessdata_prefix)/tessdata)"
+  PKG_CONFIG_PATH="$DEPS_DIR/lib/pkgconfig" cmake -S "$src" -B "$src/build" -G Ninja \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_INSTALL_PREFIX="$DEPS_DIR" \
+    -DCMAKE_CXX_FLAGS="-DTESSDATA_PREFIX=\\\"$(tessdata_prefix)\\\"" \
+    -DCMAKE_PREFIX_PATH="$DEPS_DIR" \
+    -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
+    -DBUILD_SHARED_LIBS=OFF -DBUILD_TRAINING_TOOLS=OFF -DBUILD_TESTS=OFF -DSW_BUILD=OFF \
+    -DDISABLE_ARCHIVE=ON -DDISABLE_CURL=ON -DDISABLE_TIFF=ON -DGRAPHICS_DISABLED=ON \
+    -DOPENMP_BUILD=OFF -DENABLE_LTO=OFF -DENABLE_OPENCL=OFF
+  cmake --build "$src/build"
+  cmake --install "$src/build"
+  merge_private_libs "$DEPS_DIR/lib/pkgconfig/tesseract.pc"
+  rm -rf "$src"
+  mark_built tesseract "$TESSERACT_VERSION" "$(tessdata_prefix)"
 }
 
 build_server() {
@@ -184,10 +297,7 @@ build_server() {
   local tmpdir
   tmpdir="$(mktemp -d)"
   BUILD_OUTPUT="$tmpdir/$BIN_NAME"
-  export PKG_CONFIG_PATH="$DEPS_DIR/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
-  if [ "$PLATFORM" = "macos" ]; then
-    export PKG_CONFIG_PATH="$PKG_CONFIG_PATH:$(brew --prefix ffmpeg)/lib/pkgconfig"
-  fi
+  export PKG_CONFIG_PATH="$DEPS_DIR/lib/pkgconfig"
   (cd "$SERVER_DIR" && go mod download && CGO_ENABLED=1 go build -a -o "$BUILD_OUTPUT" ./cmd)
 }
 
@@ -203,6 +313,26 @@ install_binary() {
   $sudo_cmd mkdir -p "$bindir"
   $sudo_cmd install -m 0755 "$BUILD_OUTPUT" "$dest"
   rm -rf "$(dirname "$BUILD_OUTPUT")"
+}
+
+install_tessdata() {
+  local dir="$(tessdata_prefix)/tessdata"
+  local sudo_cmd="" lang tmp
+  mkdir -p "$dir" 2>/dev/null || true
+  if [ ! -w "$dir" ]; then
+    sudo_cmd="sudo"
+  fi
+  $sudo_cmd mkdir -p "$dir"
+  for lang in $TESSDATA_LANGS; do
+    if [ -f "$dir/$lang.traineddata" ]; then
+      continue
+    fi
+    log "Downloading Tesseract language data: $lang"
+    tmp="$(mktemp)"
+    curl -fL "$TESSDATA_URL/$lang.traineddata" -o "$tmp"
+    $sudo_cmd install -m 0644 "$tmp" "$dir/$lang.traineddata"
+    rm -f "$tmp"
+  done
 }
 
 print_summary() {
