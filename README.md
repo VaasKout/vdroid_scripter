@@ -97,7 +97,7 @@ From the project root, run:
 ./install.sh
 ```
 
-The script installs the required dependencies (Go, ADB, FFmpeg, OpenCV, Tesseract OCR), builds the server, and installs the `vdroid-scripter` binary to `/usr/local/bin`. Supported out of the box: macOS (Homebrew), Arch, Debian/Ubuntu, and Fedora.
+The script installs the system dependencies (Go, ADB, FFmpeg, Tesseract OCR, CMake and Ninja), builds OpenCV from source as static libraries into `build/deps`, builds the server against them, and installs the `vdroid-scripter` binary to `/usr/local/bin`. The OpenCV build runs once (several minutes) and is reused by later runs. Supported out of the box: macOS (Homebrew), Arch, Debian/Ubuntu, and Fedora.
 
 By default the binary goes to `/usr/local/bin`, and the script uses `sudo` only if that directory is not writable. Set `PREFIX` to install somewhere else. The binary is placed in `$PREFIX/bin`:
 
@@ -109,8 +109,7 @@ If `$PREFIX/bin` is not on your `PATH`, the script prints the `export PATH=...` 
 
 ### Notes on the native dependencies
 
-* The server needs **OpenCV 4**, because gocv does not support OpenCV 5 yet. On macOS that is the `opencv@4` formula. Debian/Ubuntu and Fedora still ship OpenCV 4 as their default packages.
-* On Arch the official `opencv` package is version 5, so the script installs the AUR `opencv4` package instead: through plain `pacman` when a configured repo carries it (chaotic-aur has it prebuilt), otherwise through `paru` or `yay`. With no AUR helper available it stops and asks you to install `opencv4` yourself before re-running.
+* The server needs **OpenCV 4**, because gocv does not support OpenCV 5 yet, and distributions have started moving to 5 (Arch and Homebrew ship it as `opencv`). So the script does not use the distribution's OpenCV at all: it downloads OpenCV 4.14.0, builds the modules gocv needs as static libraries with no OpenEXR, FFmpeg or GUI support, and links them into the server binary. The result depends on no OpenCV package and is unaffected by distribution upgrades. The build lives in `build/deps` (override with `VDROID_DEPS`) and needs CMake, Ninja and a C++ compiler, which the script installs.
 * OCR runs in-process against libtesseract and Leptonica, so their headers are a build dependency too. The Homebrew and Arch `tesseract` packages pull them in. Debian/Ubuntu needs `libtesseract-dev` and `libleptonica-dev`, Fedora needs `tesseract-devel` and `leptonica-devel`. The script installs these.
 * Any recent FFmpeg major works. The server binds only libavcodec's stable decode core.
 
@@ -147,11 +146,13 @@ It listens on port `8080`. If you use the MCP server you can skip this step, bec
 cd server && go run cmd/main.go
 ```
 
-On macOS, building or running from source needs the Homebrew `opencv@4` and `ffmpeg` formulas on the pkg-config path first. `install.sh` does this internally when it builds:
+Building or running from source needs the static OpenCV that `install.sh` built on the pkg-config path (run the script once first) and, on macOS, the Homebrew `ffmpeg` formula. `install.sh` exports this itself when it builds:
 
 ```bash
-export PKG_CONFIG_PATH="$(brew --prefix opencv@4)/lib/pkgconfig:$(brew --prefix ffmpeg)/lib/pkgconfig:$PKG_CONFIG_PATH"
+export PKG_CONFIG_PATH="$PWD/build/deps/lib/pkgconfig:$(brew --prefix ffmpeg)/lib/pkgconfig:$PKG_CONFIG_PATH"
 ```
+
+On Linux only the first entry is needed.
 
 ### Configuration
 
