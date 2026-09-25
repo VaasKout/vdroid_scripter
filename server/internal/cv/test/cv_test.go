@@ -25,10 +25,22 @@ const (
 	TestTextFile   = "./text_template.png"
 	TestTextFile2  = "./text_template_2.png"
 	TestTextFile3  = "./text_template_3.png"
+	TestTextFile4  = "./text_template_4.png"
+	TestTextFile5  = "./text_template_5.png"
 	TestSignPhrase = "Sign In"
 )
 
+var TestTextFiles = []string{TestTextFile, TestTextFile2, TestTextFile3, TestTextFile4, TestTextFile5}
+
 func TestGetTextFromImage(t *testing.T) {
+	for _, testImage := range TestTextFiles {
+		t.Run(filepath.Base(testImage), func(t *testing.T) {
+			getTextFromImageAndDraw(t, testImage)
+		})
+	}
+}
+
+func getTextFromImageAndDraw(t *testing.T, testImage string) {
 	var fileProps = &config.FilesProps{
 		Logs: "./logs",
 	}
@@ -36,8 +48,6 @@ func TestGetTextFromImage(t *testing.T) {
 	var filesDB = filesdb.New(fileProps)
 	var cvAPI = cv.New(logAPI)
 	dir := filesDB.CreateLogsDir(TestSerial)
-
-	testImage := TestTextFile3
 
 	img := gocv.IMRead(testImage, gocv.IMReadColor)
 	if img.Empty() {
