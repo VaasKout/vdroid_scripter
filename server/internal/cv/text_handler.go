@@ -6,6 +6,7 @@ import (
 	"errors"
 	"image"
 	"image/color"
+	"math"
 	"strings"
 
 	"gocv.io/x/gocv"
@@ -256,7 +257,8 @@ func wordsToOCRResults(words []tesseract.Word) []OCRResult {
 			continue
 		}
 		results = append(results, OCRResult{
-			Text: word.Text,
+			Text:       word.Text,
+			Confidence: int(math.Round(float64(word.Confidence))),
 			Rectangle: models.Rectangle{
 				LeftX:   word.Rect.Min.X,
 				TopY:    word.Rect.Min.Y,
@@ -486,6 +488,7 @@ func matchPhrase(ocrArray []OCRResult, start int, words []string) (OCRResult, bo
 			return OCRResult{}, false
 		}
 
+		merged.Confidence = min(merged.Confidence, next.Confidence)
 		merged.Rectangle.LeftX = min(merged.Rectangle.LeftX, next.Rectangle.LeftX)
 		merged.Rectangle.TopY = min(merged.Rectangle.TopY, next.Rectangle.TopY)
 		merged.Rectangle.RightX = max(merged.Rectangle.RightX, next.Rectangle.RightX)

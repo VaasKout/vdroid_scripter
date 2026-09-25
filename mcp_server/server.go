@@ -19,6 +19,8 @@ const (
 	defaultTimeoutMs = 5000
 	defaultDelayMs   = 1000
 	firstStepDelayMs = 0
+
+	scanMinConfidence = 40
 )
 
 const serverInstructions = `vdroid-scripter drives Android devices with CV-located steps composed from a human-curated library.
@@ -35,7 +37,7 @@ Timing: every step carries two millisecond knobs, delay and timeout, and the ser
 
 Locale: for text landmarks and type_text, always set the landmark's locale to the Tesseract language code of its value's language. This holds for every language Tesseract supports; eng is the default. Pass the text exactly as the user wrote it, never transliterate or translate it.
 
-Perception: scan is the ONLY way to observe the screen — there are no screenshots and never will be. Call scan when a step failed, when the user's instruction is conditional ("if X is not visible, ..."), or when the user explicitly asks what is on screen. Never scan habitually between steps — the happy path is one queue_steps call and one wait_for_session. Pass in images the library image names plausibly related to the current app so scan reports which of them are visible; scan's landmarks are exactly what step landmarks consume — build follow-up steps from the returned type/value pairs.
+Perception: scan is the ONLY way to observe the screen — there are no screenshots and never will be. Call scan when a step failed, when the user's instruction is conditional ("if X is not visible, ..."), or when the user explicitly asks what is on screen. Never scan habitually between steps — the happy path is one queue_steps call and one wait_for_session. Pass in images the library image names plausibly related to the current app so scan reports which of them are visible. The result is a compact table — a header with the landmark count and the resolved text locale, then one line per landmark in reading order, "type left,top,right,bottom value" — and its type/value pairs are exactly what step landmarks consume: build follow-up steps from them, with the header's locale on text landmarks, and use the coordinates only to judge which elements sit next to each other. Text the OCR read with confidence below 40 is left out and the header counts the dropped entries — when a word you expected is missing, it was misread or is in another language, so scan again with the matching locale before concluding it is not on screen.
 
 Routes: a route is a saved flow — a name, the user's dictation as its prompt, and the exact steps that ran to success. When the user asks to save or remember a flow as <name>, call save_route with the name, the user's dictation VERBATIM as the prompt (conditions included), and the steps that actually succeeded in order; a duplicate name overwrites. The prompt may be absent on routes saved elsewhere (the Android client saves routes without one) — treat such a route as a plain script with no recorded intent. To run a saved route: run_route, then wait_for_session once — 'idle' means the whole route succeeded. Saving stamps every step with an id (1..N, its position) and stores delay and timeout exactly as sent (this MCP fills omitted ones the same way as for queue_steps, so a route's first step gets delay 0); run_route accepts an optional start_id to start mid-route from that step id — use it when the user asks to run a route from a specific point, or to rerun the unchanged remainder after a recovered failure; an id the route does not contain is an error and nothing runs, and whichever step a run starts from gets delay 0 regardless of the stored value. To extend a route: get_route, append the new steps, call save_route with the full list — nothing executes. If a route step fails, the error status names the failed step's id (queue_steps batches get 1-based position ids the same way); recover from that point guided by the route's prompt: scan, decide, then either queue adjusted steps with queue_steps or, when the remaining steps need no changes, run_route with start_id of the failed step — and after a recovered run ask the user whether to update the route with the steps that worked. Never create or modify routes without being asked.
 
@@ -184,9 +186,16 @@ func (s *Server) registerTools() {
 			"and matches for the library images passed in images. This is the ONLY way " +
 			"to observe the screen — there are no screenshots. Call it when a step " +
 			"failed, when the user's instruction is conditional, or when the user asks " +
-			"what is on screen — never habitually between steps. What it returns is " +
-			"exactly what step landmarks consume. Opens a session automatically if " +
-			"none exists.",
+			"what is on screen — never habitually between steps. Returns a header " +
+			"line with the count and the resolved text locale, then one line per " +
+			"landmark in reading order: `type left,top,right,bottom value` (value " +
+			"may contain spaces). The type/value pairs are exactly what step " +
+			"landmarks consume; use the header's locale on the text landmarks you " +
+			"build. Text read with OCR confidence below 40 is omitted and the " +
+			"header says how many entries were dropped — a word you expected but " +
+			"do not see was misread or is in another language: scan again with " +
+			"the right locale before concluding it is not on screen. Opens a " +
+			"session automatically if none exists.",
 	}, s.handleScan)
 
 	mcp.AddTool(s.mcp, &mcp.Tool{
@@ -359,7 +368,63 @@ func (s *Server) handleScan(
 	if err != nil {
 		return nil, nil, err
 	}
-	return textResult(landmarks), nil, nil
+	return textResult(formatLandmarks(landmarks, in.Locale)), nil, nil
+}
+
+func formatLandmarks(landmarks []scanLandmark, requestedLocale string) string {
+	locale := textLocale(landmarks, requestedLocale)
+	kept, dropped := confidentLandmarks(landmarks)
+	if len(kept) == 0 {
+		return fmt.Sprintf("no landmarks found (text locale %s%s)", locale, droppedNote(dropped))
+	}
+
+	var lines strings.Builder
+	fmt.Fprintf(
+		&lines,
+		"%d landmarks in reading order, text locale %s%s; columns: type left,top,right,bottom value",
+		len(kept), locale, droppedNote(dropped),
+	)
+	for _, landmark := range kept {
+		rect := landmark.Rectangle
+		fmt.Fprintf(
+			&lines,
+			"\n%s %d,%d,%d,%d %s",
+			landmark.Type, rect.LeftX, rect.TopY, rect.RightX, rect.BottomY, landmark.Value,
+		)
+	}
+	return lines.String()
+}
+
+func confidentLandmarks(landmarks []scanLandmark) ([]scanLandmark, int) {
+	kept := make([]scanLandmark, 0, len(landmarks))
+	dropped := 0
+	for _, landmark := range landmarks {
+		if landmark.Type == "text" && landmark.Confidence < scanMinConfidence {
+			dropped++
+			continue
+		}
+		kept = append(kept, landmark)
+	}
+	return kept, dropped
+}
+
+func droppedNote(dropped int) string {
+	if dropped == 0 {
+		return ""
+	}
+	return fmt.Sprintf(", %d text entries below confidence %d dropped", dropped, scanMinConfidence)
+}
+
+func textLocale(landmarks []scanLandmark, requestedLocale string) string {
+	for _, landmark := range landmarks {
+		if landmark.Locale != "" {
+			return landmark.Locale
+		}
+	}
+	if requestedLocale != "" {
+		return requestedLocale
+	}
+	return "eng"
 }
 
 func (s *Server) handleQueueSteps(

@@ -240,7 +240,7 @@ The server keeps running after the AI session ends, so later sessions find it al
 | `ping` | Check that the server is reachable, starting it when it is not |
 | `list_devices` | Connected devices and their serials |
 | `get_library` | Names of the library images and actions |
-| `scan` | The agent's only perception: the landmarks on the current screen, as JSON |
+| `scan` | The agent's only perception: the landmarks on the current screen, one `type left,top,right,bottom value` line each |
 | `queue_steps` | Queue a whole sequence of steps in one call |
 | `wait_for_session` | Block until the queue finishes, then report `idle` or the error |
 | `get_session_status` | The current session status |
@@ -272,7 +272,7 @@ The MCP server ships its own instructions to the AI, so you do not have to expla
 * **Batch.** A dictated sequence becomes one `queue_steps` call followed by one `wait_for_session`. The agent does not queue step by step and does not poll the status in between.
 * **Text is free.** An instruction phrased in words visible on screen is a chain of `tap` steps with `text` landmarks.
 * **Locale.** Text landmarks and `type_text` carry the Tesseract language code of their value, `eng` by default. Text is passed exactly as written, never transliterated or translated.
-* **Perception.** `scan` is the only way to look at the screen, and there are no screenshots. The agent scans when a step failed, when the instruction is conditional, or when you ask what is on screen. It does not scan habitually between steps.
+* **Perception.** `scan` is the only way to look at the screen, and there are no screenshots. The agent scans when a step failed, when the instruction is conditional, or when you ask what is on screen. It does not scan habitually between steps. The MCP hands the agent a compact table rather than the server's JSON, and leaves out text the OCR read with confidence below 40 (icon glyphs and stray punctuation), saying how many entries it dropped.
 * **Literal execution.** The agent queues exactly what you asked, as many times as you asked, with no added checks and no substitutions. It improvises only after a step fails.
 * **Duplicates.** When a value matches several places, the agent puts a unique nearby landmark first in the chain. With no such neighbour, the first match in reading order wins.
 * **Timing.** An omitted `delay` becomes 0 on the first step of a batch and 1000 ms on later steps. An omitted `timeout` becomes 5000 ms. The agent raises the timeout for targets that appear after a launch or a load.

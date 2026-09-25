@@ -100,7 +100,26 @@ func (c *apiClient) getLibrary() (string, error) {
 	return string(body), err
 }
 
-func (c *apiClient) scan(serial string, images []string, locale string) (string, error) {
+type scanRectangle struct {
+	LeftX   int `json:"left_x"`
+	RightX  int `json:"right_x"`
+	TopY    int `json:"top_y"`
+	BottomY int `json:"bottom_y"`
+}
+
+type scanLandmark struct {
+	Type       string        `json:"type"`
+	Value      string        `json:"value"`
+	Locale     string        `json:"locale,omitempty"`
+	Confidence int           `json:"confidence,omitempty"`
+	Rectangle  scanRectangle `json:"rectangle"`
+}
+
+type scanResponse struct {
+	Landmarks []scanLandmark `json:"landmarks"`
+}
+
+func (c *apiClient) scan(serial string, images []string, locale string) ([]scanLandmark, error) {
 	var query = url.Values{}
 	if len(images) > 0 {
 		query.Set("images", strings.Join(images, ","))
@@ -115,7 +134,15 @@ func (c *apiClient) scan(serial string, images []string, locale string) (string,
 	}
 
 	body, err := c.request(http.MethodGet, path, nil)
-	return string(body), err
+	if err != nil {
+		return nil, err
+	}
+	var response scanResponse
+	err = json.Unmarshal(body, &response)
+	if err != nil {
+		return nil, err
+	}
+	return response.Landmarks, nil
 }
 
 func (c *apiClient) queueSteps(serial string, steps []stepInput) error {

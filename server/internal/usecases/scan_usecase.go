@@ -26,10 +26,11 @@ type ScanUseCase interface {
 
 // FoundLandmark ...
 type FoundLandmark struct {
-	Type      string           `json:"type"`
-	Value     string           `json:"value"`
-	Locale    string           `json:"locale,omitempty"`
-	Rectangle models.Rectangle `json:"rectangle"`
+	Type       string           `json:"type"`
+	Value      string           `json:"value"`
+	Locale     string           `json:"locale,omitempty"`
+	Confidence int              `json:"confidence,omitempty"`
+	Rectangle  models.Rectangle `json:"rectangle"`
 }
 
 func (i *interactorImpl) Scan(
@@ -165,10 +166,11 @@ func (i *interactorImpl) scanText(
 			continue
 		}
 		landmarks = append(landmarks, FoundLandmark{
-			Type:      models.Text,
-			Value:     result.Text,
-			Locale:    ocrParams.Lang,
-			Rectangle: result.Rectangle,
+			Type:       models.Text,
+			Value:      result.Text,
+			Locale:     ocrParams.Lang,
+			Confidence: result.Confidence,
+			Rectangle:  result.Rectangle,
 		})
 	}
 	return landmarks, nil

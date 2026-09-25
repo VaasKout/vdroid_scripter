@@ -6,8 +6,9 @@ import (
 
 // OCRResult ...
 type OCRResult struct {
-	Text      string           `json:"text"`
-	Rectangle models.Rectangle `json:"rectangle"`
+	Text       string           `json:"text"`
+	Confidence int              `json:"confidence"`
+	Rectangle  models.Rectangle `json:"rectangle"`
 }
 
 // IsEmpty ...

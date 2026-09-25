@@ -546,6 +546,7 @@ the rectangle where it was found, in video-frame coordinates.
 | Type | `type` | string | `image`, `text`, or `yolo` |
 | Value | `value` | string | Library image name, recognized text, or YOLO class |
 | Locale | `locale` | string | omitempty; resolved Tesseract code on `text` entries |
+| Confidence | `confidence` | int | omitempty; OCR confidence 0–100 on `text` entries (a phrase carries its lowest word); consumers may drop low values (the MCP drops below 40) |
 | Rectangle | `rectangle` | [Rectangle](#rectangle) | Where it was found |
 
 ### OCRResult
@@ -553,10 +554,11 @@ the rectangle where it was found, in video-frame coordinates.
 `server/internal/cv/model.go`
 
 ```json
-{ "text": "Login", "rectangle": { "left_x": 40, "right_x": 220, "top_y": 900, "bottom_y": 980 } }
+{ "text": "Login", "confidence": 92, "rectangle": { "left_x": 40, "right_x": 220, "top_y": 900, "bottom_y": 980 } }
 ```
 
 | Field | JSON | Type |
 | ----- | ---- | ---- |
 | Text | `text` | string |
+| Confidence | `confidence` | int, Tesseract word confidence 0–100 rounded; a merged phrase carries its lowest word |
 | Rectangle | `rectangle` | [Rectangle](#rectangle) |

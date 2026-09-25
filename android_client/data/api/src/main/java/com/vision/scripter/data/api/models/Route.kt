@@ -51,6 +51,8 @@ data class FoundLandmark(
     val value: String = "",
     @SerialName("locale")
     val locale: String = "",
+    @SerialName("confidence")
+    val confidence: Int = 0,
     @SerialName("rectangle")
     val rectangle: CvRectangle = CvRectangle(leftX = 0, rightX = 0, topY = 0, bottomY = 0),
 )
