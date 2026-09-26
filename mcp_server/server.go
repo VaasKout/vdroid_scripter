@@ -206,7 +206,9 @@ func (s *Server) registerTools() {
 		Description: "Block until the device session stops running queued steps, then " +
 			"return the final status: 'idle' means everything completed successfully, an error " +
 			"text means a step failed (remaining queue was cleared), 'closed' means the " +
-			"session ended. Call this after queueing steps instead of polling manually.",
+			"session ended because its video stream stopped (cable, adb restart) — " +
+			"just queue again, a fresh session opens on the next call. Call this " +
+			"after queueing steps instead of polling manually.",
 	}, s.handleWaitForSession)
 
 	mcp.AddTool(s.mcp, &mcp.Tool{
