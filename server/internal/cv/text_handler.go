@@ -162,6 +162,17 @@ type OcrParams struct {
 	WhiteList string
 }
 
+type darkRegionPass struct {
+	edges      *gocv.Mat
+	gray       *gocv.Mat
+	inverted   *gocv.Mat
+	labels     *gocv.Mat
+	contours   gocv.PointsVector
+	minArea    float64
+	invertMask *gocv.Mat
+	keepMask   *gocv.Mat
+}
+
 // TextHandler ...
 type TextHandler interface {
 	FindTextRectangles(
@@ -284,66 +295,91 @@ func rebinarizeDarkRegions(edges *gocv.Mat, gray *gocv.Mat) error {
 
 	invertMask := gocv.Zeros(edges.Rows(), edges.Cols(), gocv.MatTypeCV8UC1)
 	defer invertMask.Close()
+	keepMask := gocv.Zeros(edges.Rows(), edges.Cols(), gocv.MatTypeCV8UC1)
+	defer keepMask.Close()
 
-	minArea := max(float64(edges.Rows()*edges.Cols())*darkRegionMinAreaRatio, darkRegionMinAreaPx)
-	white := color.RGBA{R: 255, G: 255, B: 255, A: 255}
-	invertFound := false
-	for i := range contours.Size() {
-		rect := gocv.BoundingRect(contours.At(i))
-		bboxArea := float64(rect.Dx() * rect.Dy())
-		if bboxArea < minArea {
-			continue
-		}
-
-		region := inverted.Region(rect)
-		fillRatio := float64(gocv.CountNonZero(region)) / bboxArea
-		region.Close()
-		if fillRatio < darkRegionMinFillRatio {
-			continue
-		}
-
-		rebinarized, err := rebinarizeRegion(edges, gray, &labels, contours, i)
-		if err != nil {
-			return err
-		}
-		if rebinarized {
-			continue
-		}
-
-		err = gocv.DrawContours(&invertMask, contours, i, white, -1)
-		if err != nil {
-			return err
-		}
-		invertFound = true
+	pass := &darkRegionPass{
+		edges:      edges,
+		gray:       gray,
+		inverted:   &inverted,
+		labels:     &labels,
+		contours:   contours,
+		minArea:    max(float64(edges.Rows()*edges.Cols())*darkRegionMinAreaRatio, darkRegionMinAreaPx),
+		invertMask: &invertMask,
+		keepMask:   &keepMask,
 	}
 
+	invertFound := false
+	for i := range contours.Size() {
+		marked, err := pass.markRegion(i)
+		if err != nil {
+			return err
+		}
+		invertFound = invertFound || marked
+	}
 	if !invertFound {
 		return nil
 	}
 
-	err := excludeLightIslands(&invertMask, edges, minArea)
-	if err != nil {
-		return err
-	}
+	gocv.BitwiseNot(keepMask, &keepMask)
+	gocv.BitwiseAnd(invertMask, keepMask, &invertMask)
 
 	kernel := gocv.GetStructuringElement(gocv.MorphRect, image.Pt(3, 3))
 	defer kernel.Close()
-	err = gocv.Dilate(inverted, &inverted, kernel)
+	err := gocv.Dilate(inverted, &inverted, kernel)
 	if err != nil {
 		return err
 	}
 	return inverted.CopyToWithMask(edges, invertMask)
 }
 
-func excludeLightIslands(invertMask *gocv.Mat, edges *gocv.Mat, minArea float64) error {
-	islands := gocv.NewMat()
-	defer islands.Close()
-	gocv.BitwiseAnd(*invertMask, *edges, &islands)
+func (p *darkRegionPass) markRegion(index int) (bool, error) {
+	rect := gocv.BoundingRect(p.contours.At(index))
+	if float64(rect.Dx()*rect.Dy()) < p.minArea {
+		return false, nil
+	}
 
-	contours := gocv.FindContours(islands, gocv.RetrievalExternal, gocv.ChainApproxSimple)
+	filled, err := filledContour(p.contours, index, p.edges.Rows(), p.edges.Cols())
+	defer filled.Close()
+	if err != nil {
+		return false, err
+	}
+	islands, err := lightIslands(&filled, p.edges, p.minArea)
+	defer islands.Close()
+	if err != nil {
+		return false, err
+	}
+	if solidFillRatio(p.inverted, &filled, &islands, rect) < darkRegionMinFillRatio {
+		return false, nil
+	}
+
+	rebinarized, err := rebinarizeRegion(p.edges, p.gray, p.labels, p.contours, index)
+	if err != nil || rebinarized {
+		return false, err
+	}
+
+	gocv.BitwiseOr(*p.invertMask, filled, p.invertMask)
+	gocv.BitwiseOr(*p.keepMask, islands, p.keepMask)
+	return true, nil
+}
+
+func filledContour(contours gocv.PointsVector, index int, rows int, cols int) (gocv.Mat, error) {
+	filled := gocv.Zeros(rows, cols, gocv.MatTypeCV8UC1)
+	white := color.RGBA{R: 255, G: 255, B: 255, A: 255}
+	err := gocv.DrawContours(&filled, contours, index, white, -1)
+	return filled, err
+}
+
+func lightIslands(filled *gocv.Mat, edges *gocv.Mat, minArea float64) (gocv.Mat, error) {
+	light := gocv.NewMat()
+	defer light.Close()
+	gocv.BitwiseAnd(*filled, *edges, &light)
+
+	contours := gocv.FindContours(light, gocv.RetrievalExternal, gocv.ChainApproxSimple)
 	defer contours.Close()
 
-	black := color.RGBA{A: 255}
+	islands := gocv.Zeros(edges.Rows(), edges.Cols(), gocv.MatTypeCV8UC1)
+	white := color.RGBA{R: 255, G: 255, B: 255, A: 255}
 	for i := range contours.Size() {
 		rect := gocv.BoundingRect(contours.At(i))
 		bboxArea := float64(rect.Dx() * rect.Dy())
@@ -351,19 +387,36 @@ func excludeLightIslands(invertMask *gocv.Mat, edges *gocv.Mat, minArea float64)
 			continue
 		}
 
-		region := islands.Region(rect)
+		region := light.Region(rect)
 		fillRatio := float64(gocv.CountNonZero(region)) / bboxArea
 		region.Close()
 		if fillRatio < darkRegionMinFillRatio {
 			continue
 		}
 
-		err := gocv.DrawContours(invertMask, contours, i, black, -1)
+		err := gocv.DrawContours(&islands, contours, i, white, -1)
 		if err != nil {
-			return err
+			return islands, err
 		}
 	}
-	return nil
+	return islands, nil
+}
+
+func solidFillRatio(inverted *gocv.Mat, filled *gocv.Mat, islands *gocv.Mat, rect image.Rectangle) float64 {
+	invertedRegion := inverted.Region(rect)
+	defer invertedRegion.Close()
+	filledRegion := filled.Region(rect)
+	defer filledRegion.Close()
+	islandsRegion := islands.Region(rect)
+	defer islandsRegion.Close()
+
+	union := gocv.NewMat()
+	defer union.Close()
+	gocv.BitwiseOr(invertedRegion, islandsRegion, &union)
+	solid := gocv.NewMat()
+	defer solid.Close()
+	gocv.BitwiseAnd(union, filledRegion, &solid)
+	return float64(gocv.CountNonZero(solid)) / float64(rect.Dx()*rect.Dy())
 }
 
 func rebinarizeRegion(
