@@ -90,14 +90,47 @@ func (c *apiClient) pingServer() error {
 	return err
 }
 
-func (c *apiClient) getDevices() (string, error) {
-	body, err := c.request(http.MethodGet, "/devices", nil)
-	return string(body), err
+func (c *apiClient) getJSON(path string, target any) error {
+	body, err := c.request(http.MethodGet, path, nil)
+	if err != nil {
+		return err
+	}
+	return json.Unmarshal(body, target)
 }
 
-func (c *apiClient) getLibrary() (string, error) {
-	body, err := c.request(http.MethodGet, "/library", nil)
-	return string(body), err
+type deviceInfo struct {
+	Serial        string `json:"serial"`
+	Brand         string `json:"brand"`
+	Device        string `json:"device"`
+	Locale        string `json:"locale"`
+	Model         string `json:"model"`
+	OsVersion     string `json:"os_version"`
+	MarketingName string `json:"marketing_name"`
+	ScrcpyRunning bool   `json:"scrcpy_running"`
+}
+
+type devicesResponse struct {
+	Devices []deviceInfo `json:"devices"`
+}
+
+func (c *apiClient) getDevices() ([]deviceInfo, error) {
+	var response devicesResponse
+	err := c.getJSON("/devices", &response)
+	if err != nil {
+		return nil, err
+	}
+	return response.Devices, nil
+}
+
+type libraryResponse struct {
+	Images  []string `json:"images"`
+	Actions []string `json:"actions"`
+}
+
+func (c *apiClient) getLibrary() (libraryResponse, error) {
+	var response libraryResponse
+	err := c.getJSON("/library", &response)
+	return response, err
 }
 
 type scanRectangle struct {
@@ -133,12 +166,8 @@ func (c *apiClient) scan(serial string, images []string, locale string) ([]scanL
 		path += "?" + encoded
 	}
 
-	body, err := c.request(http.MethodGet, path, nil)
-	if err != nil {
-		return nil, err
-	}
 	var response scanResponse
-	err = json.Unmarshal(body, &response)
+	err := c.getJSON(path, &response)
 	if err != nil {
 		return nil, err
 	}
@@ -178,26 +207,45 @@ func (c *apiClient) closeSession(serial string) error {
 }
 
 func (c *apiClient) getSessionStatus(serial string) (string, error) {
-	body, err := c.request(http.MethodGet, "/devices/"+url.PathEscape(serial)+"/session", nil)
-	if err != nil {
-		return "", err
-	}
 	var response map[string]string
-	err = json.Unmarshal(body, &response)
+	err := c.getJSON("/devices/"+url.PathEscape(serial)+"/session", &response)
 	if err != nil {
 		return "", err
 	}
 	return response["status"], nil
 }
 
-func (c *apiClient) getRoutes() (string, error) {
-	body, err := c.request(http.MethodGet, "/routes", nil)
-	return string(body), err
+type routesResponse struct {
+	Routes []string `json:"routes"`
 }
 
-func (c *apiClient) getRoute(name string) (string, error) {
-	body, err := c.request(http.MethodGet, "/routes/"+url.PathEscape(name), nil)
-	return string(body), err
+func (c *apiClient) getRoutes() ([]string, error) {
+	var response routesResponse
+	err := c.getJSON("/routes", &response)
+	if err != nil {
+		return nil, err
+	}
+	return response.Routes, nil
+}
+
+type routeStep struct {
+	ID        int             `json:"id"`
+	Event     string          `json:"event"`
+	Landmarks []landmarkInput `json:"landmarks"`
+	Timeout   int             `json:"timeout"`
+	Delay     int             `json:"delay"`
+}
+
+type routeResponse struct {
+	Name   string      `json:"name"`
+	Prompt string      `json:"prompt"`
+	Steps  []routeStep `json:"steps"`
+}
+
+func (c *apiClient) getRoute(name string) (routeResponse, error) {
+	var response routeResponse
+	err := c.getJSON("/routes/"+url.PathEscape(name), &response)
+	return response, err
 }
 
 func (c *apiClient) saveRoute(route *saveRouteInput) error {

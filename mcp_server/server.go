@@ -87,16 +87,16 @@ type waitInput struct {
 }
 
 type landmarkInput struct {
-	Type   string `json:"type" jsonschema:"landmark type: image (template match of a library image), text (OCR), or yolo (detected class)"`
-	Value  string `json:"value" jsonschema:"library image name, text to find on screen, or yolo class name; for type_text the text to type"`
-	Locale string `json:"locale,omitempty" jsonschema:"for text landmarks and type_text: the Tesseract lang code matching the language of value, default eng"`
+	Type   string `json:"type" jsonschema:"image | text | yolo"`
+	Value  string `json:"value" jsonschema:"library image name, text to find, or yolo class; for type_text the text to type"`
+	Locale string `json:"locale,omitempty" jsonschema:"Tesseract lang code of value for text landmarks and type_text, default eng"`
 }
 
 type stepInput struct {
-	Event     string          `json:"event,omitempty" jsonschema:"tap, long_tap, type_text, a generated swipe (swipe_up, swipe_down, swipe_left, swipe_right), the name of a library event to replay, or EMPTY for a pure visibility check of the target"`
-	Landmarks []landmarkInput `json:"landmarks,omitempty" jsonschema:"target chain resolved on one video frame: each landmark is located NEAREST to the previous one and the event applies to the LAST landmark; one landmark for a plain target, a preceding unique landmark to disambiguate duplicates; leave empty to replay a library event verbatim"`
-	Timeout   *int            `json:"timeout,omitempty" jsonschema:"milliseconds to keep re-locating the target before failing; omit for the default 5000 — enough for elements already on screen; raise it (10000-15000) for targets that appear after an app launch, navigation or loading; 0 = one look at the current frame, no waiting"`
-	Delay     *int            `json:"delay,omitempty" jsonschema:"milliseconds slept BEFORE the step acts; omit for the default — 0 on the first step of the batch, 1000 on every later step; raise it only when the target is visible but mid-animation"`
+	Event     string          `json:"event,omitempty" jsonschema:"tap, long_tap, type_text, swipe_up/down/left/right, a library action name, or EMPTY for a visibility check"`
+	Landmarks []landmarkInput `json:"landmarks,omitempty" jsonschema:"target chain: each landmark is located nearest to the previous one and the event applies to the LAST; empty to replay a library action verbatim"`
+	Timeout   *int            `json:"timeout,omitempty" jsonschema:"ms to keep locating the target; default 5000, raise for targets that appear after a launch or load, 0 = one look"`
+	Delay     *int            `json:"delay,omitempty" jsonschema:"ms slept before the step; default 0 on the first step of a batch, 1000 after"`
 }
 
 type queueStepsInput struct {
@@ -131,28 +131,6 @@ type recordActionInput struct {
 	Name   string `json:"name" jsonschema:"library action name to save the gesture under, <app>_<screen>_<what>[_variant] convention; a duplicate name overwrites"`
 }
 
-func (s *stepInput) describe() string {
-	var target string
-	if len(s.Landmarks) > 0 {
-		var last = s.Landmarks[len(s.Landmarks)-1]
-		target = fmt.Sprintf("%s %s", last.Type, last.Value)
-	}
-
-	if s.Event == "" {
-		return "check on " + target
-	}
-	if s.Event == "type_text" {
-		if len(s.Landmarks) == 0 {
-			return s.Event
-		}
-		return fmt.Sprintf("%s %q", s.Event, s.Landmarks[len(s.Landmarks)-1].Value)
-	}
-	if target != "" {
-		return fmt.Sprintf("%s on %s", s.Event, target)
-	}
-	return s.Event
-}
-
 func (s *Server) registerTools() {
 	mcp.AddTool(s.mcp, &mcp.Tool{
 		Name: "ping",
@@ -170,53 +148,34 @@ func (s *Server) registerTools() {
 
 	mcp.AddTool(s.mcp, &mcp.Tool{
 		Name: "get_library",
-		Description: "List the automation library: 'images' are template crops the human " +
-			"saved from device screens (usable as image targets), 'actions' are recorded " +
-			"gestures (usable as a step's event). " +
-			"Names encode their context as <app>_<screen>_<what>[_variant]. " +
-			"Call this only when an image target or a recorded gesture might be needed — " +
-			"text landmarks and the generated tap/long_tap/swipe/type_text events use " +
-			"nothing from the library.",
+		Description: "List the library: 'images' are template crops usable as image " +
+			"targets, 'actions' are recorded gestures usable as a step's event; names " +
+			"encode their context as <app>_<screen>_<what>[_variant]. Only when an " +
+			"image target or a recorded gesture might be needed.",
 	}, s.handleGetLibrary)
 
 	mcp.AddTool(s.mcp, &mcp.Tool{
 		Name: "scan",
-		Description: "Scan the device's current screen and return the landmarks found: " +
-			"every text with its rectangle (OCR, using locale), every yolo detection, " +
-			"and matches for the library images passed in images. This is the ONLY way " +
-			"to observe the screen — there are no screenshots. Call it when a step " +
-			"failed, when the user's instruction is conditional, or when the user asks " +
-			"what is on screen — never habitually between steps. Returns a header " +
-			"line with the count and the resolved text locale, then one line per " +
-			"landmark in reading order: `type left,top,right,bottom value` (value " +
-			"may contain spaces). The type/value pairs are exactly what step " +
-			"landmarks consume; use the header's locale on the text landmarks you " +
-			"build. Text read with OCR confidence below 40 is omitted and the " +
-			"header says how many entries were dropped — a word you expected but " +
-			"do not see was misread or is in another language: scan again with " +
-			"the right locale before concluding it is not on screen. Opens a " +
-			"session automatically if none exists.",
+		Description: "The ONLY way to observe the screen (no screenshots): OCR text in " +
+			"locale, yolo detections, and matches for the library images listed in " +
+			"images. Only after a step failure, for a conditional instruction, or " +
+			"when the user asks what is on screen — never between steps. Returns a " +
+			"header (count, resolved text locale, how many text entries under OCR " +
+			"confidence 40 were dropped) then one `type left,top,right,bottom value` " +
+			"line per landmark in reading order; type/value are what step landmarks " +
+			"consume, with the header's locale on text. A missing expected word was " +
+			"misread or is in another language — rescan with the right locale. Opens " +
+			"a session automatically.",
 	}, s.handleScan)
 
 	mcp.AddTool(s.mcp, &mcp.Tool{
 		Name: "queue_steps",
-		Description: "Queue steps to run in order on the device; a session opens " +
-			"automatically if none exists. Put a whole multi-step sequence into ONE call " +
-			"— the server executes the queue sequentially; do not queue steps one at a " +
-			"time or check status in between, just call wait_for_session once afterwards. " +
-			"Each step applies an event to the LAST landmark of its chain; landmarks resolve " +
-			"on one frame, each located nearest to the previous one. Events: " +
-			"'tap'/'long_tap' (landmarks required; the generated touch lands at a random " +
-			"point inside the found region), 'swipe_up'/'swipe_down'/'swipe_left'/" +
-			"'swipe_right' (generated human-like fixed-length swipe, named by the " +
-			"finger's direction; random start point on screen, or inside the last " +
-			"landmark's region when landmarks are given — the default way to scroll), " +
-			"'type_text' (types the last landmark's value on the already open " +
-			"on-screen keyboard; locale required, numeric for the numeric keypad), an EMPTY event (visibility check of the chain, no " +
-			"touch), or a library event name (replays the gesture offset into the found " +
-			"region when landmarks are given, verbatim otherwise). " +
-			"A step failure clears the remaining queue " +
-			"and sets the error status.",
+		Description: "Queue steps to run in order on the device (a session opens " +
+			"automatically). Put the whole sequence into ONE call and call " +
+			"wait_for_session once afterwards — never one step at a time, never " +
+			"status checks in between. Step and event semantics are in the server " +
+			"instructions. A failed step clears the remaining queue and sets the " +
+			"error status.",
 	}, s.handleQueueSteps)
 
 	mcp.AddTool(s.mcp, &mcp.Tool{
@@ -279,12 +238,10 @@ func (s *Server) registerTools() {
 
 	mcp.AddTool(s.mcp, &mcp.Tool{
 		Name: "run_route",
-		Description: "Queue a saved route's steps on the device; a session opens " +
-			"automatically if none exists. Pass start_id to start mid-route from " +
-			"that step id (route steps carry ids 1..N); omit it to run the whole " +
-			"route. Call wait_for_session once afterwards: 'idle' means the whole " +
-			"route succeeded; an error status names the step id that failed — " +
-			"recover from that point guided by the route's prompt.",
+		Description: "Queue a saved route's steps on the device (a session opens " +
+			"automatically); start_id starts mid-route from that step id (ids " +
+			"1..N). Then call wait_for_session once — an error status names the " +
+			"failed step id.",
 	}, s.handleRunRoute)
 
 	mcp.AddTool(s.mcp, &mcp.Tool{
@@ -341,7 +298,34 @@ func (s *Server) handleListDevices(
 	if err != nil {
 		return nil, nil, err
 	}
-	return textResult(devices), nil, nil
+	return textResult(formatDevices(devices)), nil, nil
+}
+
+func formatDevices(devices []deviceInfo) string {
+	if len(devices) == 0 {
+		return "no devices connected"
+	}
+
+	var lines strings.Builder
+	fmt.Fprintf(&lines, "%d devices; columns: serial model, brand device, Android version, locale", len(devices))
+	for _, device := range devices {
+		fmt.Fprintf(
+			&lines,
+			"\n%s %s, %s %s, Android %s, locale %s",
+			device.Serial, deviceName(device), device.Brand, device.Device, device.OsVersion, device.Locale,
+		)
+		if device.ScrcpyRunning {
+			lines.WriteString(", session open")
+		}
+	}
+	return lines.String()
+}
+
+func deviceName(device deviceInfo) string {
+	if device.MarketingName != "" {
+		return device.MarketingName
+	}
+	return device.Model
 }
 
 func (s *Server) handleGetLibrary(
@@ -353,7 +337,15 @@ func (s *Server) handleGetLibrary(
 	if err != nil {
 		return nil, nil, err
 	}
-	return textResult(library), nil, nil
+	var text = formatNames("images", library.Images) + "\n" + formatNames("actions", library.Actions)
+	return textResult(text), nil, nil
+}
+
+func formatNames(kind string, names []string) string {
+	if len(names) == 0 {
+		return kind + ": none"
+	}
+	return fmt.Sprintf("%s (%d): %s", kind, len(names), strings.Join(names, ", "))
 }
 
 func (s *Server) handleScan(
@@ -446,12 +438,7 @@ func (s *Server) handleQueueSteps(
 		return nil, nil, err
 	}
 
-	var names = make([]string, 0, len(in.Steps))
-	for _, step := range in.Steps {
-		names = append(names, step.describe())
-	}
-	var text = "queued " + strings.Join(names, ", ")
-	return textResult(text), nil, nil
+	return textResult(fmt.Sprintf("queued %d steps", len(in.Steps))), nil, nil
 }
 
 func (s *Server) handleCloseSession(
@@ -531,7 +518,7 @@ func (s *Server) handleGetRoutes(
 	if err != nil {
 		return nil, nil, err
 	}
-	return textResult(routes), nil, nil
+	return textResult(formatNames("routes", routes)), nil, nil
 }
 
 func (s *Server) handleGetRoute(
@@ -546,7 +533,46 @@ func (s *Server) handleGetRoute(
 	if err != nil {
 		return nil, nil, err
 	}
-	return textResult(route), nil, nil
+	return textResult(formatRoute(route)), nil, nil
+}
+
+func formatRoute(route routeResponse) string {
+	var lines strings.Builder
+	fmt.Fprintf(
+		&lines,
+		"route %s, %d steps; columns: id event timeout/delay landmarks (type \"value\" locale, chain joined by >; check = empty event)",
+		route.Name, len(route.Steps),
+	)
+	if route.Prompt != "" {
+		fmt.Fprintf(&lines, "\nprompt: %s", route.Prompt)
+	}
+	for _, step := range route.Steps {
+		fmt.Fprintf(&lines, "\n%d %s %d/%d", step.ID, stepEvent(step.Event), step.Timeout, step.Delay)
+		if len(step.Landmarks) == 0 {
+			continue
+		}
+		lines.WriteString(" " + formatChain(step.Landmarks))
+	}
+	return lines.String()
+}
+
+func stepEvent(event string) string {
+	if event == "" {
+		return "check"
+	}
+	return event
+}
+
+func formatChain(landmarks []landmarkInput) string {
+	parts := make([]string, 0, len(landmarks))
+	for _, landmark := range landmarks {
+		part := fmt.Sprintf("%s %q", landmark.Type, landmark.Value)
+		if landmark.Locale != "" {
+			part += " " + landmark.Locale
+		}
+		parts = append(parts, part)
+	}
+	return strings.Join(parts, " > ")
 }
 
 func (s *Server) handleSaveRoute(
