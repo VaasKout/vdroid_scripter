@@ -144,7 +144,7 @@ type scanLandmark struct {
 	Type       string        `json:"type"`
 	Value      string        `json:"value"`
 	Locale     string        `json:"locale,omitempty"`
-	Confidence int           `json:"confidence,omitempty"`
+	Confidence *int          `json:"confidence,omitempty"`
 	Rectangle  scanRectangle `json:"rectangle"`
 }
 

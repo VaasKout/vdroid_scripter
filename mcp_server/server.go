@@ -391,13 +391,20 @@ func confidentLandmarks(landmarks []scanLandmark) ([]scanLandmark, int) {
 	kept := make([]scanLandmark, 0, len(landmarks))
 	dropped := 0
 	for _, landmark := range landmarks {
-		if landmark.Type == "text" && landmark.Confidence < scanMinConfidence {
+		if lowConfidence(landmark) {
 			dropped++
 			continue
 		}
 		kept = append(kept, landmark)
 	}
 	return kept, dropped
+}
+
+func lowConfidence(landmark scanLandmark) bool {
+	if landmark.Type != "text" || landmark.Confidence == nil {
+		return false
+	}
+	return *landmark.Confidence < scanMinConfidence
 }
 
 func droppedNote(dropped int) string {
