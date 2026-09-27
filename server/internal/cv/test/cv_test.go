@@ -2,7 +2,6 @@ package test
 
 import (
 	"android_vision_scripter/config"
-	"android_vision_scripter/internal/bashcmd"
 	"android_vision_scripter/internal/cv"
 	"android_vision_scripter/internal/filesdb"
 	"android_vision_scripter/pkg/logger"
@@ -10,6 +9,8 @@ import (
 	"fmt"
 	"image"
 	"image/color"
+	"os"
+	"os/exec"
 	"path/filepath"
 	"time"
 
@@ -132,10 +133,9 @@ func TestGetTextFromScreenshot(t *testing.T) {
 	}
 	var logAPI = logger.New(logger.INFO, true)
 	var filesDB = filesdb.New(fileProps)
-	var cmdRunner = bashcmd.New(filesDB, logAPI)
 	var cvAPI = cv.New(logAPI)
 
-	screenshot := cmdRunner.ScreenShot(TestSerial)
+	screenshot := takeScreenshot(filesDB, TestSerial)
 	if screenshot == "" {
 		t.Fatal("screenshot is empty")
 	}
@@ -178,10 +178,9 @@ func TestDrawAllRectangles(t *testing.T) {
 	}
 	var logAPI = logger.New(logger.INFO, true)
 	var filesDB = filesdb.New(fileProps)
-	var cmdRunner = bashcmd.New(filesDB, logAPI)
 	var cvAPI = cv.New(logAPI)
 
-	screenshot := cmdRunner.ScreenShot(TestSerial)
+	screenshot := takeScreenshot(filesDB, TestSerial)
 	if screenshot == "" {
 		t.Fatal("screenshot is empty")
 	}
@@ -224,10 +223,9 @@ func TestFindTemplate(t *testing.T) {
 	}
 	var logAPI = logger.New(logger.INFO, true)
 	var filesDB = filesdb.New(fileProps)
-	var cmdRunner = bashcmd.New(filesDB, logAPI)
 	var cvAPI = cv.New(logAPI)
 
-	screenshot := cmdRunner.ScreenShot(TestSerial)
+	screenshot := takeScreenshot(filesDB, TestSerial)
 	if screenshot == "" {
 		t.Fatal("screenshot is empty")
 	}
@@ -278,10 +276,9 @@ func detectKeyboardAndDraw(t *testing.T, locale string, output string) {
 	}
 	var logAPI = logger.New(logger.INFO, true)
 	var filesDB = filesdb.New(fileProps)
-	var cmdRunner = bashcmd.New(filesDB, logAPI)
 	var cvAPI = cv.New(logAPI)
 
-	screenshot := cmdRunner.ScreenShot(TestSerial)
+	screenshot := takeScreenshot(filesDB, TestSerial)
 	if screenshot == "" {
 		t.Fatal("screenshot is empty")
 	}
@@ -320,4 +317,20 @@ func detectKeyboardAndDraw(t *testing.T, locale string, output string) {
 	if ok := gocv.IMWrite(screenshotWithKeys, img); !ok {
 		t.Fatal("could not write image " + screenshotWithKeys)
 	}
+}
+
+func takeScreenshot(filesDB filesdb.FilesDB, serial string) string {
+	dir := filesDB.CreateLogsDir(serial, "screenshot")
+	if dir == "" {
+		return ""
+	}
+	data, err := exec.Command("adb", "-s", serial, "exec-out", "screencap", "-p").Output()
+	if err != nil {
+		return ""
+	}
+	path := filepath.Join(dir, "screenshot.png")
+	if err := os.WriteFile(path, data, 0o644); err != nil {
+		return ""
+	}
+	return path
 }

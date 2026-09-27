@@ -1,11 +1,9 @@
 package bashcmd
 
 import (
-	"android_vision_scripter/internal/filesdb"
 	"android_vision_scripter/pkg/models"
 
 	"fmt"
-	"path/filepath"
 	"strings"
 	"time"
 )
@@ -28,8 +26,6 @@ type AdbAPI interface {
 	GetDevicesList() []string
 	GetAdbDevice(serial string) *models.AdbDevice
 	GetProp(serial string, prop string) string
-
-	ScreenShot(serial string) string
 
 	IsAdbConnected(serial string) bool
 
@@ -91,19 +87,6 @@ func (c *cmdImpl) GetSystemSetting(serial string, prop string) string {
 	}
 	result = strings.TrimSpace(result)
 	return result
-}
-
-func (c *cmdImpl) ScreenShot(serial string) string {
-	directoryName := c.filesDB.CreateLogsDir(serial, filesdb.ScreenshotDir)
-	var screenShotPath = filepath.Join(directoryName, "screenshot.jpg")
-
-	var commandFormat = "adb -s %s shell screencap -p > %s"
-	var command = fmt.Sprintf(commandFormat, serial, screenShotPath)
-	_, err := c.ExecuteCommand(command)
-	if err != nil {
-		return ""
-	}
-	return screenShotPath
 }
 
 func (c *cmdImpl) IsAdbConnected(serial string) bool {

@@ -83,13 +83,12 @@ func (s *serverImpl) handleSaveImage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	saved := s.interactor.SaveImage(data.Serial, &data.Rectangle)
-	if saved {
-		s.sendStatusOk(w)
+	err = s.interactor.SaveImage(data.Serial, &data.Rectangle, s.serverProps.SocketPort)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-
-	http.Error(w, "Something went wrong", http.StatusInternalServerError)
+	s.sendStatusOk(w)
 }
 
 func (s *serverImpl) handleSaveAction(w http.ResponseWriter, r *http.Request) {

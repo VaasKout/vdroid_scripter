@@ -19,7 +19,6 @@ type ImageHandler interface {
 		rectangles []image.Rectangle,
 		transparent bool,
 	) error
-	CutZone(imgPath string, outputPath string, zone *image.Rectangle)
 }
 
 func (c *cvImpl) FindAllRectangles(img *gocv.Mat) ([]image.Rectangle, error) {
@@ -84,18 +83,6 @@ func suppressMatch(result *gocv.Mat, loc image.Point, width int, height int) {
 	region := result.Region(image.Rect(x0, y0, x1, y1))
 	defer region.Close()
 	region.SetTo(gocv.NewScalar(0, 0, 0, 0))
-}
-
-func (c *cvImpl) CutZone(imgPath string, outputPath string, zone *image.Rectangle) {
-	img := gocv.IMRead(imgPath, gocv.IMReadColor)
-	defer img.Close()
-	if img.Empty() {
-		return
-	}
-
-	cropped := img.Region(*zone)
-	defer cropped.Close()
-	gocv.IMWrite(outputPath, cropped)
 }
 
 func (c *cvImpl) createRectangles(img *gocv.Mat) ([]image.Rectangle, error) {

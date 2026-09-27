@@ -169,9 +169,11 @@ Lists everything in the library.
 
 ### `POST /save_image`
 
-Takes a screenshot of the device, crops the given rectangle out of it, and
-saves it as `images/<name>.png` — the template that an `image` step target
-with the same `value` is matched against.
+Crops the given rectangle out of the device's **latest video frame** — the
+same frame `scan`, `rectangles` and `capture` see, in the same pixel
+coordinates — and saves it as `images/<name>.png`, the template that an
+`image` step target with the same `value` is matched against. If the device
+has no open session, one is opened automatically like `/devices/{serial}/scan`.
 
 - **Request body:**
   ```json
@@ -184,8 +186,9 @@ with the same `value` is matched against.
   `serial` and a non-empty `rectangle` are required. An existing image with the
   same name is overwritten.
 - **Response `200`:** `{ "status": "ok" }`
-- **Errors:** `400` on invalid JSON, a bad `label`, or a missing field, `500` if
-  the screenshot or crop fails.
+- **Errors:** `400` on invalid JSON, a bad `label`, or a missing field, `500` when
+  no frame is available, the rectangle lies outside the frame, or the write
+  fails (the message says which).
 
 ### `POST /save_action`
 

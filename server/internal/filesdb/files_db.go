@@ -5,11 +5,6 @@ import (
 	"android_vision_scripter/config"
 )
 
-// Basic directories for phone data
-const (
-	ScreenshotDir = "screenshot"
-)
-
 // FilesDB ...
 type FilesDB interface {
 	Create

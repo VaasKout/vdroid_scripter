@@ -6,10 +6,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"image"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
+
+	"gocv.io/x/gocv"
 )
 
 // LibraryResponse ...
@@ -21,7 +24,7 @@ type LibraryResponse struct {
 // LibraryUseCase ...
 type LibraryUseCase interface {
 	GetLibrary() *LibraryResponse
-	SaveImage(serial string, rectangle *models.Rectangle) bool
+	SaveImage(serial string, rectangle *models.Rectangle, basePort int) error
 	DeleteImage(name string) bool
 	SaveAction(action *models.Action) bool
 	DeleteAction(name string) bool
@@ -49,36 +52,50 @@ func (i *interactorImpl) libraryNames(dir string, ext string) []string {
 	return names
 }
 
-func (i *interactorImpl) SaveImage(serial string, rectangle *models.Rectangle) bool {
+func (i *interactorImpl) SaveImage(
+	serial string,
+	rectangle *models.Rectangle,
+	basePort int,
+) error {
 	serial = strings.TrimSpace(serial)
 	if serial == "" || rectangle.IsEmpty() {
-		return false
+		return errors.New("serial and rectangle are required")
 	}
 
 	name := strings.TrimSpace(rectangle.Label)
 	if !file.ValidName(name) {
-		return false
+		return errors.New("invalid image name")
 	}
 
 	imagesDir := i.filesDB.CreateImagesDir()
 	if imagesDir == "" {
-		return false
+		return errors.New("images dir not found")
 	}
+
+	if err := i.ensureSessionIsRunning(serial, basePort); err != nil {
+		return err
+	}
+
+	frame, err := i.latestFrame(serial, true)
+	if err != nil {
+		return err
+	}
+	defer frame.Close()
+
+	bounds := image.Rect(0, 0, frame.Cols(), frame.Rows())
+	zone := rectangle.ToImageRectangle().Intersect(bounds)
+	if zone.Empty() {
+		return fmt.Errorf("rectangle lies outside the %dx%d frame", bounds.Dx(), bounds.Dy())
+	}
+
+	cropped := frame.Region(zone)
+	defer cropped.Close()
 
 	imgPath := filepath.Join(imagesDir, name+file.PngExt)
-	created := file.CreateFileIfNotExist(imgPath)
-	if !created {
-		return false
+	if !gocv.IMWrite(imgPath, cropped) {
+		return fmt.Errorf("couldn't write %s", imgPath)
 	}
-
-	screenShot := i.cmd.ScreenShot(serial)
-	if screenShot == "" {
-		return false
-	}
-
-	imgRect := rectangle.ToImageRectangle()
-	i.cv.CutZone(screenShot, imgPath, imgRect)
-	return true
+	return nil
 }
 
 func (i *interactorImpl) DeleteImage(name string) bool {
