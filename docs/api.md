@@ -40,6 +40,7 @@ This document describes every HTTP endpoint exposed by the server, defined in
 | DELETE | `/actions/{name}` | Delete a library action |
 | GET | `/devices/{serial}/scan` | Scan the current screen and return the landmarks found |
 | GET | `/devices/{serial}/rectangles` | Detect every rectangle on the current screen (for cropping) |
+| GET | `/devices/{serial}/capture` | The current screen as an image (JPEG, or PNG with `?format=png`) |
 | GET | `/routes` | List saved route names |
 | GET | `/routes/{name}` | Get one saved route |
 | POST | `/routes` | Save or overwrite a route |
@@ -277,6 +278,22 @@ If the device has no open session, one is opened automatically like `/devices/{s
   Video-frame coordinates; `[]` when nothing is found.
 - **Errors:** `400` if `serial` is missing, `500` when the session couldn't
   be started, no frame arrived, or detection failed.
+
+### `GET /devices/{serial}/capture`
+
+Returns the device's latest video frame as an image — for clients that can
+look at pictures. The AI loop's perception primitive remains
+[`scan`](#get-devicesserialscan).
+
+- **Query:** `format` — `jpeg` (default, quality 85) or `png`.
+- **Response `200`:** the image bytes with `Content-Type: image/jpeg` or
+  `image/png`, at the video frame's resolution — the same pixel coordinates
+  `scan` and `rectangles` use. A static screen returns the same retained
+  frame again; reading a frame never consumes it.
+- **Errors:** `400` for an unknown `format`, `500` when no session or frame is
+  available (the message says which).
+
+If the device has no open session, one is opened automatically like `/devices/{serial}/scan`.
 
 ## Routes
 

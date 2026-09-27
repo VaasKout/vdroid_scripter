@@ -3,19 +3,33 @@ package server
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
 	"strings"
+
+	"gocv.io/x/gocv"
 )
 
 // Scan paths
 const (
 	ScanPath       = Devices + "/{" + SerialKey + "}/scan"
 	RectanglesPath = Devices + "/{" + SerialKey + "}/rectangles"
+	CapturePath    = Devices + "/{" + SerialKey + "}/capture"
 )
 
 // Scan query keys
 const (
 	ImagesKey = "images"
 	LocaleKey = "locale"
+	FormatKey = "format"
+)
+
+// Capture formats
+const (
+	FormatJPEG   = "jpeg"
+	FormatJPG    = "jpg"
+	FormatPNG    = "png"
+	MimeTypeJPEG = "image/jpeg"
+	MimeTypePNG  = "image/png"
 )
 
 func (s *serverImpl) handleScanFunctions() {
@@ -36,6 +50,49 @@ func (s *serverImpl) handleScanFunctions() {
 		}
 		http.Error(w, "use GET method", http.StatusMethodNotAllowed)
 	})
+
+	http.HandleFunc(CapturePath, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			s.logURL(r)
+			s.handleCapture(w, r)
+			return
+		}
+		http.Error(w, "use GET method", http.StatusMethodNotAllowed)
+	})
+}
+
+func (s *serverImpl) handleCapture(w http.ResponseWriter, r *http.Request) {
+	var serial = r.PathValue(SerialKey)
+	if serial == "" {
+		http.Error(w, `"serial" param required`, http.StatusBadRequest)
+		return
+	}
+
+	extension, mimeType := captureFormat(r.URL.Query().Get(FormatKey))
+	if extension == "" || mimeType == "" {
+		http.Error(w, `"format" must be jpeg or png`, http.StatusBadRequest)
+		return
+	}
+
+	image, err := s.interactor.Capture(serial, extension, s.serverProps.SocketPort)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", mimeType)
+	w.Header().Set("Content-Length", strconv.Itoa(len(image)))
+	w.Write(image)
+}
+
+func captureFormat(format string) (gocv.FileExt, string) {
+	switch strings.ToLower(strings.TrimSpace(format)) {
+	case "", FormatJPEG, FormatJPG:
+		return gocv.JPEGFileExt, MimeTypeJPEG
+	case FormatPNG:
+		return gocv.PNGFileExt, MimeTypePNG
+	}
+	return "", ""
 }
 
 func (s *serverImpl) handleScan(w http.ResponseWriter, r *http.Request) {

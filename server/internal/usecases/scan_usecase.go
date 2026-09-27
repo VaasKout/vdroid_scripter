@@ -22,7 +22,10 @@ type ScanUseCase interface {
 		basePort int,
 	) ([]FoundLandmark, error)
 	GetRectangles(serial string, basePort int) ([]models.Rectangle, error)
+	Capture(serial string, extension gocv.FileExt, basePort int) ([]byte, error)
 }
+
+const captureJPEGQuality = 85
 
 // FoundLandmark ...
 type FoundLandmark struct {
@@ -53,12 +56,9 @@ func (i *interactorImpl) Scan(
 		return nil, err
 	}
 
-	mat, err := i.scrcpy.GetMatFromLastFrame(serial, true)
+	mat, err := i.latestFrame(serial, true)
 	if err != nil {
 		return nil, err
-	}
-	if mat == nil {
-		return nil, fmt.Errorf("no video frame received from %s", serial)
 	}
 	defer mat.Close()
 
@@ -94,12 +94,9 @@ func (i *interactorImpl) GetRectangles(
 		return nil, err
 	}
 
-	mat, err := i.scrcpy.GetMatFromLastFrame(serial, false)
+	mat, err := i.latestFrame(serial, false)
 	if err != nil {
 		return nil, err
-	}
-	if mat == nil {
-		return nil, fmt.Errorf("no video frame received from %s", serial)
 	}
 	defer mat.Close()
 
@@ -108,6 +105,52 @@ func (i *interactorImpl) GetRectangles(
 		return nil, err
 	}
 	return models.ImgRectanglesToDomain(rects), nil
+}
+
+// Capture ...
+func (i *interactorImpl) Capture(
+	serial string,
+	extension gocv.FileExt,
+	basePort int,
+) ([]byte, error) {
+	serial = strings.TrimSpace(serial)
+	if serial == "" {
+		return nil, errors.New(SerialIsEmptyError)
+	}
+
+	if err := i.ensureSessionIsRunning(serial, basePort); err != nil {
+		return nil, err
+	}
+
+	frame, err := i.latestFrame(serial, true)
+	if err != nil {
+		return nil, err
+	}
+	defer frame.Close()
+
+	bgr := gocv.NewMat()
+	defer bgr.Close()
+	if err := gocv.CvtColor(*frame, &bgr, gocv.ColorRGBToBGR); err != nil {
+		return nil, err
+	}
+
+	buffer, err := gocv.IMEncodeWithParams(extension, bgr, []int{gocv.IMWriteJpegQuality, captureJPEGQuality})
+	if err != nil {
+		return nil, err
+	}
+	defer buffer.Close()
+	return append([]byte{}, buffer.GetBytes()...), nil
+}
+
+func (i *interactorImpl) latestFrame(serial string, rgb bool) (*gocv.Mat, error) {
+	mat, err := i.scrcpy.GetMatFromLastFrame(serial, rgb)
+	if err != nil {
+		return nil, err
+	}
+	if mat == nil {
+		return nil, fmt.Errorf("no video frame received from %s", serial)
+	}
+	return mat, nil
 }
 
 func (i *interactorImpl) libraryImagePaths(images []string) (map[string]string, error) {
