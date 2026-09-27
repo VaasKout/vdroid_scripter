@@ -128,13 +128,7 @@ func (i *interactorImpl) Capture(
 	}
 	defer frame.Close()
 
-	bgr := gocv.NewMat()
-	defer bgr.Close()
-	if err := gocv.CvtColor(*frame, &bgr, gocv.ColorRGBToBGR); err != nil {
-		return nil, err
-	}
-
-	buffer, err := gocv.IMEncodeWithParams(extension, bgr, []int{gocv.IMWriteJpegQuality, captureJPEGQuality})
+	buffer, err := gocv.IMEncodeWithParams(extension, *frame, []int{gocv.IMWriteJpegQuality, captureJPEGQuality})
 	if err != nil {
 		return nil, err
 	}
