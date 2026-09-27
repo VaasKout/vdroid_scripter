@@ -242,6 +242,7 @@ The server keeps running after the AI session ends, so later sessions find it al
 | `get_library` | Names of the library images and actions |
 | `scan` | The agent's perception: the landmarks on the current screen, one `type left,top,right,bottom value` line each |
 | `capture` | The current screen as a JPEG — only for agents that can see images, and only where `scan` is not enough |
+| `save_image` | Crop a rectangle of the current screen into a library image — for vision-capable agents curating icon targets |
 | `queue_steps` | Queue a whole sequence of steps in one call |
 | `wait_for_session` | Block until the queue finishes, then report `idle` or the error |
 | `get_session_status` | The current session status |
@@ -280,7 +281,7 @@ The MCP server ships its own instructions to the AI, so you do not have to expla
 * **Timing.** An omitted `delay` becomes 0 on the first step of a batch and 1000 ms on later steps. An omitted `timeout` becomes 5000 ms. The agent raises the timeout for targets that appear after a launch or a load.
 * **Recovery.** A failed step clears the rest of the queue and names the target it could not find. The agent scans, applies your instruction or the route's prompt to what it sees, then queues the remaining steps again from the failed one.
 * **Routes.** A route is saved only when you ask, with your dictation kept verbatim as its prompt. After a recovered run the agent asks before updating the route.
-* **Curation.** Library images come only from the Android client. Actions come from the client or from `record_action`, and only when you ask for a recording.
+* **Curation.** Library images come from the Android client or, for a vision-capable agent, from `save_image`: after a `capture` it picks the icon's rectangle and saves it under a `<app>_<screen>_<what>` name — only for targets with no readable text and no YOLO class. Actions come from the client or from `record_action`, and only when you ask for a recording.
 * **No adb.** The agent never drives the device with `adb` directly. Every interaction is a step.
 
 ## Recording gestures

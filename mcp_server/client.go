@@ -178,6 +178,28 @@ func (c *apiClient) capture(serial string) ([]byte, error) {
 	return c.request(http.MethodGet, "/devices/"+url.PathEscape(serial)+"/capture", nil)
 }
 
+type saveImageRectangle struct {
+	LeftX   int    `json:"left_x"`
+	RightX  int    `json:"right_x"`
+	TopY    int    `json:"top_y"`
+	BottomY int    `json:"bottom_y"`
+	Label   string `json:"label"`
+}
+
+type saveImageRequest struct {
+	Serial    string             `json:"serial"`
+	Rectangle saveImageRectangle `json:"rectangle"`
+}
+
+func (c *apiClient) saveImage(serial string, rectangle saveImageRectangle) error {
+	body, err := json.Marshal(saveImageRequest{Serial: serial, Rectangle: rectangle})
+	if err != nil {
+		return err
+	}
+	_, err = c.request(http.MethodPost, "/save_image", bytes.NewReader(body))
+	return err
+}
+
 func (c *apiClient) queueSteps(serial string, steps []stepInput) error {
 	fillStepDefaults(steps)
 	body, err := json.Marshal(steps)

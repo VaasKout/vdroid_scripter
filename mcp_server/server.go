@@ -45,7 +45,7 @@ Perception: scan is the ONLY way to observe the screen — there are no screensh
 
 Routes: a route is a saved flow — a name, the user's dictation as its prompt, and the exact steps that ran to success. When the user asks to save or remember a flow as <name>, call save_route with the name, the user's dictation VERBATIM as the prompt (conditions included), and the steps that actually succeeded in order; a duplicate name overwrites. The prompt may be absent on routes saved elsewhere (the Android client saves routes without one) — treat such a route as a plain script with no recorded intent. To run a saved route: run_route, then wait_for_session once — 'idle' means the whole route succeeded. Saving stamps every step with an id (1..N, its position) and stores delay and timeout exactly as sent (this MCP fills omitted ones the same way as for queue_steps, so a route's first step gets delay 0); run_route accepts an optional start_id to start mid-route from that step id — use it when the user asks to run a route from a specific point, or to rerun the unchanged remainder after a recovered failure; an id the route does not contain is an error and nothing runs, and whichever step a run starts from gets delay 0 regardless of the stored value. To extend a route: get_route, append the new steps, call save_route with the full list — nothing executes. When asked to build a route through screens you do not know, work screen by screen: queue the steps you are sure of, wait, scan, and — only with vision and only when the scan cannot tell where to go next — capture; then save the steps that succeeded. If a route step fails, the error status names the failed step's id (queue_steps batches get 1-based position ids the same way); recover from that point guided by the route's prompt: scan, decide, then either queue adjusted steps with queue_steps or, when the remaining steps need no changes, run_route with start_id of the failed step — and after a recovered run ask the user whether to update the route with the steps that worked. Never create or modify routes without being asked.
 
-Curation: library images are created by the human with the Android client — there is no tool here to create them. Library actions can be recorded from here: when the user asks to record a gesture as <name>, call record_action and tell them to perform the gesture on the device immediately — the device listens for 5 seconds from the moment of the call and the call blocks until the window ends; 'nothing recorded' means no touch happened, ask them to try again. Never call record_action on your own initiative. Ask the user to add a library item ONLY when the target truly cannot be reached any other way — no readable text for a text landmark, no yolo class, no generated swipe that gets there. Never request curation for something written on the screen.
+Curation: library images come from the human's Android client or, for a model with vision, from save_image: capture, pick the icon's tight bounding rectangle in the reported pixels (the icon only, not its changing surroundings), call save_image with a <app>_<screen>_<what>[_variant] name, then use that name as an image landmark — only for a target with no readable text and no yolo class. Library actions can be recorded from here: when the user asks to record a gesture as <name>, call record_action and tell them to perform the gesture on the device immediately — the device listens for 5 seconds from the moment of the call and the call blocks until the window ends; 'nothing recorded' means no touch happened, ask them to try again. Never call record_action on your own initiative. Ask the user to add a library item ONLY when the target truly cannot be reached any other way — no readable text for a text landmark, no yolo class, no generated swipe that gets there, and no vision to save the image yourself. Never request curation for something written on the screen.
 
 Rules: NEVER drive the device with adb directly — no adb shell input tap, input swipe, input text, keyevent, or any other adb command, no matter what. Every interaction is a step executed through queue_steps: tap/long_tap to touch a target, a library event to gesture, type_text to type, and an EMPTY event to find or verify an element. There is no separate lookup tool — finding an element and acting on it are both steps; scan exists only for the failure, conditional and what-is-on-screen cases described above.
 
@@ -112,6 +112,15 @@ type scanInput struct {
 	Serial string   `json:"serial" jsonschema:"device serial number, get it from list_devices"`
 	Images []string `json:"images,omitempty" jsonschema:"library image names to search for on the screen; pass the images plausibly related to the current app; omit for text+yolo only"`
 	Locale string   `json:"locale,omitempty" jsonschema:"Tesseract lang code for the OCR pass, default eng"`
+}
+
+type saveImageInput struct {
+	Serial string `json:"serial" jsonschema:"device serial number"`
+	Name   string `json:"name" jsonschema:"library image name, <app>_<screen>_<what>[_variant]; a duplicate name overwrites"`
+	Left   int    `json:"left" jsonschema:"rectangle edges in the pixels reported by capture"`
+	Top    int    `json:"top"`
+	Right  int    `json:"right"`
+	Bottom int    `json:"bottom"`
 }
 
 type saveRouteInput struct {
@@ -186,6 +195,16 @@ func (s *Server) registerTools() {
 			"between steps, never habitually; it costs about as much as a dense " +
 			"scan. Opens a session automatically.",
 	}, s.handleCapture)
+
+	mcp.AddTool(s.mcp, &mcp.Tool{
+		Name: "save_image",
+		Description: "Crop a rectangle of the current screen (pixels as reported by " +
+			"capture) and save it as library image <name>, usable at once as an " +
+			"image landmark. Only with vision, after a capture, and only for a " +
+			"target with no readable text and no yolo class — never for something " +
+			"written on screen. Crop tightly around the icon, without its changing " +
+			"surroundings. A same-named image is overwritten.",
+	}, s.handleSaveImage)
 
 	mcp.AddTool(s.mcp, &mcp.Tool{
 		Name: "queue_steps",
@@ -470,6 +489,31 @@ func (s *Server) handleCapture(
 			&mcp.ImageContent{Data: data, MIMEType: captureMimeType},
 		},
 	}, nil, nil
+}
+
+func (s *Server) handleSaveImage(
+	ctx context.Context,
+	req *mcp.CallToolRequest,
+	in saveImageInput,
+) (*mcp.CallToolResult, any, error) {
+	if in.Serial == "" || in.Name == "" {
+		return nil, nil, fmt.Errorf("serial and name are required")
+	}
+	if in.Right <= in.Left || in.Bottom <= in.Top {
+		return nil, nil, fmt.Errorf("rectangle must have right > left and bottom > top")
+	}
+	rectangle := saveImageRectangle{
+		LeftX:   in.Left,
+		RightX:  in.Right,
+		TopY:    in.Top,
+		BottomY: in.Bottom,
+		Label:   in.Name,
+	}
+	err := s.api.saveImage(in.Serial, rectangle)
+	if err != nil {
+		return nil, nil, err
+	}
+	return textResult("saved image " + in.Name), nil, nil
 }
 
 func (s *Server) handleQueueSteps(
