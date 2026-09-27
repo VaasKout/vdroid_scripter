@@ -1,13 +1,17 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"image/jpeg"
 	"strings"
 	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
+
+const captureMimeType = "image/jpeg"
 
 const (
 	serverName     = "vdroid-scripter"
@@ -37,9 +41,9 @@ Timing: every step carries two millisecond knobs, delay and timeout, and the ser
 
 Locale: for text landmarks and type_text, always set the landmark's locale to the Tesseract language code of its value's language. This holds for every language Tesseract supports; eng is the default. Pass the text exactly as the user wrote it, never transliterate or translate it.
 
-Perception: scan is the ONLY way to observe the screen — there are no screenshots and never will be. Call scan when a step failed, when the user's instruction is conditional ("if X is not visible, ..."), or when the user explicitly asks what is on screen. Never scan habitually between steps — the happy path is one queue_steps call and one wait_for_session. Pass in images the library image names plausibly related to the current app so scan reports which of them are visible. The result is a compact table — a header with the landmark count and the resolved text locale, then one line per landmark in reading order, "type left,top,right,bottom value" — and its type/value pairs are exactly what step landmarks consume: build follow-up steps from them, with the header's locale on text landmarks, and use the coordinates only to judge which elements sit next to each other. Text the OCR read with confidence below 40 is left out and the header counts the dropped entries — when a word you expected is missing, it was misread or is in another language, so scan again with the matching locale before concluding it is not on screen.
+Perception: scan is the ONLY way to observe the screen — there are no screenshots and never will be. Call scan when a step failed, when the user's instruction is conditional ("if X is not visible, ..."), or when the user explicitly asks what is on screen. Never scan habitually between steps — the happy path is one queue_steps call and one wait_for_session. Pass in images the library image names plausibly related to the current app so scan reports which of them are visible. The result is a compact table — a header with the landmark count and the resolved text locale, then one line per landmark in reading order, "type left,top,right,bottom value" — and its type/value pairs are exactly what step landmarks consume: build follow-up steps from them, with the header's locale on text landmarks, and use the coordinates only to judge which elements sit next to each other. Text the OCR read with confidence below 40 is left out and the header counts the dropped entries — when a word you expected is missing, it was misread or is in another language, so scan again with the matching locale before concluding it is not on screen. capture returns the current frame as an image and exists ONLY for models that can see images: if you cannot interpret an image, never call it — scan is your only perception. With vision, scan still comes first and remains the source of landmark values; call capture only when the scan is not enough — while building a route automatically, when the next step depends on layout or icons the scan cannot name, or when the task itself needs image recognition (an icon without readable text or a yolo class, a picture, a visual state such as a toggle's colour) — never habitually and never between steps.
 
-Routes: a route is a saved flow — a name, the user's dictation as its prompt, and the exact steps that ran to success. When the user asks to save or remember a flow as <name>, call save_route with the name, the user's dictation VERBATIM as the prompt (conditions included), and the steps that actually succeeded in order; a duplicate name overwrites. The prompt may be absent on routes saved elsewhere (the Android client saves routes without one) — treat such a route as a plain script with no recorded intent. To run a saved route: run_route, then wait_for_session once — 'idle' means the whole route succeeded. Saving stamps every step with an id (1..N, its position) and stores delay and timeout exactly as sent (this MCP fills omitted ones the same way as for queue_steps, so a route's first step gets delay 0); run_route accepts an optional start_id to start mid-route from that step id — use it when the user asks to run a route from a specific point, or to rerun the unchanged remainder after a recovered failure; an id the route does not contain is an error and nothing runs, and whichever step a run starts from gets delay 0 regardless of the stored value. To extend a route: get_route, append the new steps, call save_route with the full list — nothing executes. If a route step fails, the error status names the failed step's id (queue_steps batches get 1-based position ids the same way); recover from that point guided by the route's prompt: scan, decide, then either queue adjusted steps with queue_steps or, when the remaining steps need no changes, run_route with start_id of the failed step — and after a recovered run ask the user whether to update the route with the steps that worked. Never create or modify routes without being asked.
+Routes: a route is a saved flow — a name, the user's dictation as its prompt, and the exact steps that ran to success. When the user asks to save or remember a flow as <name>, call save_route with the name, the user's dictation VERBATIM as the prompt (conditions included), and the steps that actually succeeded in order; a duplicate name overwrites. The prompt may be absent on routes saved elsewhere (the Android client saves routes without one) — treat such a route as a plain script with no recorded intent. To run a saved route: run_route, then wait_for_session once — 'idle' means the whole route succeeded. Saving stamps every step with an id (1..N, its position) and stores delay and timeout exactly as sent (this MCP fills omitted ones the same way as for queue_steps, so a route's first step gets delay 0); run_route accepts an optional start_id to start mid-route from that step id — use it when the user asks to run a route from a specific point, or to rerun the unchanged remainder after a recovered failure; an id the route does not contain is an error and nothing runs, and whichever step a run starts from gets delay 0 regardless of the stored value. To extend a route: get_route, append the new steps, call save_route with the full list — nothing executes. When asked to build a route through screens you do not know, work screen by screen: queue the steps you are sure of, wait, scan, and — only with vision and only when the scan cannot tell where to go next — capture; then save the steps that succeeded. If a route step fails, the error status names the failed step's id (queue_steps batches get 1-based position ids the same way); recover from that point guided by the route's prompt: scan, decide, then either queue adjusted steps with queue_steps or, when the remaining steps need no changes, run_route with start_id of the failed step — and after a recovered run ask the user whether to update the route with the steps that worked. Never create or modify routes without being asked.
 
 Curation: library images are created by the human with the Android client — there is no tool here to create them. Library actions can be recorded from here: when the user asks to record a gesture as <name>, call record_action and tell them to perform the gesture on the device immediately — the device listens for 5 seconds from the moment of the call and the call blocks until the window ends; 'nothing recorded' means no touch happened, ask them to try again. Never call record_action on your own initiative. Ask the user to add a library item ONLY when the target truly cannot be reached any other way — no readable text for a text landmark, no yolo class, no generated swipe that gets there. Never request curation for something written on the screen.
 
@@ -167,6 +171,21 @@ func (s *Server) registerTools() {
 			"misread or is in another language — rescan with the right locale. Opens " +
 			"a session automatically.",
 	}, s.handleScan)
+
+	mcp.AddTool(s.mcp, &mcp.Tool{
+		Name: "capture",
+		Description: "The current screen as a JPEG image, with its pixel size. ONLY " +
+			"for models that can see images — if you cannot interpret an image, " +
+			"never call this; scan is your perception. Even with vision, scan comes " +
+			"first and stays the source of landmark values (a text landmark must " +
+			"match what the OCR reads, which only scan shows). Call capture only " +
+			"when the scan is not enough: while building a route automatically, " +
+			"when the next step depends on layout or icons the scan cannot name, or " +
+			"when the task itself needs image recognition (an icon without text or " +
+			"yolo class, a picture, a visual state such as a toggle's colour). Never " +
+			"between steps, never habitually; it costs about as much as a dense " +
+			"scan. Opens a session automatically.",
+	}, s.handleCapture)
 
 	mcp.AddTool(s.mcp, &mcp.Tool{
 		Name: "queue_steps",
@@ -426,6 +445,31 @@ func textLocale(landmarks []scanLandmark, requestedLocale string) string {
 		return requestedLocale
 	}
 	return "eng"
+}
+
+func (s *Server) handleCapture(
+	ctx context.Context,
+	req *mcp.CallToolRequest,
+	in serialInput,
+) (*mcp.CallToolResult, any, error) {
+	if in.Serial == "" {
+		return nil, nil, fmt.Errorf("serial is required")
+	}
+	data, err := s.api.capture(in.Serial)
+	if err != nil {
+		return nil, nil, err
+	}
+	config, err := jpeg.DecodeConfig(bytes.NewReader(data))
+	if err != nil {
+		return nil, nil, err
+	}
+	var text = fmt.Sprintf("frame %dx%d pixels, same coordinates as scan", config.Width, config.Height)
+	return &mcp.CallToolResult{
+		Content: []mcp.Content{
+			&mcp.TextContent{Text: text},
+			&mcp.ImageContent{Data: data, MIMEType: captureMimeType},
+		},
+	}, nil, nil
 }
 
 func (s *Server) handleQueueSteps(

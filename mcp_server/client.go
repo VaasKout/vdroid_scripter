@@ -174,6 +174,10 @@ func (c *apiClient) scan(serial string, images []string, locale string) ([]scanL
 	return response.Landmarks, nil
 }
 
+func (c *apiClient) capture(serial string) ([]byte, error) {
+	return c.request(http.MethodGet, "/devices/"+url.PathEscape(serial)+"/capture", nil)
+}
+
 func (c *apiClient) queueSteps(serial string, steps []stepInput) error {
 	fillStepDefaults(steps)
 	body, err := json.Marshal(steps)
