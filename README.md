@@ -276,13 +276,14 @@ The MCP server ships its own instructions to the AI, so you do not have to expla
 * **Locale.** Text landmarks and `type_text` carry the Tesseract language code of their value, `eng` by default. Text is passed exactly as written, never transliterated or translated.
 * **Perception.** `scan` is the way to look at the screen. The agent scans when a step failed, when the instruction is conditional, or when you ask what is on screen. It does not scan habitually between steps. The MCP hands the agent a compact table rather than the server's JSON, and leaves out text the OCR read with confidence below 40 (icon glyphs and stray punctuation), saying how many entries it dropped.
 * **Vision.** `capture` hands the agent the current frame as a JPEG. It is only for models that can see images — an agent that cannot must never call it. Even then `scan` comes first and remains the source of landmark values; `capture` is for building a route through unknown screens when the scan cannot tell where to go next, and for tasks that need image recognition (an icon without text, a picture, a toggle's colour).
-* **Literal execution.** The agent queues exactly what you asked, as many times as you asked, with no added checks and no substitutions. It improvises only after a step fails.
+* **Literal execution.** When you name concrete actions, the agent queues exactly those, as many times as you asked, with no added checks and no substitutions. It improvises only after a step fails.
+* **Abstract tasks.** When you state a goal ("write John a message in Messenger"), the agent derives the steps itself, screen by screen: scan, act on readable text and YOLO classes, and — with vision — capture a control that has neither, save its rectangle as a library image on its own initiative, and tap it. Saved images are reused on the next run; the flow becomes a route only when you ask.
 * **Duplicates.** When a value matches several places, the agent puts a unique nearby landmark first in the chain. With no such neighbour, the first match in reading order wins.
 * **Timing.** An omitted `delay` becomes 0 on the first step of a batch and 1000 ms on later steps. An omitted `timeout` becomes 5000 ms. The agent raises the timeout for targets that appear after a launch or a load.
 * **Recovery.** A failed step clears the rest of the queue and names the target it could not find. The agent scans, applies your instruction or the route's prompt to what it sees, then queues the remaining steps again from the failed one.
 * **Routes.** A route is saved only when you ask, with your dictation kept verbatim as its prompt. After a recovered run the agent asks before updating the route.
 * **Curation.** Library images come from the Android client or, for a vision-capable agent, from `save_image`: after a `capture` it picks the icon's rectangle and saves it under a `<app>_<screen>_<what>` name — only for targets with no readable text and no YOLO class. Actions come from the client or from `record_action`, and only when you ask for a recording.
-* **No adb.** The agent never drives the device with `adb` directly. Every interaction is a step.
+* **No adb.** The agent never touches the device with `adb` directly — no input, no `screencap`. Every interaction is a step, every look is `scan` or `capture`.
 
 ## Recording gestures
 
