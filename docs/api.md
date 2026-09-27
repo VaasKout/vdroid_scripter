@@ -302,14 +302,10 @@ If the device has no open session, one is opened automatically like `/devices/{s
 
 ## Routes
 
-A **route** is a saved flow: a `name`, the user's original dictation as its
-`prompt` (the flow's intent, conditions included — used by the AI layer to
-recover when a replay fails), and the exact `steps` that ran to success. The
-prompt may be empty: routes saved manually (e.g. from the Android client)
-have no dictation and replay as plain scripts.
-Routes are dumb storage under `routes/<name>.json`: saving executes nothing,
-the server never interprets the prompt, and library conventions apply (flat
-names, `ValidName` rules, overwrite on the same name).
+A **route** is a saved flow: a `name` and the exact `steps` that ran to
+success. Routes are dumb storage under `routes/<name>.json`: saving executes
+nothing, the server holds no flow semantics, and library conventions apply
+(flat names, `ValidName` rules, overwrite on the same name).
 
 ### `GET /routes`
 
@@ -329,15 +325,13 @@ Saves a route, overwriting an existing one with the same name.
   ```json
   {
     "name": "shop_add_to_cart",
-    "prompt": "open the shop app, if 'Log in' is visible sign in first, then open the catalog and add the first item to the cart",
     "steps": [
       { "event": "tap", "landmarks": [{ "type": "image", "value": "shop_app_icon" }], "timeout": 5000, "delay": 0 },
       { "event": "tap", "landmarks": [{ "type": "text", "value": "Catalog", "locale": "eng" }], "timeout": 5000, "delay": 1000 }
     ]
   }
   ```
-  `name` and a non-empty valid `steps` array are required; `prompt` is
-  optional. Steps validate like `/devices/{serial}/queue_steps`: referenced
+  `name` and a non-empty valid `steps` array are required. Steps validate like `/devices/{serial}/queue_steps`: referenced
   library images and events must exist. `timeout` and `delay` are stored
   exactly as sent (an omitted key is `0`; the server never fills defaults).
   Saving stamps every step's `id`
@@ -554,7 +548,6 @@ worker does not start queued steps.
 | Field | JSON | Type | Notes |
 | ----- | ---- | ---- | ----- |
 | Name | `name` | string | Unique route name (library naming rules) |
-| Prompt | `prompt` | string | omitempty; the user's original dictation of the flow, verbatim; empty for manually saved routes |
 | Steps | `steps` | [][Step](#step) | Required, non-empty; the steps that ran to success, in order |
 
 ### Scan landmark

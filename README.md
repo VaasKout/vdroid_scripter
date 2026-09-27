@@ -87,7 +87,7 @@ Each device has a session with a step queue. Queue steps with `POST /devices/{se
 
 ### Routes
 
-A **route** is a saved flow: a name, the steps that worked, and optionally the prompt the flow was dictated with. Run one with a single call, or start it from a specific step id. The server holds no flow logic of its own. Conditions and recovery live in whoever is driving it.
+A **route** is a saved flow: a name and the steps that worked. Run one with a single call, or start it from a specific step id. The server holds no flow logic of its own. Conditions and recovery live in whoever is driving it.
 
 ## Installation
 
@@ -280,8 +280,8 @@ The MCP server ships its own instructions to the AI, so you do not have to expla
 * **Abstract tasks.** When you state a goal ("write John a message in Messenger"), the agent derives the steps itself, screen by screen: scan, act on readable text and YOLO classes, and — with vision — capture a control that has neither, save its rectangle as a library image on its own initiative, and tap it. Saved images are reused on the next run; the flow becomes a route only when you ask.
 * **Duplicates.** When a value matches several places, the agent puts a unique nearby landmark first in the chain. With no such neighbour, the first match in reading order wins.
 * **Timing.** An omitted `delay` becomes 0 on the first step of a batch and 1000 ms on later steps. An omitted `timeout` becomes 5000 ms. The agent raises the timeout for targets that appear after a launch or a load.
-* **Recovery.** A failed step clears the rest of the queue and names the target it could not find. The agent scans, applies your instruction or the route's prompt to what it sees, then queues the remaining steps again from the failed one.
-* **Routes.** A route is saved only when you ask, with your dictation kept verbatim as its prompt. After a recovered run the agent asks before updating the route.
+* **Recovery.** A failed step clears the rest of the queue and names the target it could not find. The agent scans, applies your instruction to what it sees, then queues the remaining steps again from the failed one.
+* **Routes.** A route is saved only when you ask, with the steps that succeeded. After a recovered run the agent asks before updating the route.
 * **Curation.** Library images come from the Android client or, for a vision-capable agent, from `save_image`: after a `capture` it picks the icon's rectangle and saves it under a `<app>_<screen>_<what>` name — only for targets with no readable text and no YOLO class. Actions come from the client or from `record_action`, and only when you ask for a recording.
 * **No adb.** The agent never touches the device with `adb` directly — no input, no `screencap`. Every interaction is a step, every look is `scan` or `capture`.
 

@@ -263,9 +263,8 @@ type routeStep struct {
 }
 
 type routeResponse struct {
-	Name   string      `json:"name"`
-	Prompt string      `json:"prompt"`
-	Steps  []routeStep `json:"steps"`
+	Name  string      `json:"name"`
+	Steps []routeStep `json:"steps"`
 }
 
 func (c *apiClient) getRoute(name string) (routeResponse, error) {
