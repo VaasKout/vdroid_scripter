@@ -8,9 +8,8 @@ import (
 
 // Route ...
 type Route struct {
-	Name   string `json:"name"`
-	Prompt string `json:"prompt,omitempty"`
-	Steps  []Step `json:"steps"`
+	Name  string `json:"name"`
+	Steps []Step `json:"steps"`
 }
 
 // Valid ...

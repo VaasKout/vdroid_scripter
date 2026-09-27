@@ -7,8 +7,6 @@ import kotlinx.serialization.Serializable
 data class Route(
     @SerialName("name")
     val name: String = "",
-    @SerialName("prompt")
-    val prompt: String = "",
     @SerialName("steps")
     val steps: List<Step> = listOf(),
 )

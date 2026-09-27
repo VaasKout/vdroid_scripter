@@ -53,7 +53,6 @@ func (i *interactorImpl) SaveRoute(route *models.Route) error {
 		return errors.New("route is empty")
 	}
 	route.Name = strings.TrimSpace(route.Name)
-	route.Prompt = strings.TrimSpace(route.Prompt)
 	if !route.Valid() {
 		return errors.New("invalid route")
 	}
