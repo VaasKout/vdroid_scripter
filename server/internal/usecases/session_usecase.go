@@ -177,6 +177,9 @@ func (i *interactorImpl) addStepsToQueue(serial string, steps []models.Step) boo
 		return false
 	}
 	session.Query = append(session.Query, steps...)
+	if !session.IsBusy() {
+		session.Status = fmt.Sprintf(models.StatusRunningStep, steps[0].ToString())
+	}
 	i.sessionsCache.Add(serial, session)
 	return true
 }
@@ -264,7 +267,7 @@ func (i *interactorImpl) startRecording(serial string) bool {
 	if !ok || len(session.Query) != 0 {
 		return false
 	}
-	if session.Status == models.StatusRecording || models.IsRunningStatus(session.Status) {
+	if session.IsBusy() {
 		return false
 	}
 	session.Status = models.StatusRecording

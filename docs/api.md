@@ -116,7 +116,9 @@ Queues one or more steps to run in order on a device. If the device has no open
 session, one is opened automatically (scrcpy is started and the call waits up
 to ~15s for the first video frame before queueing). All steps are
 validated up front — library images and events referenced by the steps must
-exist — then appended to the session's queue. A per-session worker executes
+exist — then appended to the session's queue; the session status becomes
+`running <first step>` in the same call, so a poller never reads a stale
+`idle` before the worker starts. A per-session worker executes
 steps sequentially, updating the session status; a step failure sets the error
 status and clears the remaining queue.
 

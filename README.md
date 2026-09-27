@@ -244,7 +244,7 @@ The server keeps running after the AI session ends, so later sessions find it al
 | `capture` | The current screen as a JPEG — only for agents that can see images, and only where `scan` is not enough |
 | `save_image` | Crop a rectangle of the current screen into a library image — for vision-capable agents curating icon targets |
 | `queue_steps` | Queue a whole sequence of steps in one call |
-| `wait_for_session` | Block until the queue finishes, then report `idle` or the error |
+| `wait_for_session` | Block until the queue finishes, then report `idle` or the error — only after `queue_steps`/`run_route` reported a batch still running, or for a run started from the app |
 | `get_session_status` | The current session status |
 | `close_session` | Close the device session |
 | `record_action` | Record a gesture the human performs on the device, see below |
@@ -271,7 +271,7 @@ Anything written on the screen needs nothing from the library. Text landmarks an
 The MCP server ships its own instructions to the AI, so you do not have to explain the tool. In short:
 
 * **Start with `ping`**, then `list_devices` for a serial. `ping` brings the server up when it is down.
-* **Batch.** A dictated sequence becomes one `queue_steps` call followed by one `wait_for_session`. The agent does not queue step by step and does not poll the status in between.
+* **Batch.** A dictated sequence becomes one `queue_steps` call, which blocks until the batch is done and reports `idle` or the failed step. The agent does not queue step by step and does not poll the status in between; `wait_for_session` is only for a batch that ran past the call's three-minute wait.
 * **Text is free.** An instruction phrased in words visible on screen is a chain of `tap` steps with `text` landmarks.
 * **Locale.** Text landmarks and `type_text` carry the Tesseract language code of their value, `eng` by default. Text is passed exactly as written, never transliterated or translated.
 * **Perception.** `scan` is the way to look at the screen. The agent scans when a step failed, when the instruction is conditional, or when you ask what is on screen. It does not scan habitually between steps. The MCP hands the agent a compact table rather than the server's JSON, and leaves out text the OCR read with confidence below 40 (icon glyphs and stray punctuation), saying how many entries it dropped.

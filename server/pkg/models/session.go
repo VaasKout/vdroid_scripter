@@ -15,11 +15,6 @@ const (
 // RecordDurationSeconds ...
 const RecordDurationSeconds = 5
 
-// IsRunningStatus ...
-func IsRunningStatus(status string) bool {
-	return strings.HasPrefix(status, StatusRunningPrefix)
-}
-
 // Session ...
 type Session struct {
 	ServerPort  int
@@ -28,4 +23,9 @@ type Session struct {
 	Query       []Step
 	Status      string
 	DoneCh      chan struct{}
+}
+
+// IsBusy ...
+func (s *Session) IsBusy() bool {
+	return strings.HasPrefix(s.Status, StatusRunningPrefix) || s.Status == StatusRecording
 }
