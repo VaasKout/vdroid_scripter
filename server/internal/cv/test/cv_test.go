@@ -1,7 +1,6 @@
 package test
 
 import (
-	"android_vision_scripter/config"
 	"android_vision_scripter/internal/cv"
 	"android_vision_scripter/pkg/core/file"
 	"android_vision_scripter/pkg/logger"
@@ -29,6 +28,7 @@ const (
 	TestTextFile4  = "./text_template_4.png"
 	TestTextFile5  = "./text_template_5.png"
 	TestSignPhrase = "Sign In"
+	TestLogsDir    = "./logs"
 )
 
 var TestTextFiles = []string{TestTextFile, TestTextFile2, TestTextFile3, TestTextFile4, TestTextFile5}
@@ -42,12 +42,9 @@ func TestGetTextFromImage(t *testing.T) {
 }
 
 func getTextFromImageAndDraw(t *testing.T, testImage string) {
-	var fileProps = &config.FilesProps{
-		Logs: "./logs",
-	}
 	var logAPI = logger.New(logger.INFO, true)
 	var cvAPI = cv.New(logAPI)
-	dir := createLogsDir(fileProps.Logs, TestSerial)
+	dir := createLogsDir(TestLogsDir, TestSerial)
 
 	img := gocv.IMRead(testImage, gocv.IMReadColor)
 	if img.Empty() {
@@ -82,12 +79,9 @@ func getTextFromImageAndDraw(t *testing.T, testImage string) {
 }
 
 func TestFindSignText(t *testing.T) {
-	var fileProps = &config.FilesProps{
-		Logs: "./logs",
-	}
 	var logAPI = logger.New(logger.INFO, true)
 	var cvAPI = cv.New(logAPI)
-	dir := createLogsDir(fileProps.Logs, TestSerial)
+	dir := createLogsDir(TestLogsDir, TestSerial)
 
 	img := gocv.IMRead(TestTextFile2, gocv.IMReadColor)
 	if img.Empty() {
@@ -126,13 +120,10 @@ func TestFindSignText(t *testing.T) {
 }
 
 func TestGetTextFromScreenshot(t *testing.T) {
-	var fileProps = &config.FilesProps{
-		Logs: "./logs",
-	}
 	var logAPI = logger.New(logger.INFO, true)
 	var cvAPI = cv.New(logAPI)
 
-	screenshot := takeScreenshot(fileProps.Logs, TestSerial)
+	screenshot := takeScreenshot(TestLogsDir, TestSerial)
 	if screenshot == "" {
 		t.Fatal("screenshot is empty")
 	}
@@ -170,13 +161,10 @@ func TestGetTextFromScreenshot(t *testing.T) {
 }
 
 func TestDrawAllRectangles(t *testing.T) {
-	var fileProps = &config.FilesProps{
-		Logs: "./logs",
-	}
 	var logAPI = logger.New(logger.INFO, true)
 	var cvAPI = cv.New(logAPI)
 
-	screenshot := takeScreenshot(fileProps.Logs, TestSerial)
+	screenshot := takeScreenshot(TestLogsDir, TestSerial)
 	if screenshot == "" {
 		t.Fatal("screenshot is empty")
 	}
@@ -206,7 +194,7 @@ func TestDrawAllRectangles(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var screenshotWithRects = filepath.Join(createLogsDir(fileProps.Logs, TestSerial), "screenshot.png")
+	var screenshotWithRects = filepath.Join(createLogsDir(TestLogsDir, TestSerial), "screenshot.png")
 	params := []int{gocv.IMWriteJpegQuality, 90}
 	if ok := gocv.IMWriteWithParams(screenshotWithRects, img, params); !ok {
 		fmt.Println("could not write image " + screenshot)
@@ -214,13 +202,10 @@ func TestDrawAllRectangles(t *testing.T) {
 }
 
 func TestFindTemplate(t *testing.T) {
-	var fileProps = &config.FilesProps{
-		Logs: "./logs",
-	}
 	var logAPI = logger.New(logger.INFO, true)
 	var cvAPI = cv.New(logAPI)
 
-	screenshot := takeScreenshot(fileProps.Logs, TestSerial)
+	screenshot := takeScreenshot(TestLogsDir, TestSerial)
 	if screenshot == "" {
 		t.Fatal("screenshot is empty")
 	}
@@ -250,7 +235,7 @@ func TestFindTemplate(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var screenshotWithRects = filepath.Join(createLogsDir(fileProps.Logs, TestSerial), "screenshot.png")
+	var screenshotWithRects = filepath.Join(createLogsDir(TestLogsDir, TestSerial), "screenshot.png")
 	params := []int{gocv.IMWriteJpegQuality, 90}
 	if ok := gocv.IMWriteWithParams(screenshotWithRects, img, params); !ok {
 		fmt.Println("could not write image " + screenshot)
@@ -266,13 +251,10 @@ func TestDetectNumericKeyboard(t *testing.T) {
 }
 
 func detectKeyboardAndDraw(t *testing.T, locale string, output string) {
-	var fileProps = &config.FilesProps{
-		Logs: "./logs",
-	}
 	var logAPI = logger.New(logger.INFO, true)
 	var cvAPI = cv.New(logAPI)
 
-	screenshot := takeScreenshot(fileProps.Logs, TestSerial)
+	screenshot := takeScreenshot(TestLogsDir, TestSerial)
 	if screenshot == "" {
 		t.Fatal("screenshot is empty")
 	}
@@ -307,7 +289,7 @@ func detectKeyboardAndDraw(t *testing.T, locale string, output string) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var screenshotWithKeys = filepath.Join(createLogsDir(fileProps.Logs, TestSerial), output)
+	var screenshotWithKeys = filepath.Join(createLogsDir(TestLogsDir, TestSerial), output)
 	if ok := gocv.IMWrite(screenshotWithKeys, img); !ok {
 		t.Fatal("could not write image " + screenshotWithKeys)
 	}

@@ -14,13 +14,12 @@ import (
 )
 
 const (
-	TestSerial = "xxx" //serial number of the device
+	TestSerial  = "xxx" //serial number of the device
+	TestLogsDir = "./logs/"
 )
 
 func TestGetDeviceList(t *testing.T) {
-	var fileProps = &config.FilesProps{
-		Logs: "./logs/",
-	}
+	var fileProps = &config.FilesProps{}
 	logAPI := logger.New(logger.INFO, true)
 	var filesDB = filesdb.New(fileProps)
 	var cmdRunner = bashcmd.New(filesDB, logAPI)
@@ -31,11 +30,7 @@ func TestGetDeviceList(t *testing.T) {
 }
 
 func TestScreenshot(t *testing.T) {
-	var fileProps = &config.FilesProps{
-		Logs: "./logs/",
-	}
-
-	screenshot := takeScreenshot(fileProps.Logs, TestSerial)
+	screenshot := takeScreenshot(TestLogsDir, TestSerial)
 	if screenshot == "" {
 		t.Fatal("screenshot is empty")
 	}

@@ -166,7 +166,6 @@ Everything is optional. Settings are read from a `.env` file in the working dire
 | `ROUTES_DIR` | `routes` | Saved routes |
 | `YOLO_DIR` | `yolo` | YOLO model files |
 | `SCRCPY_DIR` | `scrcpy` | Downloaded scrcpy-server binaries |
-| `LOGS` | `logs` | Log files |
 | `SCRCPY_VERSION` | `3.3.4` | scrcpy-server version to download |
 
 With the defaults the data directory is `~/Library/Caches/vdroid_scripter` on macOS and `~/.cache/vdroid_scripter` on Linux. The other directories in the table live inside it.

@@ -18,9 +18,6 @@ const (
 
 func TestConnectToServer(t *testing.T) {
 	var config = config.Config{
-		FilesProps: &config.FilesProps{
-			Logs: "./logs/",
-		},
 		ScrcpyProps: &config.ScrcpyProps{
 			ScrcpyVersion: "3.3.4",
 		},

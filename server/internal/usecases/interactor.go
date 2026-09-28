@@ -8,7 +8,6 @@ import (
 	"android_vision_scripter/internal/scrcpy"
 	"android_vision_scripter/internal/yolo"
 	"android_vision_scripter/pkg/core/cache"
-	"android_vision_scripter/pkg/core/network"
 	"android_vision_scripter/pkg/logger"
 	"android_vision_scripter/pkg/models"
 )
@@ -36,7 +35,6 @@ type interactorImpl struct {
 	filesDB filesdb.FilesDB
 	scrcpy  scrcpy.Scrcpy
 	yolo    yolo.Yolo
-	network network.Client
 	logger  *logger.Logger
 
 	devicesCache  cache.Cache[models.AdbDevice]
@@ -50,7 +48,6 @@ func New(
 	filesDB filesdb.FilesDB,
 	scrcpy scrcpy.Scrcpy,
 	yolo yolo.Yolo,
-	network network.Client,
 	logger *logger.Logger,
 ) Interactor {
 	var devicesCache = cache.NewSafeCache[models.AdbDevice]()
@@ -63,7 +60,6 @@ func New(
 		logger:  logger,
 		scrcpy:  scrcpy,
 		yolo:    yolo,
-		network: network,
 
 		devicesCache:  devicesCache,
 		sessionsCache: sessionsCache,

@@ -10,7 +10,6 @@ import (
 // Default values
 const (
 	BasePath       = "vdroid_scripter"
-	LogsDir        = "logs"
 	ScrcpyDir      = "scrcpy"
 	YoloDir        = "yolo"
 	ImagesDir      = "images"
@@ -36,7 +35,6 @@ type ServerProps struct {
 
 // FilesProps ...
 type FilesProps struct {
-	Logs    string
 	Scrcpy  string
 	Yolo    string
 	Images  string
@@ -75,11 +73,6 @@ func New() *Config {
 	}
 	cachePath := filepath.Join(userCacheDir, basePath)
 
-	logsDir := os.Getenv("LOGS")
-	if logsDir == "" {
-		logsDir = LogsDir
-	}
-
 	scrcpyDir := os.Getenv("SCRCPY_DIR")
 	if scrcpyDir == "" {
 		scrcpyDir = ScrcpyDir
@@ -116,7 +109,6 @@ func New() *Config {
 			SocketPort: baseSocketPort,
 		},
 		FilesProps: &FilesProps{
-			Logs:    filepath.Join(cachePath, logsDir),
 			Scrcpy:  filepath.Join(cachePath, scrcpyDir),
 			Yolo:    filepath.Join(cachePath, yoloDir),
 			Images:  filepath.Join(cachePath, imagesDir),

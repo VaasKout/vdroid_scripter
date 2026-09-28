@@ -17,7 +17,8 @@ import (
 )
 
 const (
-	TestSerial = "emulator-5554"
+	TestSerial  = "emulator-5554"
+	TestLogsDir = "./logs"
 )
 
 func TestDetectLabels(t *testing.T) {
@@ -26,7 +27,7 @@ func TestDetectLabels(t *testing.T) {
 	filesDB := filesdb.New(cfg.FilesProps)
 	yoloAPI := yolo.New(filesDB, logAPI)
 
-	screenshot := takeScreenshot(cfg.FilesProps.Logs, TestSerial)
+	screenshot := takeScreenshot(TestLogsDir, TestSerial)
 	if screenshot == "" {
 		t.Fatal("screenshot is empty")
 	}
