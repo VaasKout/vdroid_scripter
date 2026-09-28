@@ -18,6 +18,7 @@ const (
 
 func TestConnectToServer(t *testing.T) {
 	var config = config.Config{
+		FilesProps: &config.FilesProps{},
 		ScrcpyProps: &config.ScrcpyProps{
 			ScrcpyVersion: "3.3.4",
 		},
