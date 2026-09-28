@@ -35,12 +35,6 @@ func toSlogLevel(level LogLevel) slog.Level {
 // Logger ...
 type Logger struct {
 	*slog.Logger
-	requestID string
-}
-
-// Options ...
-type Options struct {
-	RequestID string
 }
 
 // New instance of Logger
@@ -60,41 +54,12 @@ func New(level LogLevel, isDev bool) *Logger {
 	}
 }
 
-// SetOptions ...
-func (l *Logger) SetOptions(opts *Options) *Logger {
-	l.requestID = opts.RequestID
-
-	return l
-}
-
-// GetRequestID ...
-func (l *Logger) GetRequestID() string {
-	return l.requestID
-}
-
 // Info ...
 func (l *Logger) Info(msg string, args ...any) {
-	l.Logger.Info(msg, l.prepareArgs(args...)...)
-}
-
-// Debug ...
-func (l *Logger) Debug(msg string, args ...any) {
-	l.Logger.Debug(msg, l.prepareArgs(args...)...)
-}
-
-// Warn ...
-func (l *Logger) Warn(msg string, args ...any) {
-	l.Logger.Warn(msg, l.prepareArgs(args...)...)
+	l.Logger.Info(msg, args...)
 }
 
 // Error ...
 func (l *Logger) Error(msg string, args ...any) {
-	l.Logger.Error(msg, l.prepareArgs(args...)...)
-}
-
-func (l *Logger) prepareArgs(args ...any) []any {
-	if l.requestID != "" {
-		args = append(args, String("request-id", l.requestID))
-	}
-	return args
+	l.Logger.Error(msg, args...)
 }

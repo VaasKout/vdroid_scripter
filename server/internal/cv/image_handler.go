@@ -2,9 +2,7 @@ package cv
 
 import (
 	"errors"
-	"fmt"
 	"image"
-	"image/color"
 	"sort"
 
 	"gocv.io/x/gocv"
@@ -14,11 +12,6 @@ import (
 type ImageHandler interface {
 	FindAllRectangles(img *gocv.Mat) ([]image.Rectangle, error)
 	FindImages(img *gocv.Mat, template string) ([]image.Rectangle, error)
-	DrawRectangles(
-		img gocv.Mat,
-		rectangles []image.Rectangle,
-		transparent bool,
-	) error
 }
 
 func (c *cvImpl) FindAllRectangles(img *gocv.Mat) ([]image.Rectangle, error) {
@@ -171,25 +164,4 @@ func isCloseToBorder(inner, outer image.Rectangle) bool {
 		(rightDist >= 0 && rightDist <= MinBorderDistance) ||
 		(topDist >= 0 && topDist <= MinBorderDistance) ||
 		(bottomDist >= 0 && bottomDist <= MinBorderDistance)) && inner.Overlaps(outer)
-}
-
-func (c *cvImpl) DrawRectangles(
-	img gocv.Mat,
-	rectangles []image.Rectangle,
-	transparent bool,
-) error {
-	if transparent {
-		gocv.CvtColor(img, &img, gocv.ColorBGRToBGRA)
-		img.SetTo(gocv.NewScalar(0, 0, 0, 0))
-	}
-	var redColor = color.RGBA{R: 255, A: 255}
-	for _, rect := range rectangles {
-		err := gocv.Rectangle(&img, rect, redColor, 2)
-		if err != nil {
-			fmt.Println(err)
-			continue
-		}
-	}
-
-	return nil
 }

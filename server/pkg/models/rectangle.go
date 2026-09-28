@@ -21,16 +21,6 @@ type Rectangle struct {
 	Label   string `json:"label,omitempty"`
 }
 
-// Center ...
-func (r *Rectangle) Center() (int, int) {
-	return (r.LeftX + r.RightX) / 2, (r.TopY + r.BottomY) / 2
-}
-
-// IsNotEmpty ...
-func (r *Rectangle) IsNotEmpty() bool {
-	return r != nil && (r.LeftX > 0 || r.RightX > 0 || r.BottomY > 0 || r.TopY > 0)
-}
-
 // IsEmpty ...
 func (r *Rectangle) IsEmpty() bool {
 	return r == nil || (r.LeftX <= 0 && r.RightX <= 0 && r.BottomY <= 0 && r.TopY <= 0)

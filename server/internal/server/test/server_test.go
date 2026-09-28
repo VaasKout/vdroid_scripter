@@ -2,9 +2,13 @@
 package test
 
 import (
-	"android_vision_scripter/pkg/core/network"
 	"android_vision_scripter/pkg/logger"
 	"bytes"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"time"
 )
 
 // Common test contants...
@@ -20,14 +24,38 @@ func makeHTTPRequest(
 	data any,
 ) {
 	logAPI := logger.New(logger.INFO, true)
-	client := network.New(logAPI)
-	request := &network.HTTPRequest{
-		URL:     url,
-		Method:  method,
-		Body:    bytes.NewBuffer(body),
-		LogBody: true,
-		LogReq:  true,
-	}
+	logAPI.Info(fmt.Sprintf("Starting Request: %s - %s", method, url))
+	logAPI.Info(fmt.Sprintf("Body: %s", string(body)))
 
-	client.MakeRequest(request, data)
+	request, err := http.NewRequest(method, url, bytes.NewBuffer(body))
+	if err != nil {
+		logAPI.Error(fmt.Sprintf("error due creating request: %s", err))
+		return
+	}
+	request.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{Timeout: 30 * time.Second}
+	response, err := client.Do(request)
+	if err != nil {
+		logAPI.Error(fmt.Sprintf("error due executing request: %s", err))
+		return
+	}
+	defer response.Body.Close()
+
+	responseBody, err := io.ReadAll(response.Body)
+	if err != nil {
+		logAPI.Error(err.Error())
+		return
+	}
+	if response.StatusCode != http.StatusOK {
+		logAPI.Error(fmt.Sprintf("Status: %s, Body: %s", response.Status, string(responseBody)))
+		return
+	}
+	logAPI.Info(fmt.Sprintf("End of request: %s - %s: %s", method, url, response.Status))
+
+	if text, ok := data.(*string); ok {
+		*text = string(responseBody)
+		return
+	}
+	json.Unmarshal(responseBody, &data)
 }

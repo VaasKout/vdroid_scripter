@@ -12,7 +12,6 @@ type Cache[V any] interface {
 	Delete(key string)
 	GetMap() map[string]V
 	GetDataArray() []V
-	ClearCache()
 }
 
 // SafeCache ...
@@ -85,13 +84,4 @@ func (c *SafeCache[V]) Delete(key string) {
 		newOrder = append(newOrder, oldKey)
 	}
 	c.order = newOrder
-}
-
-// ClearCache ...
-func (c *SafeCache[V]) ClearCache() {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	for k := range c.store {
-		delete(c.store, k)
-	}
 }

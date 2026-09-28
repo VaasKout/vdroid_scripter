@@ -11,7 +11,6 @@ import (
 
 // ScrcpyUseCase ...
 type ScrcpyUseCase interface {
-	StartScrcpyServer(serial string, serverPort int) bool
 	AcceptVideoConnections(
 		ctx context.Context,
 		serial string,

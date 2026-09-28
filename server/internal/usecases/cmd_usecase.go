@@ -7,9 +7,7 @@ import (
 
 // CmdUseCase ...
 type CmdUseCase interface {
-	FillUpDevicesCache()
 	GetDevices() []models.AdbDevice
-	GetDevice(serial string) *models.AdbDevice
 }
 
 func (i *interactorImpl) FillUpDevicesCache() {
@@ -38,22 +36,6 @@ func (i *interactorImpl) FillUpDevicesCache() {
 
 func (i *interactorImpl) GetDevices() []models.AdbDevice {
 	return i.devicesCache.GetDataArray()
-}
-
-func (i *interactorImpl) GetDevice(serial string) *models.AdbDevice {
-	var device = &models.AdbDevice{}
-	if result, ok := i.devicesCache.Get(serial); ok {
-		if result.Serial != "" {
-			device = &result
-		}
-	}
-
-	if device.Serial == "" {
-		i.cmd.GetAdbDevice(serial)
-	}
-
-	i.devicesCache.Add(serial, *device)
-	return device
 }
 
 func (i *interactorImpl) setScrcpyState(serial string, isRunning bool) {

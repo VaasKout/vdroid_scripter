@@ -18,8 +18,6 @@ import (
 type CmdAPI interface {
 	AdbAPI
 	ScrCpy
-
-	ExecuteCommand(serial string) (string, error)
 }
 type cmdImpl struct {
 	logger  *logger.Logger

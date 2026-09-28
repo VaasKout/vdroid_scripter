@@ -25,9 +25,6 @@ const (
 type AdbAPI interface {
 	GetDevicesList() []string
 	GetAdbDevice(serial string) *models.AdbDevice
-	GetProp(serial string, prop string) string
-
-	IsAdbConnected(serial string) bool
 
 	PushFile(serial string, path string, dest string) error
 	ForwardTCPPort(serial string, port int, tag string) error

@@ -15,9 +15,3 @@ type OCRResult struct {
 func (o *OCRResult) IsEmpty() bool {
 	return o == nil || o.Rectangle.IsEmpty() || o.Text == ""
 }
-
-// TemplateResult ...
-type TemplateResult struct {
-	Rectangle models.Rectangle
-	Path      string
-}

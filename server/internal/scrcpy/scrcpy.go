@@ -96,10 +96,9 @@ func (s *scrcpyImpl) downloadScrcpyServer() error {
 	client := network.New(s.logAPI)
 	var downloadLink = fmt.Sprintf(ScrcpyLinkFormat, s.props.ScrcpyVersion, s.props.ScrcpyVersion)
 	request := &network.HTTPRequest{
-		URL:     downloadLink,
-		Method:  http.MethodGet,
-		LogBody: true,
-		LogReq:  true,
+		URL:    downloadLink,
+		Method: http.MethodGet,
+		LogReq: true,
 	}
 	return client.DownloadFile(request, scrcpyFilePath)
 }

@@ -3,7 +3,7 @@ package test
 import (
 	"android_vision_scripter/config"
 	"android_vision_scripter/internal/cv"
-	"android_vision_scripter/internal/filesdb"
+	"android_vision_scripter/pkg/core/file"
 	"android_vision_scripter/pkg/logger"
 	"android_vision_scripter/pkg/models"
 	"fmt"
@@ -46,9 +46,8 @@ func getTextFromImageAndDraw(t *testing.T, testImage string) {
 		Logs: "./logs",
 	}
 	var logAPI = logger.New(logger.INFO, true)
-	var filesDB = filesdb.New(fileProps)
 	var cvAPI = cv.New(logAPI)
-	dir := filesDB.CreateLogsDir(TestSerial)
+	dir := createLogsDir(fileProps.Logs, TestSerial)
 
 	img := gocv.IMRead(testImage, gocv.IMReadColor)
 	if img.Empty() {
@@ -72,7 +71,7 @@ func getTextFromImageAndDraw(t *testing.T, testImage string) {
 		rectangles = append(rectangles, *imgRect)
 	}
 
-	err = cvAPI.DrawRectangles(img, rectangles, false)
+	err = drawRectangles(img, rectangles)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -87,9 +86,8 @@ func TestFindSignText(t *testing.T) {
 		Logs: "./logs",
 	}
 	var logAPI = logger.New(logger.INFO, true)
-	var filesDB = filesdb.New(fileProps)
 	var cvAPI = cv.New(logAPI)
-	dir := filesDB.CreateLogsDir(TestSerial)
+	dir := createLogsDir(fileProps.Logs, TestSerial)
 
 	img := gocv.IMRead(TestTextFile2, gocv.IMReadColor)
 	if img.Empty() {
@@ -113,7 +111,7 @@ func TestFindSignText(t *testing.T) {
 		rectangles = append(rectangles, *imgRect)
 	}
 
-	err = cvAPI.DrawRectangles(img, rectangles, false)
+	err = drawRectangles(img, rectangles)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -132,10 +130,9 @@ func TestGetTextFromScreenshot(t *testing.T) {
 		Logs: "./logs",
 	}
 	var logAPI = logger.New(logger.INFO, true)
-	var filesDB = filesdb.New(fileProps)
 	var cvAPI = cv.New(logAPI)
 
-	screenshot := takeScreenshot(filesDB, TestSerial)
+	screenshot := takeScreenshot(fileProps.Logs, TestSerial)
 	if screenshot == "" {
 		t.Fatal("screenshot is empty")
 	}
@@ -162,7 +159,7 @@ func TestGetTextFromScreenshot(t *testing.T) {
 		rectangles = append(rectangles, *imgRect)
 	}
 
-	err = cvAPI.DrawRectangles(img, rectangles, false)
+	err = drawRectangles(img, rectangles)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -177,10 +174,9 @@ func TestDrawAllRectangles(t *testing.T) {
 		Logs: "./logs",
 	}
 	var logAPI = logger.New(logger.INFO, true)
-	var filesDB = filesdb.New(fileProps)
 	var cvAPI = cv.New(logAPI)
 
-	screenshot := takeScreenshot(filesDB, TestSerial)
+	screenshot := takeScreenshot(fileProps.Logs, TestSerial)
 	if screenshot == "" {
 		t.Fatal("screenshot is empty")
 	}
@@ -206,11 +202,11 @@ func TestDrawAllRectangles(t *testing.T) {
 	t.Logf("rects len: %d", len(rectangles))
 	t.Log(rectangles)
 
-	err = cvAPI.DrawRectangles(img, rectangles, false)
+	err = drawRectangles(img, rectangles)
 	if err != nil {
 		t.Fatal(err)
 	}
-	var screenshotWithRects = filepath.Join(filesDB.CreateLogsDir(TestSerial), "screenshot.png")
+	var screenshotWithRects = filepath.Join(createLogsDir(fileProps.Logs, TestSerial), "screenshot.png")
 	params := []int{gocv.IMWriteJpegQuality, 90}
 	if ok := gocv.IMWriteWithParams(screenshotWithRects, img, params); !ok {
 		fmt.Println("could not write image " + screenshot)
@@ -222,10 +218,9 @@ func TestFindTemplate(t *testing.T) {
 		Logs: "./logs",
 	}
 	var logAPI = logger.New(logger.INFO, true)
-	var filesDB = filesdb.New(fileProps)
 	var cvAPI = cv.New(logAPI)
 
-	screenshot := takeScreenshot(filesDB, TestSerial)
+	screenshot := takeScreenshot(fileProps.Logs, TestSerial)
 	if screenshot == "" {
 		t.Fatal("screenshot is empty")
 	}
@@ -251,11 +246,11 @@ func TestFindTemplate(t *testing.T) {
 	elapsed := time.Since(start)
 	fmt.Printf("\nfound template for %d ms\n\n", elapsed.Milliseconds())
 
-	err = cvAPI.DrawRectangles(img, []image.Rectangle{*rectangle}, false)
+	err = drawRectangles(img, []image.Rectangle{*rectangle})
 	if err != nil {
 		t.Fatal(err)
 	}
-	var screenshotWithRects = filepath.Join(filesDB.CreateLogsDir(TestSerial), "screenshot.png")
+	var screenshotWithRects = filepath.Join(createLogsDir(fileProps.Logs, TestSerial), "screenshot.png")
 	params := []int{gocv.IMWriteJpegQuality, 90}
 	if ok := gocv.IMWriteWithParams(screenshotWithRects, img, params); !ok {
 		fmt.Println("could not write image " + screenshot)
@@ -275,10 +270,9 @@ func detectKeyboardAndDraw(t *testing.T, locale string, output string) {
 		Logs: "./logs",
 	}
 	var logAPI = logger.New(logger.INFO, true)
-	var filesDB = filesdb.New(fileProps)
 	var cvAPI = cv.New(logAPI)
 
-	screenshot := takeScreenshot(filesDB, TestSerial)
+	screenshot := takeScreenshot(fileProps.Logs, TestSerial)
 	if screenshot == "" {
 		t.Fatal("screenshot is empty")
 	}
@@ -309,18 +303,37 @@ func detectKeyboardAndDraw(t *testing.T, locale string, output string) {
 		gocv.PutText(&img, string(ch), image.Pt(rect.Min.X, rect.Min.Y), gocv.FontHersheySimplex, 1, blueColor, 2)
 	}
 
-	err = cvAPI.DrawRectangles(img, rectangles, false)
+	err = drawRectangles(img, rectangles)
 	if err != nil {
 		t.Fatal(err)
 	}
-	var screenshotWithKeys = filepath.Join(filesDB.CreateLogsDir(TestSerial), output)
+	var screenshotWithKeys = filepath.Join(createLogsDir(fileProps.Logs, TestSerial), output)
 	if ok := gocv.IMWrite(screenshotWithKeys, img); !ok {
 		t.Fatal("could not write image " + screenshotWithKeys)
 	}
 }
 
-func takeScreenshot(filesDB filesdb.FilesDB, serial string) string {
-	dir := filesDB.CreateLogsDir(serial, "screenshot")
+func drawRectangles(img gocv.Mat, rectangles []image.Rectangle) error {
+	var redColor = color.RGBA{R: 255, A: 255}
+	for _, rect := range rectangles {
+		if err := gocv.Rectangle(&img, rect, redColor, 2); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func createLogsDir(logsDir string, args ...string) string {
+	var dirName = filepath.Join(logsDir, filepath.Join(args...))
+	if ok := file.CreateDirIfNotExist(dirName); !ok {
+		fmt.Printf("Couldn't create dir %s\n", dirName)
+		return ""
+	}
+	return dirName
+}
+
+func takeScreenshot(logsDir string, serial string) string {
+	dir := createLogsDir(logsDir, serial, "screenshot")
 	if dir == "" {
 		return ""
 	}

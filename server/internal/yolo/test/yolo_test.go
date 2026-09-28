@@ -4,7 +4,9 @@ import (
 	"android_vision_scripter/config"
 	"android_vision_scripter/internal/filesdb"
 	"android_vision_scripter/internal/yolo"
+	"android_vision_scripter/pkg/core/file"
 	"android_vision_scripter/pkg/logger"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -24,7 +26,7 @@ func TestDetectLabels(t *testing.T) {
 	filesDB := filesdb.New(cfg.FilesProps)
 	yoloAPI := yolo.New(filesDB, logAPI)
 
-	screenshot := takeScreenshot(filesDB, TestSerial)
+	screenshot := takeScreenshot(cfg.FilesProps.Logs, TestSerial)
 	if screenshot == "" {
 		t.Fatal("screenshot is empty")
 	}
@@ -46,8 +48,17 @@ func TestDetectLabels(t *testing.T) {
 	}
 }
 
-func takeScreenshot(filesDB filesdb.FilesDB, serial string) string {
-	dir := filesDB.CreateLogsDir(serial, "screenshot")
+func createLogsDir(logsDir string, args ...string) string {
+	var dirName = filepath.Join(logsDir, filepath.Join(args...))
+	if ok := file.CreateDirIfNotExist(dirName); !ok {
+		fmt.Printf("Couldn't create dir %s\n", dirName)
+		return ""
+	}
+	return dirName
+}
+
+func takeScreenshot(logsDir string, serial string) string {
+	dir := createLogsDir(logsDir, serial, "screenshot")
 	if dir == "" {
 		return ""
 	}
