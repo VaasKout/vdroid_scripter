@@ -32,33 +32,33 @@ const (
 
 const serverInstructions = `vdroid-scripter drives Android devices with CV-located steps composed from a human-curated library.
 
-Workflow: ping first (it starts the vdroid server when needed), list_devices for a serial, get_routes for saved flows, then queue_steps. get_library only when an image target or a recorded gesture might be needed; library names carry their context as <app>_<screen>_<what>[_variant] (shop_catalog_swipe_1 = a swipe recorded on a shop app's catalog screen). stop_server only when the user explicitly asks to stop or restart the server.
+Workflow: ping first, list_devices for a serial, get_routes for saved flows, then act; sessions open automatically. get_library only when an icon target or a recorded gesture might be needed: images are template crops used as image landmarks, actions are recorded gestures used as events. Library names carry their context as <app>_<screen>_<what>[_variant] (shop_catalog_swipe_1 = a swipe recorded on a shop app's catalog screen); a duplicate name overwrites. Text is free: text landmarks and the generated events need nothing from the library, so an instruction in words visible on screen ("open Settings") is tap steps on text landmarks through the obvious screens (Settings -> Network & internet -> Wi-Fi).
 
-Steps: a step is an event applied to a chain of landmarks. A landmark is a CV target: type image | text | yolo, value = library image name | text to find | yolo class; text landmarks also carry the locale. The chain resolves on ONE video frame: the first landmark takes its first match in reading order (top to bottom, left to right), every following landmark takes the candidate of its value NEAREST to the previous one, and the event applies to the LAST landmark. One landmark is the normal case; to disambiguate duplicates put a unique nearby element first ("the toggle next to 'Show refresh rate'" = [{text "Show refresh rate"}, {image toggle}]). Events: tap and long_tap touch the last landmark's region. swipe_up, swipe_down, swipe_left and swipe_right generate a human-like fixed-length swipe (the finger's direction, so swipe_up reveals content below) from a random point on screen, or from inside the last landmark's region when landmarks are given — use them for scrolling; recorded library swipes are for app-specific gestures. type_text types the LAST landmark's value on the keyboard that is already open (tap the field in an earlier step); its locale is REQUIRED and must be the language the keyboard shows; letters, space, digits (when the keyboard has a number row) and capitals via Shift are typed, punctuation and symbols fail the step; a number or phone field takes locale numeric (numeric keypad, digits only). An EMPTY event is a visibility check of the chain. Any other event replays that library action: offset into the last landmark's region when landmarks are given, verbatim without.
+Steps: a step is an event applied to a chain of landmarks. A landmark is a CV target: type image | text | yolo, value = library image name | text to find | yolo class. The chain resolves on ONE video frame: the first landmark takes its first match in reading order (top to bottom, left to right), each following landmark the candidate NEAREST to the previous one, and the event applies to the LAST. One landmark is the normal case; to disambiguate duplicates put a unique nearby element first ("the toggle next to 'Show refresh rate'" = [{text "Show refresh rate"}, {image toggle}]). Events: tap and long_tap touch the last landmark. swipe_up/down/left/right make a human-like fixed-length swipe in the finger's direction (swipe_up reveals content below) from a random point, or from inside the last landmark when given — use them for scrolling; recorded library swipes are for app-specific gestures. type_text types the last landmark's value on the keyboard already open (tap the field in an earlier step); its locale is REQUIRED and must be the keyboard's language; letters, space, digits (number row) and capitals are typed, punctuation and symbols fail the step; a number or phone field takes locale numeric (keypad, digits only). An EMPTY event is a visibility check. Any other event replays that library action, moved into the last landmark when given, verbatim without.
 
-Text is free: text landmarks and the generated events need nothing from the library. An instruction phrased in words visible on screen ("open Settings", "enter wifi connections") is tap steps with text landmarks through the obvious screens (Settings -> Network & internet -> Wi-Fi). The library is only for a target without readable text (an icon = image landmark) or for a recorded gesture.
+Locale: text landmarks and type_text carry the Tesseract code of their value's language, eng by default; pass the text exactly as the user wrote it, never transliterate or translate.
 
-Locale: text landmarks and type_text always carry the Tesseract language code of their value's language, eng by default. Pass the text exactly as the user wrote it, never transliterate or translate.
+Timing: delay is ms slept BEFORE the step acts, letting the previous change settle; timeout is ms the server keeps re-locating the target on live frames, proceeding the moment it appears; both are literal, 0 = no delay / one look. Omitted: delay 0 on a batch's first step and 1000 after, timeout 5000. For a target that appears late (app launch, navigation, loading) raise timeout to 10000-15000, not delay; a bigger delay only for a target visible early but not yet safe to touch. A probe never gets a raised timeout, so a negative answer comes back fast. Session startup never eats the timeout.
 
-Timing: delay (ms slept BEFORE the step acts, pacing the flow and letting the previous action's screen change settle) and timeout (ms the server keeps re-locating the target on live frames, back to back, proceeding the moment it appears) are taken literally; omitted delay is 0 on a batch's first step and 1000 after, omitted timeout is 5000, 0 means no delay / one look at the current frame. For a target that appears late (app launch, navigation, loading) raise timeout to 10000-15000 rather than delay; a bigger delay only when the target is visible early but not yet safe to touch. Keep probe checks at the default timeout so a negative answer comes back fast. Session startup never eats the timeout.
+Batching: a dictated sequence becomes ONE queue_steps call in the given order — never one step at a time, never status polls in between. The call returns when the batch is done: 'idle' = every step succeeded; otherwise the error names the failed step by id (its batch position, or the route's id) and the rest of the queue is cleared. Only a batch reported still running needs wait_for_session.
 
-Batching: a dictated sequence becomes ONE queue_steps call with the steps in the given order. Never one step at a time, never status polls in between: the call returns when the batch is done, 'idle' means every step succeeded, an error text names the failed step and the rest of the queue is cleared. wait_for_session only when the call reports the batch still running (past 3 minutes) or for a run started elsewhere (the Android client).
+Literal execution: when the user names concrete actions ("tap Settings, then tap Wi-Fi"), queue exactly those — no extra checks or probes, nothing added, substituted or reordered; a repeated ask runs again every time, as many times as asked. Never argue or ask for confirmation. Improvise only when a step fails.
 
-Literal execution: when the user names concrete actions ("tap Settings, then tap Wi-Fi"), queue exactly those — no extra checks, no probing, no added, substituted or reordered steps; a repeated ask is executed again every time, exactly as many times as asked, never deduplicated. Never argue, never ask for confirmation. Improvise only when a step fails.
+Perception: scan is the primary way to see the screen, capture the second. Scan when a step failed, for a conditional instruction ("if X is not visible, ..."), when the user asks what is on screen, or on each new screen of an abstract task — never habitually between dictated steps; pass in images the library names related to the current app. The result is a header (count, resolved text locale, dropped low-confidence entries), then one "type left,top,right,bottom value" line per landmark in reading order; type/value are what step landmarks consume (with the header's locale on text), coordinates only show what sits next to what. A missing expected word was misread or is in another language: rescan with the matching locale before calling it absent. capture costs about 1500 tokens — five scans — per call and stays in context; never call it if you cannot interpret images. With vision, scan still comes first and names the landmark values: if the target's text or yolo class is in the scan, act without capturing. Capture only for a target the scan lacks that has no text (an icon, a picture, a toggle's colour) or for an unknown screen the scan says nothing about, naming the target — at most once per new screen, never within a dictated batch.
 
-Abstract tasks: when the user states a goal ("write John a message in Telegram", "turn off Wi-Fi"), derive the steps yourself and carry it through without asking, screen by screen: scan, turn readable text and yolo classes into landmarks, queue the steps you are sure of, read the outcome, look again, until the goal is done, then report; type message text with type_text in its own locale. A control with neither text nor yolo class (a send arrow, an attach clip, a tab icon) needs an image: check get_library for one, otherwise — with vision — capture and save_image it on your own initiative, never ask the user to curate. Saved images make the next run capture-free; save the flow as a route only when asked. Without vision, report such a control to the user as the one thing that needs an image.
+Curation: a target with no readable text and no yolo class needs a library image: use one from get_library, otherwise with vision capture, pick the icon's tight rectangle in the reported pixels (only the icon, no badge or highlight that changes) and save_image it as <app>_<screen>_<what>[_variant] — on your own initiative, never asking the user to curate; saved images make the next run capture-free. Ask the user for a library item only when you have no vision and no text, yolo class or generated swipe reaches the target. Actions come from the Android client, or from record_action on the user's ask.
 
-Perception: scan is the primary way to observe the screen, capture (vision only) the second; the frame reaches you only through these two tools. Scan when a step failed, when the instruction is conditional ("if X is not visible, ..."), when the user asks what is on screen, or on each new screen of an abstract task — never habitually between dictated steps. Pass in images the library image names plausibly related to the current app. The result is a header (landmark count, resolved text locale, how many low-confidence text entries were dropped) then one "type left,top,right,bottom value" line per landmark in reading order; type/value are exactly what step landmarks consume (with the header's locale on text), the coordinates only tell which elements sit next to each other. A missing expected word was misread or is in another language: rescan with the matching locale before concluding it is absent. capture returns the frame as an image and costs about 1500 tokens — five scans — every call, staying in context. ONLY for models that can see images; if you cannot interpret an image, never call it. With vision, scan still comes first and remains the source of landmark values; decide against the scan you just took: the target's text or yolo class is in it -> act, no capture. Capture only for a target absent from the scan that has no text (an icon, a picture, a visual state such as a toggle's colour) or for an unknown screen whose scan gives nothing to go on, naming the target you look for — at most once per new screen, never between the steps of a dictated batch.
+Abstract tasks (explorer only): when the user states a goal ("write John a message in Telegram", "turn off Wi-Fi"), derive the steps yourself and carry it through without asking, screen by screen: scan, turn text and yolo classes into landmarks, queue what you are sure of, read the outcome, look again, until done, then report; type message text with type_text in its own locale.
 
-Curation: library images come from the human's Android client or, with vision, from save_image: after a capture pick the icon's tight rectangle in the reported pixels (the icon only, not a badge count or a highlight that would change) and save it under <app>_<screen>_<what>[_variant]; only for a target with no readable text and no yolo class. Library actions come from the client or from record_action, only when the user asks to record a gesture as <name>: tell them to perform it on the device immediately — it listens for 5 seconds from the call and blocks until the window ends; 'nothing recorded' means no touch happened, ask them to try again. Ask the user to add a library item only when a target has no readable text, no yolo class, no generated swipe that gets there, and you have no vision to save the image yourself.
+Routes: a route is a saved flow — a name and the steps that ran to success, with ids 1..N and their delay/timeout. run_route returns its outcome like queue_steps; start_id runs from that step — on the user's ask, or to rerun the unchanged remainder after a recovered failure; the start step gets delay 0, an unknown id runs nothing. Never create or modify a route unless the user asks, apart from explorer recording and navigator route repair.
 
-Routes: a route is a saved flow — a name and the exact steps that ran to success, stored with ids 1..N and their delay/timeout as sent (omitted ones filled like queue_steps). Routes are recorded only in explorer mode. save_route writes a route from steps without running them, only on the user's ask; a duplicate name overwrites. edit_route changes one step's timeout, delay or landmarks, or deletes it — on your own only in navigator (below), otherwise on the user's ask. run_route runs a route and returns its outcome like queue_steps; start_id runs from that step id — on the user's ask, or to rerun the unchanged remainder after a recovered failure; the started step gets delay 0, an id the route lacks is an error and nothing runs. Never create or modify a route without being asked; after a recovered run_route in default mode ask whether to update the route.
+Modes: navigator (the start mode) and explorer; the mode holds until the user changes it (see Rules). In both, dictated steps run as asked (Literal execution), with recovery on failure.
+navigator records nothing, and dictated steps never change a route. A goal is reached only across saved routes: get_routes, get_route and scan show where the phone is and which route leads on, or which step to enter via start_id; chain run_route calls; a goal no route reaches needs explorer: say so. When a route run fails, scan; for a route defect, fix the step with edit_route and rerun from it without asking: the target is on screen now -> raise its timeout; it appears in several places or the previous tap hit the wrong one -> landmarks with a unique neighbour first; the screen is mid-transition -> raise its delay; the step repeats the one before and undoes it -> delete it. At most two fixes per failing step; anything else (another screen, a popup, a missing app) is no defect: report it. List every fix in your answer.
+explorer (with a route name) carries a goal through as an abstract task and records your own work: each batch of yours appends its succeeded steps, minus your visibility checks and probes, to that route and saves it — no save_route needed; a failed step and the rest of its batch stay out, the recovery batch goes in; an existing route is appended to (delete_route first only when the user wants it replaced). Steps the user dictates go in their own batch with dictated=true: they run as asked and only their visibility checks, the checks the user asked for, are recorded.
 
-Modes: set_mode switches between default, explorer and navigator — only when the user asks for a mode, never on your own; the mode holds until the next set_mode. default is everything described here. explorer (with a route name) carries the task through like an abstract task and records it: every queue_steps batch appends its succeeded steps to that route and saves it — your own visibility checks and probes stay out, but a check the user asked for ("check that Wi-Fi is visible") is part of the flow: queue it with keep_checks, never together with probes of your own — so the route grows as you go and you never re-send steps; a failed step and the rest of its batch stay out, the recovery batch that follows goes in; an existing route is appended to, delete_route first only when the user wants it replaced. navigator moves only along saved routes: get_routes, get_route and scan tell you where the phone is and which route leads on, or which step to enter at via start_id; chain run_route calls to reach the goal. queue_steps, save_route, delete_route, record_action, capture and save_image are refused. When a route step fails, scan; if the scan shows a route defect, fix it with edit_route and run_route again from that step without asking: the target is on screen now -> raise its timeout; the target appears in several places or the previous tap hit the wrong one -> landmarks with a unique neighbour first; the screen is caught mid-transition -> raise its delay; the step repeats the one before and undoes it -> delete it. At most two fixes per failing step. Anything else (another screen, a popup, a missing app) is no route defect: report that the task needs explorer mode. List every fix you made in your answer.
+Failure and recovery: recover from the failed step: scan (with the relevant library images) and apply the user's instruction to what it shows — tap the alternative the user named, scroll with a generated swipe or the screen's recorded swipe (variants _1, _2, ...) when the target should be further down, or report honestly on an unexpected screen — then re-queue from the failed step in one call, or run_route with start_id when a route's remaining steps need no change. A scan with no landmarks at all, not even the status bar, means the screen is off: close_session, scan again (the new session turns the screen on) and continue. Conditional dictations split at the condition: queue the unconditional prefix ending with the probe step, then resolve the condition with a scan once the call returns.
 
-Failure and recovery: a failed step clears the remaining queue and the status names the target it could not find, prefixed with the step's id (its batch position, or the route's id). Recover from that point: scan (with the relevant library images), apply the user's instruction to what the scan shows — tap the alternative the user named, scroll with a generated swipe (swipe_up reveals content below) or the screen's recorded swipe (variants _1, _2, ...) when the target should be below, or report honestly on an unexpected screen — then re-queue the remaining steps from the failed one in one call, or run_route with start_id when a route's remaining steps need no change. A scan with no landmarks at all, not even the status bar (a black frame), means the screen is off: close_session, then scan again — the new session turns the screen on — and continue from what it shows. Conditional dictations split at the condition: queue the unconditional prefix, give the probe step a short timeout, resolve the condition with a scan once the call returns.
-
-Rules: NEVER touch the device with adb directly — no input tap, swipe, text or keyevent, no screencap, no other adb command. Every interaction is a step through queue_steps or run_route, every look is scan or capture.`
+Rules: NEVER touch the device with adb — no input, keyevent, screencap or any other adb command; every interaction is a step through queue_steps or run_route, every look is scan or capture. NEVER call set_mode unless the user explicitly tells you to change the mode — not because a task seems to need another mode, not to finish a task; when another mode is needed, say so and wait.`
 
 // Server ...
 type Server struct {
@@ -88,73 +88,72 @@ func (s *Server) Run(ctx context.Context) error {
 type emptyInput struct{}
 
 type serialInput struct {
-	Serial string `json:"serial" jsonschema:"device serial from list_devices"`
+	Serial string `json:"serial" jsonschema:"device serial"`
 }
 
 type waitInput struct {
-	Serial         string `json:"serial" jsonschema:"device serial from list_devices"`
-	TimeoutSeconds int    `json:"timeout_seconds,omitempty" jsonschema:"max seconds to wait, default 60"`
+	Serial         string `json:"serial" jsonschema:"device serial"`
+	TimeoutSeconds int    `json:"timeout_seconds,omitempty" jsonschema:"max seconds, default 60"`
 }
 
 type landmarkInput struct {
 	Type   string `json:"type" jsonschema:"image | text | yolo"`
-	Value  string `json:"value" jsonschema:"library image name, text to find, or yolo class; the text to type for type_text"`
-	Locale string `json:"locale,omitempty" jsonschema:"Tesseract lang code of value, default eng"`
+	Value  string `json:"value" jsonschema:"image name, text or yolo class; for type_text the text to type"`
+	Locale string `json:"locale,omitempty" jsonschema:"Tesseract code of value, default eng"`
 }
 
 type stepInput struct {
-	Event     string          `json:"event,omitempty" jsonschema:"tap, long_tap, type_text, swipe_up/down/left/right, a library action name, or empty for a visibility check"`
-	Landmarks []landmarkInput `json:"landmarks,omitempty" jsonschema:"target chain, the event applies to the last; empty to replay an action verbatim"`
-	Timeout   *int            `json:"timeout,omitempty" jsonschema:"ms, default 5000"`
-	Delay     *int            `json:"delay,omitempty" jsonschema:"ms, default 0 on the first step, 1000 after"`
+	Event     string          `json:"event,omitempty" jsonschema:"tap, long_tap, type_text, swipe_up/down/left/right, a library action, or empty = visibility check"`
+	Landmarks []landmarkInput `json:"landmarks,omitempty" jsonschema:"target chain, event on the last; empty = replay verbatim"`
+	Timeout   *int            `json:"timeout,omitempty" jsonschema:"ms"`
+	Delay     *int            `json:"delay,omitempty" jsonschema:"ms"`
 }
 
 type queueStepsInput struct {
-	Serial     string      `json:"serial" jsonschema:"device serial from list_devices"`
-	Steps      []stepInput `json:"steps" jsonschema:"steps in execution order"`
-	KeepChecks bool        `json:"keep_checks,omitempty" jsonschema:"explorer: record this batch's visibility checks too, only checks the user asked for"`
+	Serial   string      `json:"serial" jsonschema:"device serial"`
+	Steps    []stepInput `json:"steps" jsonschema:"in execution order"`
+	Dictated bool        `json:"dictated,omitempty" jsonschema:"explorer: the batch is exactly the user's dictated steps"`
 }
 
 type scanInput struct {
-	Serial string   `json:"serial" jsonschema:"device serial from list_devices"`
-	Images []string `json:"images,omitempty" jsonschema:"library image names to look for; omit for text and yolo only"`
-	Locale string   `json:"locale,omitempty" jsonschema:"Tesseract lang code for the OCR, default eng"`
+	Serial string   `json:"serial" jsonschema:"device serial"`
+	Images []string `json:"images,omitempty" jsonschema:"library image names to look for"`
+	Locale string   `json:"locale,omitempty" jsonschema:"Tesseract code for the OCR, default eng"`
 }
 
 type saveImageInput struct {
-	Serial string `json:"serial" jsonschema:"device serial from list_devices"`
-	Name   string `json:"name" jsonschema:"<app>_<screen>_<what>[_variant]; overwrites"`
-	Left   int    `json:"left" jsonschema:"rectangle edges in the pixels reported by capture"`
+	Serial string `json:"serial" jsonschema:"device serial"`
+	Name   string `json:"name" jsonschema:"<app>_<screen>_<what>[_variant]"`
+	Left   int    `json:"left" jsonschema:"edges in capture pixels"`
 	Top    int    `json:"top"`
 	Right  int    `json:"right"`
 	Bottom int    `json:"bottom"`
 }
 
 type saveRouteInput struct {
-	Name  string      `json:"name" jsonschema:"<app>_<flow>; overwrites"`
+	Name  string      `json:"name" jsonschema:"<app>_<flow>"`
 	Steps []stepInput `json:"steps" jsonschema:"the steps that ran to success, in order"`
 }
 
 type routeNameInput struct {
-	Name string `json:"name" jsonschema:"route name from get_routes"`
+	Name string `json:"name" jsonschema:"route name"`
 }
 
 type runRouteInput struct {
-	Serial  string `json:"serial" jsonschema:"device serial from list_devices"`
-	Name    string `json:"name" jsonschema:"route name from get_routes"`
-	StartID int    `json:"start_id,omitempty" jsonschema:"step id to start from (1..N, see get_route); omit for the whole route"`
+	Serial  string `json:"serial" jsonschema:"device serial"`
+	Name    string `json:"name" jsonschema:"route name"`
+	StartID int    `json:"start_id,omitempty" jsonschema:"step id to start from; omit for the whole route"`
 }
 
 type recordActionInput struct {
-	Serial string `json:"serial" jsonschema:"device serial from list_devices"`
-	Name   string `json:"name" jsonschema:"<app>_<screen>_<what>[_variant]; overwrites"`
+	Serial string `json:"serial" jsonschema:"device serial"`
+	Name   string `json:"name" jsonschema:"<app>_<screen>_<what>[_variant]"`
 }
 
 func (s *Server) registerTools() {
 	mcp.AddTool(s.mcp, &mcp.Tool{
-		Name: "ping",
-		Description: "Check that the vdroid server is reachable, starting it when needed " +
-			"(up to 15 seconds). Call first in a session.",
+		Name:        "ping",
+		Description: "Check that the vdroid server is reachable, starting it when needed (up to 15 s).",
 	}, s.handlePing)
 
 	mcp.AddTool(s.mcp, &mcp.Tool{
@@ -163,48 +162,43 @@ func (s *Server) registerTools() {
 	}, s.handleListDevices)
 
 	mcp.AddTool(s.mcp, &mcp.Tool{
-		Name: "get_library",
-		Description: "List library images (template crops for image landmarks) and " +
-			"actions (recorded gestures usable as a step's event).",
+		Name:        "get_library",
+		Description: "List library image and action names.",
 	}, s.handleGetLibrary)
 
 	mcp.AddTool(s.mcp, &mcp.Tool{
 		Name: "scan",
-		Description: "The primary way to observe the screen: OCR text in locale, yolo " +
-			"detections and matches for the library images in images, as a table of " +
-			"landmarks step chains consume. Opens a session automatically.",
+		Description: "Observe the screen: OCR text in locale, yolo detections and matches " +
+			"for the library images in images.",
 	}, s.handleScan)
 
 	mcp.AddTool(s.mcp, &mcp.Tool{
 		Name: "capture",
-		Description: "The current frame as a JPEG (about 1500 tokens). Vision only: " +
-			"never call it if you cannot interpret images. Scan first; capture only " +
-			"for a target the scan could not name. Opens a session automatically.",
+		Description: "The current frame as a JPEG (about 1500 tokens). Vision only, and " +
+			"only for a target the scan could not name.",
 	}, s.handleCapture)
 
 	mcp.AddTool(s.mcp, &mcp.Tool{
 		Name: "save_image",
-		Description: "Crop a rectangle of the current frame (pixels as reported by " +
-			"capture) into library image name, usable at once as an image landmark. " +
-			"Only for a target with no readable text and no yolo class.",
+		Description: "Crop a rectangle of the current frame (capture pixels) into library " +
+			"image name. Only for a target without text or yolo class.",
 	}, s.handleSaveImage)
 
 	mcp.AddTool(s.mcp, &mcp.Tool{
 		Name: "queue_steps",
-		Description: "Run steps in order (a session opens automatically) and block " +
-			"until the batch is done: 'idle' or the failed step's error. The whole " +
-			"sequence goes into ONE call.",
+		Description: "Run steps in order and block until the batch is done: 'idle' or " +
+			"the failed step's error.",
 	}, s.handleQueueSteps)
 
 	mcp.AddTool(s.mcp, &mcp.Tool{
 		Name:        "close_session",
-		Description: "Close the device session and stop screen capture when the flow is finished.",
+		Description: "Close the device session when the flow is finished.",
 	}, s.handleCloseSession)
 
 	mcp.AddTool(s.mcp, &mcp.Tool{
 		Name: "stop_server",
-		Description: "Stop the local vdroid server process, closing every device " +
-			"session. Only on the user's explicit ask; the next tool call starts it again.",
+		Description: "Stop the local vdroid server process, closing every session. Only " +
+			"on the user's explicit ask; the next call starts it again.",
 	}, s.handleStopServer)
 
 	mcp.AddTool(s.mcp, &mcp.Tool{
@@ -215,10 +209,9 @@ func (s *Server) registerTools() {
 
 	mcp.AddTool(s.mcp, &mcp.Tool{
 		Name: "wait_for_session",
-		Description: "Block until the session stops running steps and return the " +
-			"final status. Only after queue_steps or run_route reported still " +
-			"running, or for a run started by the Android client; 'closed' means the " +
-			"video stream ended, just queue again.",
+		Description: "Block until the session stops running steps and return the final " +
+			"status; 'closed' means the video stream ended, just queue again. Only for a " +
+			"batch reported still running or a run started by the Android client.",
 	}, s.handleWaitForSession)
 
 	mcp.AddTool(s.mcp, &mcp.Tool{
@@ -228,26 +221,26 @@ func (s *Server) registerTools() {
 
 	mcp.AddTool(s.mcp, &mcp.Tool{
 		Name:        "get_route",
-		Description: "Get a route's steps with their ids, to extend it or rerun part of it.",
+		Description: "A route's steps with their ids.",
 	}, s.handleGetRoute)
 
 	mcp.AddTool(s.mcp, &mcp.Tool{
 		Name: "save_route",
-		Description: "Write or overwrite a route from steps without running them. " +
-			"Only when the user asks; explorer mode records a route while running.",
+		Description: "Write or overwrite a route from steps without running them. Only " +
+			"when the user asks.",
 	}, s.handleSaveRoute)
 
 	mcp.AddTool(s.mcp, &mcp.Tool{
 		Name: "edit_route",
 		Description: "Change one step of a saved route (timeout, delay, landmarks) or " +
-			"delete it; later ids shift down after a delete. Saves at once.",
+			"delete it; later ids shift down after a delete.",
 	}, s.handleEditRoute)
 
 	mcp.AddTool(s.mcp, &mcp.Tool{
 		Name: "set_mode",
-		Description: "Switch the agent mode: default, explorer (records every batch into " +
-			"route) or navigator (saved routes only). Only when the user asks for a " +
-			"mode; it holds until the next set_mode.",
+		Description: "Switch the agent mode: navigator (the start mode, nothing recorded) " +
+			"or explorer (records your own batches into route). ONLY when the user " +
+			"explicitly tells you to change the mode, never on your own.",
 	}, s.handleSetMode)
 
 	mcp.AddTool(s.mcp, &mcp.Tool{
@@ -257,17 +250,16 @@ func (s *Server) registerTools() {
 
 	mcp.AddTool(s.mcp, &mcp.Tool{
 		Name: "run_route",
-		Description: "Run a saved route (a session opens automatically), optionally " +
-			"from start_id, and block until it finishes: 'idle' or the failed " +
-			"step's error.",
+		Description: "Run a saved route, optionally from start_id, and block until it " +
+			"finishes: 'idle' or the failed step's error.",
 	}, s.handleRunRoute)
 
 	mcp.AddTool(s.mcp, &mcp.Tool{
 		Name: "record_action",
-		Description: "Record a gesture the HUMAN performs on the device during the 5 " +
-			"seconds after the call and save it as library action name. Only when " +
-			"the user asks; tell them to perform it right away. Fails while the " +
-			"device is running steps.",
+		Description: "Record a gesture the HUMAN performs on the device within 5 seconds " +
+			"of the call and save it as library action name; 'nothing recorded' = no " +
+			"touch, ask them to retry. Only when the user asks; tell them to perform it " +
+			"right away.",
 	}, s.handleRecordAction)
 }
 
@@ -446,9 +438,6 @@ func (s *Server) handleCapture(
 	req *mcp.CallToolRequest,
 	in serialInput,
 ) (*mcp.CallToolResult, any, error) {
-	if err := s.refuseInNavigator("capture"); err != nil {
-		return nil, nil, err
-	}
 	if in.Serial == "" {
 		return nil, nil, fmt.Errorf("serial is required")
 	}
@@ -474,9 +463,6 @@ func (s *Server) handleSaveImage(
 	req *mcp.CallToolRequest,
 	in saveImageInput,
 ) (*mcp.CallToolResult, any, error) {
-	if err := s.refuseInNavigator("save_image"); err != nil {
-		return nil, nil, err
-	}
 	if in.Serial == "" || in.Name == "" {
 		return nil, nil, fmt.Errorf("serial and name are required")
 	}
@@ -503,9 +489,6 @@ func (s *Server) handleQueueSteps(
 	in queueStepsInput,
 ) (*mcp.CallToolResult, any, error) {
 	mode, route := s.mode.get()
-	if mode == modeNavigator {
-		return nil, nil, navigatorRefusal("queue_steps")
-	}
 	if in.Serial == "" || len(in.Steps) == 0 {
 		return nil, nil, fmt.Errorf("serial and steps are required")
 	}
@@ -529,11 +512,8 @@ func (s *Server) handleQueueSteps(
 	if mode != modeExplorer {
 		return textResult(outcome), nil, nil
 	}
-	var succeeded = succeededSteps(recorded, status, finished)
-	if !in.KeepChecks {
-		succeeded = withoutChecks(succeeded)
-	}
-	return textResult(outcome + "; " + s.recordRoute(route, succeeded)), nil, nil
+	var recordable = filterChecks(succeededSteps(recorded, status, finished), in.Dictated)
+	return textResult(outcome + "; " + s.recordRoute(route, recordable)), nil, nil
 }
 
 func succeededSteps(steps []stepInput, status string, finished bool) []stepInput {
@@ -718,9 +698,6 @@ func (s *Server) handleSaveRoute(
 	req *mcp.CallToolRequest,
 	in saveRouteInput,
 ) (*mcp.CallToolResult, any, error) {
-	if err := s.refuseInNavigator("save_route"); err != nil {
-		return nil, nil, err
-	}
 	if in.Name == "" || len(in.Steps) == 0 {
 		return nil, nil, fmt.Errorf("name and steps are required")
 	}
@@ -736,9 +713,6 @@ func (s *Server) handleDeleteRoute(
 	req *mcp.CallToolRequest,
 	in routeNameInput,
 ) (*mcp.CallToolResult, any, error) {
-	if err := s.refuseInNavigator("delete_route"); err != nil {
-		return nil, nil, err
-	}
 	if in.Name == "" {
 		return nil, nil, fmt.Errorf("name is required")
 	}
@@ -773,9 +747,6 @@ func (s *Server) handleRecordAction(
 	req *mcp.CallToolRequest,
 	in recordActionInput,
 ) (*mcp.CallToolResult, any, error) {
-	if err := s.refuseInNavigator("record_action"); err != nil {
-		return nil, nil, err
-	}
 	if in.Serial == "" || in.Name == "" {
 		return nil, nil, fmt.Errorf("serial and name are required")
 	}

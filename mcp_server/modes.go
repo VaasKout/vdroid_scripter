@@ -9,9 +9,8 @@ import (
 )
 
 const (
-	modeDefault   = "default"
-	modeExplorer  = "explorer"
 	modeNavigator = "navigator"
+	modeExplorer  = "explorer"
 )
 
 type agentMode struct {
@@ -24,7 +23,7 @@ func (m *agentMode) get() (string, string) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	if m.name == "" {
-		return modeDefault, ""
+		return modeNavigator, ""
 	}
 	return m.name, m.route
 }
@@ -37,8 +36,8 @@ func (m *agentMode) set(name string, route string) {
 }
 
 type setModeInput struct {
-	Mode  string `json:"mode" jsonschema:"default | explorer | navigator"`
-	Route string `json:"route,omitempty" jsonschema:"explorer only: route name to record into"`
+	Mode  string `json:"mode" jsonschema:"navigator | explorer"`
+	Route string `json:"route,omitempty" jsonschema:"explorer: route to record into"`
 }
 
 func (s *Server) handleSetMode(
@@ -47,16 +46,13 @@ func (s *Server) handleSetMode(
 	in setModeInput,
 ) (*mcp.CallToolResult, any, error) {
 	switch in.Mode {
-	case modeDefault:
-		s.mode.set(modeDefault, "")
-		return textResult("mode default"), nil, nil
 	case modeNavigator:
 		s.mode.set(modeNavigator, "")
-		return textResult("mode navigator: saved routes only, fix them with edit_route"), nil, nil
+		return textResult("mode navigator: nothing is recorded"), nil, nil
 	case modeExplorer:
 		return s.enterExplorer(in.Route)
 	}
-	return nil, nil, fmt.Errorf("unknown mode %q: use default, explorer or navigator", in.Mode)
+	return nil, nil, fmt.Errorf("unknown mode %q: use navigator or explorer", in.Mode)
 }
 
 func (s *Server) enterExplorer(route string) (*mcp.CallToolResult, any, error) {
@@ -72,26 +68,10 @@ func (s *Server) enterExplorer(route string) (*mcp.CallToolResult, any, error) {
 	return textResult(text), nil, nil
 }
 
-func (s *Server) refuseInNavigator(tool string) error {
-	mode, _ := s.mode.get()
-	if mode != modeNavigator {
-		return nil
-	}
-	return navigatorRefusal(tool)
-}
-
-func navigatorRefusal(tool string) error {
-	return fmt.Errorf(
-		"%s is not available in navigator mode: follow saved routes with run_route "+
-			"and fix them with edit_route, or ask the user to switch to explorer",
-		tool,
-	)
-}
-
-func withoutChecks(steps []stepInput) []stepInput {
+func filterChecks(steps []stepInput, checks bool) []stepInput {
 	kept := make([]stepInput, 0, len(steps))
 	for _, step := range steps {
-		if step.Event == "" {
+		if (step.Event == "") != checks {
 			continue
 		}
 		kept = append(kept, step)

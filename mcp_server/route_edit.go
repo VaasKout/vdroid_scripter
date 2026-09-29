@@ -10,8 +10,8 @@ import (
 )
 
 type editRouteInput struct {
-	Name      string          `json:"name" jsonschema:"route name from get_routes"`
-	ID        int             `json:"id" jsonschema:"step id from get_route"`
+	Name      string          `json:"name" jsonschema:"route name"`
+	ID        int             `json:"id" jsonschema:"step id"`
 	Delete    bool            `json:"delete,omitempty" jsonschema:"remove the step"`
 	Timeout   *int            `json:"timeout,omitempty" jsonschema:"new timeout, ms"`
 	Delay     *int            `json:"delay,omitempty" jsonschema:"new delay, ms"`
