@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"image/jpeg"
+	"slices"
 	"strings"
 	"time"
 
@@ -17,6 +18,7 @@ const (
 	serverName     = "vdroid-scripter"
 	serverVersion  = "0.1.0"
 	runningPrefix  = "running"
+	idleStatus     = "idle"
 	pollInterval   = 500 * time.Millisecond
 	defaultWaitSec = 60
 	queueWaitSec   = 180
@@ -50,16 +52,19 @@ Perception: scan is the primary way to observe the screen, capture (vision only)
 
 Curation: library images come from the human's Android client or, with vision, from save_image: after a capture pick the icon's tight rectangle in the reported pixels (the icon only, not a badge count or a highlight that would change) and save it under <app>_<screen>_<what>[_variant]; only for a target with no readable text and no yolo class. Library actions come from the client or from record_action, only when the user asks to record a gesture as <name>: tell them to perform it on the device immediately — it listens for 5 seconds from the call and blocks until the window ends; 'nothing recorded' means no touch happened, ask them to try again. Ask the user to add a library item only when a target has no readable text, no yolo class, no generated swipe that gets there, and you have no vision to save the image yourself.
 
-Routes: a route is a saved flow — a name and the exact steps that ran to success, stored with ids 1..N and their delay/timeout as sent (omitted ones filled like queue_steps). save_route only when the user asks to save or remember a flow, with the steps that actually succeeded in order; a duplicate name overwrites; saving executes nothing. run_route runs a route and returns its outcome like queue_steps; start_id runs from that step id — on the user's ask, or to rerun the unchanged remainder after a recovered failure; the started step gets delay 0, an id the route lacks is an error and nothing runs. To extend a route: get_route, append, save_route with the full list. Building a route through unknown screens works like an abstract task; then save the steps that succeeded. Never create or modify a route without being asked; after a recovered run ask whether to update it.
+Routes: a route is a saved flow — a name and the exact steps that ran to success, stored with ids 1..N and their delay/timeout as sent (omitted ones filled like queue_steps). Routes are recorded only in explorer mode. save_route writes a route from steps without running them, only on the user's ask; a duplicate name overwrites. edit_route changes one step's timeout, delay or landmarks, or deletes it — on your own only in navigator (below), otherwise on the user's ask. run_route runs a route and returns its outcome like queue_steps; start_id runs from that step id — on the user's ask, or to rerun the unchanged remainder after a recovered failure; the started step gets delay 0, an id the route lacks is an error and nothing runs. Never create or modify a route without being asked; after a recovered run_route in default mode ask whether to update the route.
+
+Modes: set_mode switches between default, explorer and navigator — only when the user asks for a mode, never on your own; the mode holds until the next set_mode. default is everything described here. explorer (with a route name) carries the task through like an abstract task and records it: every queue_steps batch appends its succeeded steps, visibility checks excepted, to that route and saves it, so the route grows as you go and you never re-send steps; a failed step and the rest of its batch stay out, the recovery batch that follows goes in; an existing route is appended to, delete_route first only when the user wants it replaced. navigator moves only along saved routes: get_routes, get_route and scan tell you where the phone is and which route leads on, or which step to enter at via start_id; chain run_route calls to reach the goal. queue_steps, save_route, delete_route, record_action, capture and save_image are refused. When a route step fails, scan; if the scan shows a route defect, fix it with edit_route and run_route again from that step without asking: the target is on screen now -> raise its timeout; the target appears in several places or the previous tap hit the wrong one -> landmarks with a unique neighbour first; the screen is caught mid-transition -> raise its delay; the step repeats the one before and undoes it -> delete it. At most two fixes per failing step. Anything else (another screen, a popup, a missing app) is no route defect: report that the task needs explorer mode. List every fix you made in your answer.
 
 Failure and recovery: a failed step clears the remaining queue and the status names the target it could not find, prefixed with the step's id (its batch position, or the route's id). Recover from that point: scan (with the relevant library images), apply the user's instruction to what the scan shows — tap the alternative the user named, scroll with a generated swipe (swipe_up reveals content below) or the screen's recorded swipe (variants _1, _2, ...) when the target should be below, or report honestly on an unexpected screen — then re-queue the remaining steps from the failed one in one call, or run_route with start_id when a route's remaining steps need no change. A scan with no landmarks at all, not even the status bar (a black frame), means the screen is off: close_session, then scan again — the new session turns the screen on — and continue from what it shows. Conditional dictations split at the condition: queue the unconditional prefix, give the probe step a short timeout, resolve the condition with a scan once the call returns.
 
-Rules: NEVER touch the device with adb directly — no input tap, swipe, text or keyevent, no screencap, no other adb command. Every interaction is a step through queue_steps, every look is scan or capture.`
+Rules: NEVER touch the device with adb directly — no input tap, swipe, text or keyevent, no screencap, no other adb command. Every interaction is a step through queue_steps or run_route, every look is scan or capture.`
 
 // Server ...
 type Server struct {
-	api *apiClient
-	mcp *mcp.Server
+	api  *apiClient
+	mcp  *mcp.Server
+	mode agentMode
 }
 
 // New ...
@@ -227,9 +232,22 @@ func (s *Server) registerTools() {
 
 	mcp.AddTool(s.mcp, &mcp.Tool{
 		Name: "save_route",
-		Description: "Save or overwrite a route with the steps that actually ran to " +
-			"success, in order. Only when the user asks; executes nothing.",
+		Description: "Write or overwrite a route from steps without running them. " +
+			"Only when the user asks; explorer mode records a route while running.",
 	}, s.handleSaveRoute)
+
+	mcp.AddTool(s.mcp, &mcp.Tool{
+		Name: "edit_route",
+		Description: "Change one step of a saved route (timeout, delay, landmarks) or " +
+			"delete it; later ids shift down after a delete. Saves at once.",
+	}, s.handleEditRoute)
+
+	mcp.AddTool(s.mcp, &mcp.Tool{
+		Name: "set_mode",
+		Description: "Switch the agent mode: default, explorer (records every batch into " +
+			"route) or navigator (saved routes only). Only when the user asks for a " +
+			"mode; it holds until the next set_mode.",
+	}, s.handleSetMode)
 
 	mcp.AddTool(s.mcp, &mcp.Tool{
 		Name:        "delete_route",
@@ -427,6 +445,9 @@ func (s *Server) handleCapture(
 	req *mcp.CallToolRequest,
 	in serialInput,
 ) (*mcp.CallToolResult, any, error) {
+	if err := s.refuseInNavigator("capture"); err != nil {
+		return nil, nil, err
+	}
 	if in.Serial == "" {
 		return nil, nil, fmt.Errorf("serial is required")
 	}
@@ -452,6 +473,9 @@ func (s *Server) handleSaveImage(
 	req *mcp.CallToolRequest,
 	in saveImageInput,
 ) (*mcp.CallToolResult, any, error) {
+	if err := s.refuseInNavigator("save_image"); err != nil {
+		return nil, nil, err
+	}
 	if in.Serial == "" || in.Name == "" {
 		return nil, nil, fmt.Errorf("serial and name are required")
 	}
@@ -477,6 +501,10 @@ func (s *Server) handleQueueSteps(
 	req *mcp.CallToolRequest,
 	in queueStepsInput,
 ) (*mcp.CallToolResult, any, error) {
+	mode, route := s.mode.get()
+	if mode == modeNavigator {
+		return nil, nil, navigatorRefusal("queue_steps")
+	}
 	if in.Serial == "" || len(in.Steps) == 0 {
 		return nil, nil, fmt.Errorf("serial and steps are required")
 	}
@@ -486,6 +514,7 @@ func (s *Server) handleQueueSteps(
 		}
 	}
 
+	recorded := slices.Clone(in.Steps)
 	err := s.api.queueSteps(in.Serial, in.Steps)
 	if err != nil {
 		return nil, nil, err
@@ -495,8 +524,39 @@ func (s *Server) handleQueueSteps(
 	if err != nil {
 		return nil, nil, err
 	}
-	var prefix = fmt.Sprintf("queued %d steps", len(in.Steps))
-	return textResult(batchOutcome(prefix, status, finished)), nil, nil
+	var outcome = batchOutcome(fmt.Sprintf("queued %d steps", len(in.Steps)), status, finished)
+	if mode != modeExplorer {
+		return textResult(outcome), nil, nil
+	}
+	var succeeded = withoutChecks(succeededSteps(recorded, status, finished))
+	return textResult(outcome + "; " + s.recordRoute(route, succeeded)), nil, nil
+}
+
+func succeededSteps(steps []stepInput, status string, finished bool) []stepInput {
+	if !finished {
+		return nil
+	}
+	if status == idleStatus {
+		return steps
+	}
+
+	var failedID int
+	_, err := fmt.Sscanf(status, "step %d:", &failedID)
+	if err != nil || failedID < 1 || failedID > len(steps) {
+		return nil
+	}
+	return steps[:failedID-1]
+}
+
+func (s *Server) recordRoute(name string, succeeded []stepInput) string {
+	if len(succeeded) == 0 {
+		return fmt.Sprintf("route %s unchanged", name)
+	}
+	total, err := s.api.appendToRoute(name, succeeded)
+	if err != nil {
+		return fmt.Sprintf("route %s not saved: %v", name, err)
+	}
+	return fmt.Sprintf("route %s +%d = %d steps", name, len(succeeded), total)
 }
 
 func (s *Server) handleCloseSession(
@@ -654,6 +714,9 @@ func (s *Server) handleSaveRoute(
 	req *mcp.CallToolRequest,
 	in saveRouteInput,
 ) (*mcp.CallToolResult, any, error) {
+	if err := s.refuseInNavigator("save_route"); err != nil {
+		return nil, nil, err
+	}
 	if in.Name == "" || len(in.Steps) == 0 {
 		return nil, nil, fmt.Errorf("name and steps are required")
 	}
@@ -669,6 +732,9 @@ func (s *Server) handleDeleteRoute(
 	req *mcp.CallToolRequest,
 	in routeNameInput,
 ) (*mcp.CallToolResult, any, error) {
+	if err := s.refuseInNavigator("delete_route"); err != nil {
+		return nil, nil, err
+	}
 	if in.Name == "" {
 		return nil, nil, fmt.Errorf("name is required")
 	}
@@ -703,6 +769,9 @@ func (s *Server) handleRecordAction(
 	req *mcp.CallToolRequest,
 	in recordActionInput,
 ) (*mcp.CallToolResult, any, error) {
+	if err := s.refuseInNavigator("record_action"); err != nil {
+		return nil, nil, err
+	}
 	if in.Serial == "" || in.Name == "" {
 		return nil, nil, fmt.Errorf("serial and name are required")
 	}

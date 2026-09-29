@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -271,6 +272,45 @@ func (c *apiClient) getRoute(name string) (routeResponse, error) {
 	var response routeResponse
 	err := c.getJSON("/routes/"+url.PathEscape(name), &response)
 	return response, err
+}
+
+func (c *apiClient) appendToRoute(name string, steps []stepInput) (int, error) {
+	saved, err := c.savedRouteSteps(name)
+	if err != nil {
+		return 0, err
+	}
+
+	route := saveRouteInput{Name: name, Steps: append(saved, steps...)}
+	err = c.saveRoute(&route)
+	if err != nil {
+		return 0, err
+	}
+	return len(route.Steps), nil
+}
+
+func (c *apiClient) savedRouteSteps(name string) ([]stepInput, error) {
+	names, err := c.getRoutes()
+	if err != nil {
+		return nil, err
+	}
+	if !slices.Contains(names, name) {
+		return nil, nil
+	}
+
+	route, err := c.getRoute(name)
+	if err != nil {
+		return nil, err
+	}
+	return routeInputs(route.Steps), nil
+}
+
+func (s routeStep) toInput() stepInput {
+	return stepInput{
+		Event:     s.Event,
+		Landmarks: s.Landmarks,
+		Timeout:   intPtr(s.Timeout),
+		Delay:     intPtr(s.Delay),
+	}
 }
 
 func (c *apiClient) saveRoute(route *saveRouteInput) error {

@@ -248,7 +248,9 @@ The server keeps running after the AI session ends, so later sessions find it al
 | `close_session` | Close the device session |
 | `record_action` | Record a gesture the human performs on the device, see below |
 | `get_routes`, `get_route` | List and read saved routes |
-| `save_route`, `delete_route` | Save or remove a route |
+| `save_route`, `delete_route` | Write a route from steps without running them, or remove one |
+| `edit_route` | Change one step of a route (timeout, delay, landmarks) or delete it |
+| `set_mode` | Switch between the default, explorer and navigator modes |
 | `run_route` | Queue a saved route, optionally from a given step id |
 | `stop_server` | Stop the local server process |
 
@@ -280,7 +282,8 @@ The MCP server ships its own instructions to the AI, so you do not have to expla
 * **Duplicates.** When a value matches several places, the agent puts a unique nearby landmark first in the chain. With no such neighbour, the first match in reading order wins.
 * **Timing.** An omitted `delay` becomes 0 on the first step of a batch and 1000 ms on later steps. An omitted `timeout` becomes 5000 ms. The agent raises the timeout for targets that appear after a launch or a load.
 * **Recovery.** A failed step clears the rest of the queue and names the target it could not find. The agent scans, applies your instruction to what it sees, then queues the remaining steps again from the failed one.
-* **Routes.** A route is saved only when you ask, with the steps that succeeded. After a recovered run the agent asks before updating the route.
+* **Routes.** A route is built only when you ask. After a recovered run in the default mode the agent asks before updating the route.
+* **Modes.** Ask the agent to switch modes; it never switches on its own. In **explorer** mode, given a route name, it carries the task through and records every batch into that route as it goes: the steps that succeed go in, failed attempts and visibility checks stay out. In **navigator** mode it moves only along saved routes, chaining them and entering mid-route where the screen fits, and cannot queue its own steps. When a route step fails because of the route itself, such as a timeout that is too short or a target that appears twice, it fixes that step with `edit_route`, reruns from there, and lists every fix. Anything else it reports as a job for explorer mode. The **default** mode is everything else described here.
 * **Curation.** Library images come from the Android client or, for a vision-capable agent, from `save_image`: after a `capture` it picks the icon's rectangle and saves it under a `<app>_<screen>_<what>` name — only for targets with no readable text and no YOLO class. Actions come from the client or from `record_action`, and only when you ask for a recording.
 * **No adb.** The agent never touches the device with `adb` directly — no input, no `screencap`. Every interaction is a step, every look is `scan` or `capture`.
 
