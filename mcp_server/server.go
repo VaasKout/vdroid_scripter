@@ -54,7 +54,7 @@ Curation: library images come from the human's Android client or, with vision, f
 
 Routes: a route is a saved flow — a name and the exact steps that ran to success, stored with ids 1..N and their delay/timeout as sent (omitted ones filled like queue_steps). Routes are recorded only in explorer mode. save_route writes a route from steps without running them, only on the user's ask; a duplicate name overwrites. edit_route changes one step's timeout, delay or landmarks, or deletes it — on your own only in navigator (below), otherwise on the user's ask. run_route runs a route and returns its outcome like queue_steps; start_id runs from that step id — on the user's ask, or to rerun the unchanged remainder after a recovered failure; the started step gets delay 0, an id the route lacks is an error and nothing runs. Never create or modify a route without being asked; after a recovered run_route in default mode ask whether to update the route.
 
-Modes: set_mode switches between default, explorer and navigator — only when the user asks for a mode, never on your own; the mode holds until the next set_mode. default is everything described here. explorer (with a route name) carries the task through like an abstract task and records it: every queue_steps batch appends its succeeded steps, visibility checks excepted, to that route and saves it, so the route grows as you go and you never re-send steps; a failed step and the rest of its batch stay out, the recovery batch that follows goes in; an existing route is appended to, delete_route first only when the user wants it replaced. navigator moves only along saved routes: get_routes, get_route and scan tell you where the phone is and which route leads on, or which step to enter at via start_id; chain run_route calls to reach the goal. queue_steps, save_route, delete_route, record_action, capture and save_image are refused. When a route step fails, scan; if the scan shows a route defect, fix it with edit_route and run_route again from that step without asking: the target is on screen now -> raise its timeout; the target appears in several places or the previous tap hit the wrong one -> landmarks with a unique neighbour first; the screen is caught mid-transition -> raise its delay; the step repeats the one before and undoes it -> delete it. At most two fixes per failing step. Anything else (another screen, a popup, a missing app) is no route defect: report that the task needs explorer mode. List every fix you made in your answer.
+Modes: set_mode switches between default, explorer and navigator — only when the user asks for a mode, never on your own; the mode holds until the next set_mode. default is everything described here. explorer (with a route name) carries the task through like an abstract task and records it: every queue_steps batch appends its succeeded steps to that route and saves it — your own visibility checks and probes stay out, but a check the user asked for ("check that Wi-Fi is visible") is part of the flow: queue it with keep_checks, never together with probes of your own — so the route grows as you go and you never re-send steps; a failed step and the rest of its batch stay out, the recovery batch that follows goes in; an existing route is appended to, delete_route first only when the user wants it replaced. navigator moves only along saved routes: get_routes, get_route and scan tell you where the phone is and which route leads on, or which step to enter at via start_id; chain run_route calls to reach the goal. queue_steps, save_route, delete_route, record_action, capture and save_image are refused. When a route step fails, scan; if the scan shows a route defect, fix it with edit_route and run_route again from that step without asking: the target is on screen now -> raise its timeout; the target appears in several places or the previous tap hit the wrong one -> landmarks with a unique neighbour first; the screen is caught mid-transition -> raise its delay; the step repeats the one before and undoes it -> delete it. At most two fixes per failing step. Anything else (another screen, a popup, a missing app) is no route defect: report that the task needs explorer mode. List every fix you made in your answer.
 
 Failure and recovery: a failed step clears the remaining queue and the status names the target it could not find, prefixed with the step's id (its batch position, or the route's id). Recover from that point: scan (with the relevant library images), apply the user's instruction to what the scan shows — tap the alternative the user named, scroll with a generated swipe (swipe_up reveals content below) or the screen's recorded swipe (variants _1, _2, ...) when the target should be below, or report honestly on an unexpected screen — then re-queue the remaining steps from the failed one in one call, or run_route with start_id when a route's remaining steps need no change. A scan with no landmarks at all, not even the status bar (a black frame), means the screen is off: close_session, then scan again — the new session turns the screen on — and continue from what it shows. Conditional dictations split at the condition: queue the unconditional prefix, give the probe step a short timeout, resolve the condition with a scan once the call returns.
 
@@ -110,8 +110,9 @@ type stepInput struct {
 }
 
 type queueStepsInput struct {
-	Serial string      `json:"serial" jsonschema:"device serial from list_devices"`
-	Steps  []stepInput `json:"steps" jsonschema:"steps in execution order"`
+	Serial     string      `json:"serial" jsonschema:"device serial from list_devices"`
+	Steps      []stepInput `json:"steps" jsonschema:"steps in execution order"`
+	KeepChecks bool        `json:"keep_checks,omitempty" jsonschema:"explorer: record this batch's visibility checks too, only checks the user asked for"`
 }
 
 type scanInput struct {
@@ -528,7 +529,10 @@ func (s *Server) handleQueueSteps(
 	if mode != modeExplorer {
 		return textResult(outcome), nil, nil
 	}
-	var succeeded = withoutChecks(succeededSteps(recorded, status, finished))
+	var succeeded = succeededSteps(recorded, status, finished)
+	if !in.KeepChecks {
+		succeeded = withoutChecks(succeeded)
+	}
 	return textResult(outcome + "; " + s.recordRoute(route, succeeded)), nil, nil
 }
 
