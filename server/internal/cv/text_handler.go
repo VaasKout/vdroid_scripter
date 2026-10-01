@@ -30,6 +30,8 @@ const (
 	OemText  = 3
 )
 
+var yoReplacer = strings.NewReplacer("ё", "е", "Ё", "Е")
+
 // TesseractLocaleMap converts adb system locales
 var TesseractLocaleMap = map[string]string{
 	"af": "afr", "af-ZA": "afr", "afr": "afr",
@@ -212,7 +214,7 @@ func (c *cvImpl) FindTextRectangles(
 		return []OCRResult{}, errors.New("params are empty")
 	}
 
-	edges, err := c.createEdges(img)
+	edges, err := c.createTextEdges(img)
 	defer edges.Close()
 	if err != nil {
 		return []OCRResult{}, err
@@ -524,7 +526,7 @@ func matchPhrase(ocrArray []OCRResult, start int, words []string) (OCRResult, bo
 	}
 
 	merged := ocrArray[start]
-	if !strings.EqualFold(merged.Text, words[0]) {
+	if !sameWord(merged.Text, words[0]) {
 		return OCRResult{}, false
 	}
 
@@ -534,7 +536,7 @@ func matchPhrase(ocrArray []OCRResult, start int, words []string) (OCRResult, bo
 		}
 		prev := ocrArray[start+i-1]
 		next := ocrArray[start+i]
-		if !strings.EqualFold(next.Text, word) {
+		if !sameWord(next.Text, word) {
 			return OCRResult{}, false
 		}
 		if !isNextWordInLine(prev, next) {
@@ -550,6 +552,12 @@ func matchPhrase(ocrArray []OCRResult, start int, words []string) (OCRResult, bo
 
 	merged.Text = strings.Join(words, " ")
 	return merged, true
+}
+
+func sameWord(found string, wanted string) bool {
+	foundFolded := yoReplacer.Replace(found)
+	wantedFolded := yoReplacer.Replace(wanted)
+	return strings.EqualFold(foundFolded, wantedFolded)
 }
 
 func isNextWordInLine(prev OCRResult, next OCRResult) bool {
