@@ -70,7 +70,7 @@ The `event` decides what happens at the target:
 | `tap`, `long_tap` | A generated touch at a random point inside the found region |
 | `swipe_up`, `swipe_down`, `swipe_left`, `swipe_right` | A generated human-like swipe, named by the finger's direction. Landmarks are optional |
 | `type_text` | Types the last landmark's `value` on the open on-screen keyboard. The landmark's `locale` names the keyboard language |
-| a library action name | Replays that recorded gesture, moved into the found region when the step has a target, verbatim otherwise |
+| a library action name | Replays that recorded gesture, moved into the found region when the step has a target, verbatim otherwise. A gesture recorded on another screen size is scaled to the current one |
 | empty | A pure visibility check of the target, no touch |
 
 `delay` is slept before the step acts and `timeout` is how long the server keeps looking for the target. Both are milliseconds and both are taken literally.

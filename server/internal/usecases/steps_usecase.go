@@ -214,6 +214,12 @@ func (i *interactorImpl) playCustomEvent(serial string, step *models.Step) error
 		}
 	}
 
+	width, height, err := i.scrcpy.GetScreenSize(serial)
+	if err != nil {
+		return err
+	}
+
+	action.FitScreen(width, height)
 	i.playEvent(serial, foundRect, action.Events)
 	return nil
 }

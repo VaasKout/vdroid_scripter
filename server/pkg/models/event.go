@@ -303,6 +303,23 @@ func (b *ControlBytes) ApplyOffset(x, y int) {
 	b.setTouchPoint(xWithOffset, yWithOffset)
 }
 
+func (b ControlBytes) rescale(fromWidth int, fromHeight int, toWidth int, toHeight int) {
+	if len(b) != ControlBytesSize {
+		return
+	}
+
+	x, y := b.getTouchPoint()
+	var scaledX = scaleCoord(x, fromWidth, toWidth)
+	var scaledY = scaleCoord(y, fromHeight, toHeight)
+	b.setTouchPoint(scaledX, scaledY)
+	binary.BigEndian.PutUint16(b[18:20], uint16(toWidth))
+	binary.BigEndian.PutUint16(b[20:22], uint16(toHeight))
+}
+
+func scaleCoord(value int, from int, to int) int {
+	return int(math.Round(float64(value) * float64(to) / float64(from)))
+}
+
 func (b ControlBytes) getTouchPoint() (int, int) {
 	x := binary.BigEndian.Uint32(b[10:14])
 	y := binary.BigEndian.Uint32(b[14:18])
