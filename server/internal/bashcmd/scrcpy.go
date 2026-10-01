@@ -37,7 +37,7 @@ func (s *ScrcpyCmdConfig) SetDefault(version string) {
 	s.TunnelForward = true
 	s.LogLevel = "verbose"
 	s.Audio = false
-	s.Cleanup = false
+	s.Cleanup = true
 	s.RawStream = false
 	// s.MaxSize = "1920"
 	// s.Codec = "h264"
