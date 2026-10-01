@@ -4,6 +4,7 @@ import (
 	"android_vision_scripter/pkg/models"
 
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -19,6 +20,11 @@ const (
 	Manufacturer    = "ro.product.manufacturer"
 	MarketingName   = "ro.config.marketing_name"
 	LineageCodeName = "ro.lineage.device"
+)
+
+// Other constants
+const (
+	OverrideDensityPrefix = "Override density"
 )
 
 // AdbAPI ...
@@ -63,7 +69,36 @@ func (c *cmdImpl) GetAdbDevice(serial string) *models.AdbDevice {
 	adbDevice.OsVersion = c.GetProp(serial, OsVersionProp)
 	adbDevice.Manufacturer = c.GetProp(serial, Manufacturer)
 	adbDevice.MarketingName = c.GetProp(serial, MarketingName)
+	adbDevice.Density = c.GetDensity(serial)
 	return adbDevice
+}
+
+func (c *cmdImpl) GetDensity(serial string) int {
+	command := fmt.Sprintf("adb -s %s shell wm density", serial)
+	result, err := c.ExecuteCommand(command)
+	if err != nil {
+		return 0
+	}
+	return parseDensity(result)
+}
+
+func parseDensity(output string) int {
+	density := 0
+	for _, line := range strings.Split(output, "\n") {
+		name, value, found := strings.Cut(line, ":")
+		if !found {
+			continue
+		}
+		parsed, err := strconv.Atoi(strings.TrimSpace(value))
+		if err != nil {
+			continue
+		}
+		if strings.HasPrefix(strings.TrimSpace(name), OverrideDensityPrefix) {
+			return parsed
+		}
+		density = parsed
+	}
+	return density
 }
 
 func (c *cmdImpl) GetProp(serial string, prop string) string {

@@ -27,6 +27,8 @@ data class AdbDevice(
     val manufacturer: String = "",
     @SerialName("marketing_name")
     val marketingName: String = "",
+    @SerialName("density")
+    val density: Int = 0,
     @SerialName("scrcpy_running")
     val scrCpyConnection: Boolean = false,
 )

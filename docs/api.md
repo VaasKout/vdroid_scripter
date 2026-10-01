@@ -76,6 +76,7 @@ Returns all ADB devices currently visible to the server.
         "os_version": "14",
         "manufacturer": "Google",
         "marketing_name": "Pixel 6 Pro",
+        "density": 560,
         "scrcpy_running": false
       }
     ]
@@ -156,6 +157,17 @@ compose: **images** (template crops, stored as `images/<name>.png`) and
 `catalog_cart_icon` or `swipe_catalog_1`, since the name is the only
 context an item carries. Saving under an existing name overwrites the item.
 
+Both kinds carry what replaying them on another phone needs. An image is
+saved with the screen **density** of the device it was cropped on
+(`images/<name>.json`, `{"density": 450}`); when the current device's density
+differs, the template is resized by current ÷ saved density before matching,
+because Android sizes its UI by density, not by resolution. An image without
+that file, or saved while the density was unknown, is matched at its original
+size. An action stores the frame size it was recorded on and is scaled the
+same way (see [Step](#step)). Scaling cannot help when another Android
+version or vendor skin draws the element differently — save a second image
+under a variant name for that.
+
 ### `GET /library`
 
 Lists everything in the library.
@@ -214,7 +226,7 @@ Saves a recorded gesture as `actions/<name>.json`. The body is a whole
 
 ### `DELETE /images/{name}`
 
-Deletes `images/<name>.png`.
+Deletes `images/<name>.png` and its `images/<name>.json`.
 
 - **Response `200`:** `{ "status": "ok" }`
 - **Errors:** `404` if no image with that name exists.
@@ -464,6 +476,7 @@ worker does not start queued steps.
 | OsVersion | `os_version` | string | |
 | Manufacturer | `manufacturer` | string | |
 | MarketingName | `marketing_name` | string | |
+| Density | `density` | int | Screen density in dpi from `wm density` (the override when set); `0` when unknown. Used to scale library images |
 | ScrcpyRunning | `scrcpy_running` | bool | Whether scrcpy is currently running |
 
 ### Rectangle

@@ -260,16 +260,17 @@ func (i *interactorImpl) findRectOnLastFrame(
 		return nil, fmt.Errorf("no video frame received from %s", serial)
 	}
 	defer mat.Close()
-	return i.findLandmarkChain(mat, step)
+	return i.findLandmarkChain(serial, mat, step)
 }
 
 func (i *interactorImpl) findLandmarkChain(
+	serial string,
 	mat *gocv.Mat,
 	step *models.Step,
 ) (*image.Rectangle, error) {
 	var prevRect *image.Rectangle
 	for _, landmark := range step.Landmarks {
-		candidates, err := i.findLandmarkCandidates(mat, &landmark)
+		candidates, err := i.findLandmarkCandidates(serial, mat, &landmark)
 		if err != nil {
 			return nil, err
 		}
@@ -284,6 +285,7 @@ func (i *interactorImpl) findLandmarkChain(
 }
 
 func (i *interactorImpl) findLandmarkCandidates(
+	serial string,
 	mat *gocv.Mat,
 	landmark *models.Landmark,
 ) ([]image.Rectangle, error) {
@@ -296,7 +298,8 @@ func (i *interactorImpl) findLandmarkCandidates(
 		if !file.Exists(tmpImage) {
 			return nil, fmt.Errorf("image not found in library: %s", landmark.Value)
 		}
-		rectangles, err := i.cv.FindImages(mat, tmpImage)
+		scale := i.imageScale(serial, tmpImage)
+		rectangles, err := i.cv.FindImages(mat, tmpImage, scale)
 		if err != nil {
 			return nil, err
 		}

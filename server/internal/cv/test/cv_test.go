@@ -218,7 +218,7 @@ func TestFindTemplate(t *testing.T) {
 	}
 	defer img.Close()
 
-	rectangles, err := cvAPI.FindImages(&img, TestImage)
+	rectangles, err := cvAPI.FindImages(&img, TestImage, 1)
 	if err != nil {
 		t.Fatal(err)
 	}

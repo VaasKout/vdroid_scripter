@@ -309,8 +309,8 @@ func (b ControlBytes) rescale(fromWidth int, fromHeight int, toWidth int, toHeig
 	}
 
 	x, y := b.getTouchPoint()
-	var scaledX = scaleCoord(x, fromWidth, toWidth)
-	var scaledY = scaleCoord(y, fromHeight, toHeight)
+	scaledX := scaleCoord(x, fromWidth, toWidth)
+	scaledY := scaleCoord(y, fromHeight, toHeight)
 	b.setTouchPoint(scaledX, scaledY)
 	binary.BigEndian.PutUint16(b[18:20], uint16(toWidth))
 	binary.BigEndian.PutUint16(b[20:22], uint16(toHeight))

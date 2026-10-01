@@ -3,6 +3,7 @@ package cv
 import (
 	"errors"
 	"image"
+	"math"
 	"sort"
 
 	"gocv.io/x/gocv"
@@ -11,7 +12,7 @@ import (
 // ImageHandler ...
 type ImageHandler interface {
 	FindAllRectangles(img *gocv.Mat) ([]image.Rectangle, error)
-	FindImages(img *gocv.Mat, template string) ([]image.Rectangle, error)
+	FindImages(img *gocv.Mat, template string, scale float64) ([]image.Rectangle, error)
 }
 
 func (c *cvImpl) FindAllRectangles(img *gocv.Mat) ([]image.Rectangle, error) {
@@ -30,25 +31,30 @@ func (c *cvImpl) FindAllRectangles(img *gocv.Mat) ([]image.Rectangle, error) {
 func (c *cvImpl) FindImages(
 	img *gocv.Mat,
 	template string,
+	scale float64,
 ) ([]image.Rectangle, error) {
 	if img == nil || template == "" {
 		return nil, errors.New("empty params")
 	}
 
-	templateMat := gocv.IMRead(template, gocv.IMReadColor)
+	templateMat, err := readTemplate(template, scale)
 	defer templateMat.Close()
-	if templateMat.Empty() {
-		return nil, errors.New("could not read template")
-	}
-
-	result := gocv.NewMat()
-	defer result.Close()
-	err := gocv.MatchTemplate(*img, templateMat, &result, gocv.TmCcoeffNormed, result)
 	if err != nil {
 		return nil, err
 	}
 
 	rectangles := []image.Rectangle{}
+	if templateMat.Cols() > img.Cols() || templateMat.Rows() > img.Rows() {
+		return rectangles, nil
+	}
+
+	result := gocv.NewMat()
+	defer result.Close()
+	err = gocv.MatchTemplate(*img, templateMat, &result, gocv.TmCcoeffNormed, result)
+	if err != nil {
+		return nil, err
+	}
+
 	for len(rectangles) < MaxTemplateMatches {
 		_, maxVal, _, maxLoc := gocv.MinMaxLoc(result)
 		if maxVal < MatchCoefficient {
@@ -65,6 +71,28 @@ func (c *cvImpl) FindImages(
 	}
 
 	return rectangles, nil
+}
+
+func readTemplate(path string, scale float64) (gocv.Mat, error) {
+	templateMat := gocv.IMRead(path, gocv.IMReadColor)
+	if templateMat.Empty() {
+		return templateMat, errors.New("could not read template")
+	}
+	if scale <= 0 || scale == 1 {
+		return templateMat, nil
+	}
+	defer templateMat.Close()
+
+	width := max(int(math.Round(float64(templateMat.Cols())*scale)), 1)
+	height := max(int(math.Round(float64(templateMat.Rows())*scale)), 1)
+	interpolation := gocv.InterpolationArea
+	if scale > 1 {
+		interpolation = gocv.InterpolationCubic
+	}
+
+	scaledMat := gocv.NewMat()
+	err := gocv.Resize(templateMat, &scaledMat, image.Pt(width, height), 0, 0, interpolation)
+	return scaledMat, err
 }
 
 func suppressMatch(result *gocv.Mat, loc image.Point, width int, height int) {

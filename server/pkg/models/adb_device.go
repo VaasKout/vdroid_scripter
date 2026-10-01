@@ -15,6 +15,7 @@ type AdbDevice struct {
 	OsVersion     string `json:"os_version"`
 	Manufacturer  string `json:"manufacturer"`
 	MarketingName string `json:"marketing_name"`
+	Density       int    `json:"density"`
 	ScrcpyRunning bool   `json:"scrcpy_running"`
 }
 

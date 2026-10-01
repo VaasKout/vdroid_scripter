@@ -91,11 +91,47 @@ func (i *interactorImpl) SaveImage(
 	cropped := frame.Region(zone)
 	defer cropped.Close()
 
-	imgPath := filepath.Join(imagesDir, name+file.PngExt)
+	imageName := name + file.PngExt
+	imgPath := filepath.Join(imagesDir, imageName)
 	if !gocv.IMWrite(imgPath, cropped) {
 		return fmt.Errorf("couldn't write %s", imgPath)
 	}
-	return nil
+	return i.saveImageInfo(serial, imgPath)
+}
+
+func (i *interactorImpl) saveImageInfo(serial string, imgPath string) error {
+	info := &models.ImageInfo{Density: i.deviceDensity(serial)}
+	bytes, err := json.Marshal(info)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(imageInfoPath(imgPath), bytes, 0644)
+}
+
+func (i *interactorImpl) imageScale(serial string, imgPath string) float64 {
+	bytes, err := os.ReadFile(imageInfoPath(imgPath))
+	if err != nil {
+		return 1
+	}
+
+	info := &models.ImageInfo{}
+	err = json.Unmarshal(bytes, info)
+	if err != nil {
+		return 1
+	}
+	return info.ScaleFor(i.deviceDensity(serial))
+}
+
+func (i *interactorImpl) deviceDensity(serial string) int {
+	device, ok := i.devicesCache.Get(serial)
+	if !ok {
+		return 0
+	}
+	return device.Density
+}
+
+func imageInfoPath(imgPath string) string {
+	return strings.TrimSuffix(imgPath, file.PngExt) + file.JSONExt
 }
 
 func (i *interactorImpl) DeleteImage(name string) bool {
@@ -107,7 +143,13 @@ func (i *interactorImpl) DeleteImage(name string) bool {
 	if imagesDir == "" {
 		return false
 	}
-	return i.filesDB.DeleteFileByName(imagesDir, strings.TrimSpace(name)+file.PngExt)
+	name = strings.TrimSpace(name)
+	infoName := name + file.JSONExt
+	infoPath := filepath.Join(imagesDir, infoName)
+	_ = os.Remove(infoPath)
+
+	imageName := name + file.PngExt
+	return i.filesDB.DeleteFileByName(imagesDir, imageName)
 }
 
 func (i *interactorImpl) SaveAction(action *models.Action) bool {

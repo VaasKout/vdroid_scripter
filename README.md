@@ -40,7 +40,7 @@ The server never needs coordinates from you. It finds things on the live screen 
 
 A human curates a small library of named resources, stored as plain files on the server:
 
-* **Images** are template crops taken from the device screen, for example an icon that has no text.
+* **Images** are template crops taken from the device screen, for example an icon that has no text. Each is saved with the screen density of its device and resized to the density of the phone it is searched on, so one crop serves phones of different resolutions as long as they draw the element the same way.
 * **Actions** are recorded gestures, for example an app-specific swipe or a drag.
 
 Names are flat and unique per kind. The convention is to put the context into the name, `<app>_<screen>_<what>[_variant]`, for example `shop_catalog_swipe_1`. Saving under an existing name overwrites it.

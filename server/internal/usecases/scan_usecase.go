@@ -70,7 +70,7 @@ func (i *interactorImpl) Scan(
 	}
 	landmarks = append(landmarks, textLandmarks...)
 
-	imageLandmarks, err := i.scanImages(mat, imagePaths)
+	imageLandmarks, err := i.scanImages(serial, mat, imagePaths)
 	if err != nil {
 		return nil, err
 	}
@@ -164,7 +164,8 @@ func (i *interactorImpl) libraryImagePaths(images []string) (map[string]string, 
 			return nil, fmt.Errorf("invalid image name: %s", name)
 		}
 
-		imagePath := filepath.Join(imagesDir, name+file.PngExt)
+		imageName := name + file.PngExt
+		imagePath := filepath.Join(imagesDir, imageName)
 		if !file.Exists(imagePath) {
 			return nil, fmt.Errorf("image not found in library: %s", name)
 		}
@@ -214,6 +215,7 @@ func (i *interactorImpl) scanText(
 }
 
 func (i *interactorImpl) scanImages(
+	serial string,
 	mat *gocv.Mat,
 	imagePaths map[string]string,
 ) ([]FoundLandmark, error) {
@@ -225,7 +227,9 @@ func (i *interactorImpl) scanImages(
 
 	landmarks := []FoundLandmark{}
 	for _, name := range names {
-		rects, err := i.cv.FindImages(mat, imagePaths[name])
+		imagePath := imagePaths[name]
+		scale := i.imageScale(serial, imagePath)
+		rects, err := i.cv.FindImages(mat, imagePath, scale)
 		if err != nil {
 			return nil, err
 		}
