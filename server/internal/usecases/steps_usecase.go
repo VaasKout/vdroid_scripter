@@ -18,8 +18,8 @@ import (
 
 // Typing constants
 const (
-	KeyPressMinDelayMs  = 100
-	KeyPressMaxDelayMs  = 300
+	KeyPressMinDelayMs  = 50
+	KeyPressMaxDelayMs  = 150
 	KeyboardSettleMs    = 400
 	MaxKeyboardSwitches = 3
 )
