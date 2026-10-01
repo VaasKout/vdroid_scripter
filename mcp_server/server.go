@@ -54,7 +54,7 @@ Routes: a route is a saved flow — a name and the steps that ran to success, wi
 
 Modes: navigator (the start mode) and explorer; the mode holds until the user changes it (see Rules). In both, dictated steps run as asked (Literal execution), with recovery on failure.
 navigator records nothing, and dictated steps never change a route. A goal is reached only across saved routes: get_routes, get_route and scan show where the phone is and which route leads on, or which step to enter via start_id; chain run_route calls; a goal no route reaches needs explorer: say so. When a route run fails, scan; for a route defect, fix the step with edit_route and rerun from it without asking: the target is on screen now -> raise its timeout; it appears in several places or the previous tap hit the wrong one -> landmarks with a unique neighbour first; the screen is mid-transition -> raise its delay; the step repeats the one before and undoes it -> delete it. At most two fixes per failing step; anything else (another screen, a popup, a missing app) is no defect: report it. List every fix in your answer.
-explorer (with a route name) carries a goal through as an abstract task and records your own work: each batch of yours appends its succeeded steps, minus your visibility checks and probes, to that route and saves it — no save_route needed; a failed step and the rest of its batch stay out, the recovery batch goes in; an existing route is appended to (delete_route first only when the user wants it replaced). Steps the user dictates go in their own batch with dictated=true: they run as asked and only their visibility checks, the checks the user asked for, are recorded.
+explorer (with a route name) carries a goal through as an abstract task and records your own work: each batch of yours appends its succeeded steps, minus your visibility checks and probes, to that route and saves it — no save_route needed; a failed step and the rest of its batch stay out, the recovery batch goes in; an existing route is appended to (delete_route first only when the user wants it replaced). Steps the user dictates go in their own batch with dictated=true: they run as asked and EVERY succeeded one is recorded, actions and the visibility checks the user asked for alike.
 
 Failure and recovery: recover from the failed step: scan (with the relevant library images) and apply the user's instruction to what it shows — tap the alternative the user named, scroll with a generated swipe or the screen's recorded swipe (variants _1, _2, ...) when the target should be further down, or report honestly on an unexpected screen — then re-queue from the failed step in one call, or run_route with start_id when a route's remaining steps need no change. A scan with no landmarks at all, not even the status bar, means the screen is off: close_session, scan again (the new session turns the screen on) and continue. Conditional dictations split at the condition: queue the unconditional prefix ending with the probe step, then resolve the condition with a scan once the call returns.
 
@@ -512,8 +512,10 @@ func (s *Server) handleQueueSteps(
 	if mode != modeExplorer {
 		return textResult(outcome), nil, nil
 	}
-	var recordable = filterChecks(succeededSteps(recorded, status, finished), in.Dictated)
-	return textResult(outcome + "; " + s.recordRoute(route, recordable)), nil, nil
+	var succeeded = succeededSteps(recorded, status, finished)
+	var recordable = recordableSteps(succeeded, in.Dictated)
+	var recordNote = s.recordRoute(route, recordable)
+	return textResult(outcome + "; " + recordNote), nil, nil
 }
 
 func succeededSteps(steps []stepInput, status string, finished bool) []stepInput {

@@ -68,10 +68,14 @@ func (s *Server) enterExplorer(route string) (*mcp.CallToolResult, any, error) {
 	return textResult(text), nil, nil
 }
 
-func filterChecks(steps []stepInput, checks bool) []stepInput {
+func recordableSteps(steps []stepInput, dictated bool) []stepInput {
+	if dictated {
+		return steps
+	}
+
 	kept := make([]stepInput, 0, len(steps))
 	for _, step := range steps {
-		if (step.Event == "") != checks {
+		if step.Event == "" {
 			continue
 		}
 		kept = append(kept, step)
