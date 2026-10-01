@@ -24,6 +24,7 @@ const (
 	darkRegionMinTextRatio = 0.005
 
 	phraseMaxGapHeights = 3
+	sameSpotMinOverlap  = 0.5
 
 	PsmText  = 11
 	PsmBlock = 6
@@ -214,12 +215,30 @@ func (c *cvImpl) FindTextRectangles(
 		return []OCRResult{}, errors.New("params are empty")
 	}
 
-	edges, err := c.createTextEdges(img)
-	defer edges.Close()
+	localEdges, err := c.createTextEdges(img)
+	defer localEdges.Close()
+	if err != nil {
+		return []OCRResult{}, err
+	}
+	localResults, err := recognizeText(&localEdges, params)
 	if err != nil {
 		return []OCRResult{}, err
 	}
 
+	globalEdges, err := c.createEdges(img)
+	defer globalEdges.Close()
+	if err != nil {
+		return []OCRResult{}, err
+	}
+	globalResults, err := recognizeText(&globalEdges, params)
+	if err != nil {
+		return []OCRResult{}, err
+	}
+
+	return mergeResults(localResults, globalResults), nil
+}
+
+func recognizeText(edges *gocv.Mat, params *OcrParams) ([]OCRResult, error) {
 	words, err := tesseract.Recognize(
 		edges.ToBytes(),
 		edges.Cols(),
@@ -234,7 +253,47 @@ func (c *cvImpl) FindTextRectangles(
 		return []OCRResult{}, err
 	}
 
-	return filterResults(wordsToOCRResults(words), params.Text), nil
+	results := wordsToOCRResults(words)
+	return filterResults(results, params.Text), nil
+}
+
+func mergeResults(primary []OCRResult, secondary []OCRResult) []OCRResult {
+	merged := append([]OCRResult{}, primary...)
+	for _, candidate := range secondary {
+		index := sameSpotIndex(merged, candidate)
+		if index < 0 {
+			merged = append(merged, candidate)
+			continue
+		}
+		if candidate.Confidence > merged[index].Confidence {
+			merged[index] = candidate
+		}
+	}
+	return merged
+}
+
+func sameSpotIndex(results []OCRResult, candidate OCRResult) int {
+	for index, result := range results {
+		if sameSpot(result.Rectangle, candidate.Rectangle) {
+			return index
+		}
+	}
+	return -1
+}
+
+func sameSpot(first models.Rectangle, second models.Rectangle) bool {
+	firstRect := image.Rect(first.LeftX, first.TopY, first.RightX, first.BottomY)
+	secondRect := image.Rect(second.LeftX, second.TopY, second.RightX, second.BottomY)
+	overlap := firstRect.Intersect(secondRect)
+	if overlap.Empty() {
+		return false
+	}
+
+	firstArea := firstRect.Dx() * firstRect.Dy()
+	secondArea := secondRect.Dx() * secondRect.Dy()
+	smallerArea := min(firstArea, secondArea)
+	overlapArea := overlap.Dx() * overlap.Dy()
+	return float64(overlapArea) >= sameSpotMinOverlap*float64(smallerArea)
 }
 
 func (c *cvImpl) createEdges(img *gocv.Mat) (gocv.Mat, error) {
