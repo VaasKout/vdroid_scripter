@@ -20,9 +20,10 @@ const (
 
 // Route query keys
 const (
-	StartIDKey = "start_id"
-	EndIDKey   = "end_id"
-	ArgsKey    = "args"
+	StartIDKey    = "start_id"
+	EndIDKey      = "end_id"
+	ArgsKey       = "args"
+	ArgsLocaleKey = "args_locale"
 )
 
 func (s *serverImpl) handleRouteFunctions() {
@@ -131,12 +132,13 @@ func (s *serverImpl) handleRunRoute(w http.ResponseWriter, r *http.Request) {
 	}
 
 	params := &usecases.RunRouteParams{
-		Serial:   serial,
-		Name:     name,
-		StartID:  startID,
-		EndID:    endID,
-		Args:     r.URL.Query()[ArgsKey],
-		BasePort: s.serverProps.SocketPort,
+		Serial:     serial,
+		Name:       name,
+		StartID:    startID,
+		EndID:      endID,
+		Args:       r.URL.Query()[ArgsKey],
+		ArgsLocale: r.URL.Query().Get(ArgsLocaleKey),
+		BasePort:   s.serverProps.SocketPort,
 	}
 	err = s.interactor.RunRoute(params)
 	if errors.Is(err, usecases.ErrRecordingInProgress) {

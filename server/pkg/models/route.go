@@ -74,6 +74,22 @@ func (r *Route) stepIndex(id int) (int, error) {
 	return 0, fmt.Errorf("%d not found: route %s has %d steps", id, r.Name, len(r.Steps))
 }
 
+// ClearArgLocales ...
+func (r *Route) ClearArgLocales() {
+	if r == nil {
+		return
+	}
+	for stepIndex := range r.Steps {
+		landmarks := r.Steps[stepIndex].Landmarks
+		for landmarkIndex := range landmarks {
+			if landmarks[landmarkIndex].ArgsCount() == 0 {
+				continue
+			}
+			landmarks[landmarkIndex].Locale = ""
+		}
+	}
+}
+
 // ArgsCount ...
 func (r *Route) ArgsCount() int {
 	if r == nil {
@@ -88,7 +104,7 @@ func (r *Route) ArgsCount() int {
 }
 
 // StepsWithArgs ...
-func (r *Route) StepsWithArgs(args []string) ([]Step, error) {
+func (r *Route) StepsWithArgs(args []string, argsLocale string) ([]Step, error) {
 	if r == nil {
 		return nil, errors.New("route is empty")
 	}
@@ -109,7 +125,7 @@ func (r *Route) StepsWithArgs(args []string) ([]Step, error) {
 	for _, step := range r.Steps {
 		count := step.ArgsCount()
 		stepArgs := args[used : used+count]
-		filled := step.WithArgs(stepArgs)
+		filled := step.WithArgs(stepArgs, argsLocale)
 		steps = append(steps, filled)
 		used += count
 	}

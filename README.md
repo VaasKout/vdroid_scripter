@@ -251,7 +251,7 @@ The server keeps running after the AI session ends, so later sessions find it al
 | `save_route`, `delete_route` | Write a route from steps without running them, or remove one |
 | `edit_route` | Change one step of a route (timeout, delay, landmarks) or delete it |
 | `set_mode` | Switch between the navigator and explorer modes |
-| `run_route` | Queue a saved route, or only the steps from `start_id` to `end_id`, with `args` for its `%s` placeholders |
+| `run_route` | Queue a saved route, or only the steps from `start_id` to `end_id`, with `args` for its `%s` placeholders and an optional `args_locale` for their language (a route keeps no locale for its arguments; none given runs as `eng`) |
 | `stop_server` | Stop the local server process |
 
 ### Talking to the agent

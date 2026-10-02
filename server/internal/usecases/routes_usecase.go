@@ -13,12 +13,13 @@ import (
 
 // RunRouteParams ...
 type RunRouteParams struct {
-	Serial   string
-	Name     string
-	StartID  int
-	EndID    int
-	Args     []string
-	BasePort int
+	Serial     string
+	Name       string
+	StartID    int
+	EndID      int
+	Args       []string
+	ArgsLocale string
+	BasePort   int
 }
 
 // RouteUseCase ...
@@ -66,6 +67,7 @@ func (i *interactorImpl) SaveRoute(route *models.Route) error {
 	if !route.Valid() {
 		return errors.New("invalid route")
 	}
+	route.ClearArgLocales()
 	if err := i.checkStepAssets(route.Steps); err != nil {
 		return err
 	}
@@ -105,7 +107,7 @@ func (i *interactorImpl) RunRoute(params *RunRouteParams) error {
 		return err
 	}
 
-	steps, err := route.StepsWithArgs(params.Args)
+	steps, err := route.StepsWithArgs(params.Args, params.ArgsLocale)
 	if err != nil {
 		return err
 	}

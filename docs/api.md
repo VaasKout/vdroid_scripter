@@ -108,7 +108,7 @@ bare landmark deterministically takes the first candidate on screen.
 | *(empty)* | Visibility check of the landmark chain — no touch. Landmarks required. |
 | `tap` / `long_tap` | Generated tap pair placed at a random point inside the last landmark's region. Landmarks required. |
 | `swipe_up` / `swipe_down` / `swipe_left` / `swipe_right` | Generated human-like swipe named by the finger's direction: fixed length (half the screen dimension), curved Bézier path with per-point jitter, eased 300–500ms timing, random start point inside the middle half of the screen (25% start margin) with the end point kept at least 5% from the screen edge. With landmarks, the swipe starts inside the last landmark's region instead. Reserved names — a library action with the same name is shadowed. Landmarks optional. |
-| `type_text` | The **last landmark's `value` is the text to type** and its `locale` (required) is the keyboard language. The keyboard must already be open: the server reads its letter rows off the live frame, matches them against the layout of that language (QWERTY, AZERTY, QWERTZ, ЙЦУКЕН and the other European layouts), and taps the keys. Letters, space and, when the keyboard shows a number row, digits are typed; capitals go through Shift. Any other character fails the step. A `locale` of `numeric` selects the numeric keypad instead (the `123`, `456`, `789` rows with `0` below), for number and phone fields and for dial pads drawn by the app itself. Nothing about keyboards is stored. |
+| `type_text` | The **last landmark's `value` is the text to type** and its `locale` is the keyboard language (`eng` when omitted). The keyboard must already be open: the server reads its letter rows off the live frame, matches them against the layout of that language (QWERTY, AZERTY, QWERTZ, ЙЦУКЕН and the other European layouts), and taps the keys. Letters, space and, when the keyboard shows a number row, digits are typed; capitals go through Shift. Any other character fails the step. A `locale` of `numeric` selects the numeric keypad instead (the `123`, `456`, `789` rows with `0` below), for number and phone fields and for dial pads drawn by the app itself. Nothing about keyboards is stored. |
 | any other name | The library event with that name is replayed: **offset into the found region** when landmarks are given (first touch moved into the last landmark's region, relative shape preserved), **verbatim** without them. A gesture recorded on a different screen size is scaled to the current one first (each axis by current ÷ recorded size), so it covers the same share of the screen. |
 
 ### `POST /devices/{serial}/queue_steps`
@@ -379,13 +379,20 @@ then taps `В корзину` next to `%s`:
 `/run_route?serial=…&name=shop_add_item&args=Молоко&args=Молоко`. The
 count must match exactly: a route without placeholders takes no `args`.
 Arguments always cover the whole route, also when `start_id` or `end_id`
-cut steps off. In `image` and `yolo` landmarks `%s` has no special meaning.
+cut steps off. A route stores **no locale** for a landmark that holds a
+placeholder — saving a route clears it — so the language of the arguments
+comes with the run: `args_locale` becomes the `locale` of every landmark an
+argument fills (the OCR language of a text target, the keyboard language of
+a `type_text` step). It is optional: without it those landmarks carry no
+locale, which runs as `eng` like any empty locale. Landmarks without a
+placeholder keep their stored locale. In `image` and `yolo` landmarks `%s` has no special meaning.
 
 - **Query params:** `serial` and `name` (both required); `start_id` and
   `end_id` — optional step ids (`1..N`, stamped on save) of the first and
   the last step to run; omitted or `0` means from the first step and to the
   last, so `end_id` alone runs the route from its start up to that step;
-  `args` — repeated, one per `%s` of the route.
+  `args` — repeated, one per `%s` of the route; `args_locale` — optional
+  language code of the args.
 - **Response `200`:** `{ "status": "ok" }` — the steps were queued. Track the
   outcome via [`GET /devices/{serial}/session`](#get-devicesserialsession).
 - **Errors:** `400` if a query is missing, `start_id` or `end_id` is not a
@@ -542,7 +549,7 @@ worker does not start queued steps.
 | ----- | ---- | ---- | ----- |
 | Type | `type` | string | `image` (template match against `images/<value>.png`), `text` (OCR), or `yolo` (detection class) |
 | Value | `value` | string | Library image name, OCR text, or YOLO class name — for `type_text`'s last landmark, the text to type |
-| Locale | `locale` | string | OCR language for `text` landmarks (omitempty, default `eng`); required on `type_text`'s last landmark, where it selects the keyboard layout (`numeric` = the numeric keypad) |
+| Locale | `locale` | string | OCR language for `text` landmarks; on `type_text`'s last landmark it selects the keyboard layout (`numeric` = the numeric keypad). omitempty — an empty locale is read as `eng` when the step runs |
 
 ### Event
 

@@ -343,6 +343,9 @@ func (c *apiClient) runRoute(in runRouteInput) error {
 	for _, arg := range in.Args {
 		query.Add("args", arg)
 	}
+	if in.ArgsLocale != "" {
+		query.Set("args_locale", in.ArgsLocale)
+	}
 
 	_, err := c.request(http.MethodGet, "/run_route?"+query.Encode(), nil)
 	return err

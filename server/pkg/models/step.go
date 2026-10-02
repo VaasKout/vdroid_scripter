@@ -120,10 +120,10 @@ func (s *Step) Valid() bool {
 		return s.ValidLandmarks()
 	case TypeTextEvent:
 		last := s.LastLandmark()
-		if last == nil || strings.TrimSpace(last.Value) == "" {
+		if last == nil {
 			return false
 		}
-		return strings.TrimSpace(last.Locale) != ""
+		return strings.TrimSpace(last.Value) != ""
 	}
 	if s.IsCheckEvent() {
 		return s.ValidLandmarks()
@@ -242,20 +242,27 @@ func (s *Step) ArgsCount() int {
 }
 
 // WithArgs ...
-func (s Step) WithArgs(args []string) Step {
+func (s Step) WithArgs(args []string, argsLocale string) Step {
 	landmarks := make([]Landmark, 0, len(s.Landmarks))
 	used := 0
 	for _, landmark := range s.Landmarks {
 		count := landmark.ArgsCount()
 		if count > 0 {
 			landmarkArgs := args[used : used+count]
-			landmark.Value = fillPlaceholders(landmark.Value, landmarkArgs)
+			landmark = landmark.WithArgs(landmarkArgs, argsLocale)
 		}
 		landmarks = append(landmarks, landmark)
 		used += count
 	}
 	s.Landmarks = landmarks
 	return s
+}
+
+// WithArgs ...
+func (l Landmark) WithArgs(args []string, argsLocale string) Landmark {
+	l.Value = fillPlaceholders(l.Value, args)
+	l.Locale = argsLocale
+	return l
 }
 
 func fillPlaceholders(value string, args []string) string {
