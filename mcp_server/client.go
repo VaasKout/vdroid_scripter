@@ -328,14 +328,19 @@ func (c *apiClient) deleteRoute(name string) error {
 	return err
 }
 
-func (c *apiClient) runRoute(serial string, name string, startID int, args []string) error {
+func (c *apiClient) runRoute(in runRouteInput) error {
 	var query = url.Values{}
-	query.Set("serial", serial)
-	query.Set("name", name)
-	if startID > 0 {
-		query.Set("start_id", strconv.Itoa(startID))
+	query.Set("serial", in.Serial)
+	query.Set("name", in.Name)
+	if in.StartID > 0 {
+		var startID = strconv.Itoa(in.StartID)
+		query.Set("start_id", startID)
 	}
-	for _, arg := range args {
+	if in.EndID > 0 {
+		var endID = strconv.Itoa(in.EndID)
+		query.Set("end_id", endID)
+	}
+	for _, arg := range in.Args {
 		query.Add("args", arg)
 	}
 

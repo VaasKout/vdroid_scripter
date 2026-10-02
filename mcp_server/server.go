@@ -53,10 +53,10 @@ Curation: a target with no readable text and no yolo class needs a library image
 
 Abstract tasks (explorer only): when the user states a goal ("write John a message in Telegram", "turn off Wi-Fi"), derive the steps yourself and carry it through without asking, screen by screen: scan, turn text and yolo classes into landmarks, queue what you are sure of, read the outcome, look again, until done, then report; type message text with type_text in its own locale.
 
-Routes: a route is a saved flow — a name and the steps that ran to success, with ids 1..N and their delay/timeout. run_route returns its outcome like queue_steps; start_id runs from that step — on the user's ask, or to rerun the unchanged remainder after a recovered failure; the start step gets delay 0, an unknown id runs nothing. Never create or modify a route unless the user asks, apart from explorer recording and navigator route repair. A %s inside a text landmark's value (a text target or the text to type) is an argument: run_route takes args, one value per %s in step order (the same value twice when two steps use it), and refuses a wrong count — get_route shows it. To make a recorded value an argument, on the user's ask replace it with %s through edit_route.
+Routes: a route is a saved flow — a name and the steps that ran to success, with ids 1..N and their delay/timeout. run_route returns its outcome like queue_steps; start_id and end_id run only that slice, both inclusive (an end_id below start_id is ignored, the run goes to the end) — to enter mid-route, to stop before steps the goal does not need, or to rerun the unchanged remainder after a recovered failure; the start step gets delay 0, an unknown id runs nothing. The ids are yours to find, never the user's to give: when the described task covers only part of a route ("just get to the search", "continue from the cart"), read get_route and match the described actions to the steps' events and landmarks — the first step that belongs is start_id, the last is end_id. Never create or modify a route unless the user asks, apart from explorer recording and navigator route repair. A %s inside a text landmark's value (a text target or the text to type) is an argument: run_route takes args, one value per %s in step order (the same value twice when two steps use it), and refuses a wrong count — get_route shows it. To make a recorded value an argument, on the user's ask replace it with %s through edit_route.
 
 Modes: navigator (the start mode) and explorer; the mode holds until the user changes it (see Rules). In both, dictated steps run as asked (Literal execution), with recovery on failure.
-navigator records nothing, and dictated steps never change a route. A goal is reached only across saved routes: get_routes, get_route and scan show where the phone is and which route leads on, or which step to enter via start_id; chain run_route calls; a goal no route reaches needs explorer: say so. When a route run fails, scan; for a route defect, fix the step with edit_route and rerun from it without asking: the target is on screen now -> raise its timeout; it appears in several places or the previous tap hit the wrong one -> landmarks with a unique neighbour first; the screen is mid-transition -> raise its delay; the step repeats the one before and undoes it -> delete it. At most two fixes per failing step; anything else (another screen, a popup, a missing app) is no defect: report it. List every fix in your answer.
+navigator records nothing, and dictated steps never change a route. Every request that is not a direct order to run named steps is a goal, and you find the way yourself: get_routes, then get_route for every candidate, and work out which routes to chain, which start_id..end_id slice of each and which args; scan when you need to know where the phone is; then run it. NEVER ask the user which route to use or to name one — the routes are yours to read. Only a goal no chain of routes reaches needs explorer: say so, naming what is missing. When a route run fails, scan; for a route defect, fix the step with edit_route and rerun from it without asking: the target is on screen now -> raise its timeout; it appears in several places or the previous tap hit the wrong one -> landmarks with a unique neighbour first; the screen is mid-transition -> raise its delay; the step repeats the one before and undoes it -> delete it. At most two fixes per failing step; anything else (another screen, a popup, a missing app) is no defect: report it. List every fix in your answer.
 explorer (with a route name) carries a goal through as an abstract task and records your own work: each batch of yours appends its succeeded steps, minus your visibility checks and probes, to that route and saves it — no save_route needed; a failed step and the rest of its batch stay out, the recovery batch goes in; an existing route is appended to (delete_route first only when the user wants it replaced). Steps the user dictates go in their own batch with dictated=true: they run as asked and EVERY succeeded one is recorded, actions and the visibility checks the user asked for alike.
 
 Failure and recovery: recover from the failed step: scan (with the relevant library images) and apply the user's instruction to what it shows — tap the alternative the user named, scroll with a generated swipe or the screen's recorded swipe (variants _1, _2, ...) when the target should be further down, or report honestly on an unexpected screen — then re-queue from the failed step in one call, or run_route with start_id when a route's remaining steps need no change. A scan with no landmarks at all, not even the status bar, means the screen is off: close_session, scan again (the new session turns the screen on) and continue. Conditional dictations split at the condition: queue the unconditional prefix ending with the probe step, then resolve the condition with a scan once the call returns.
@@ -145,7 +145,8 @@ type routeNameInput struct {
 type runRouteInput struct {
 	Serial  string   `json:"serial" jsonschema:"device serial"`
 	Name    string   `json:"name" jsonschema:"route name"`
-	StartID int      `json:"start_id,omitempty" jsonschema:"step id to start from; omit for the whole route"`
+	StartID int      `json:"start_id,omitempty" jsonschema:"first step id to run; omit to start at step 1"`
+	EndID   int      `json:"end_id,omitempty" jsonschema:"last step id to run; omit to run to the end"`
 	Args    []string `json:"args,omitempty" jsonschema:"one value per %s of the route, in step order"`
 }
 
@@ -254,8 +255,8 @@ func (s *Server) registerTools() {
 
 	mcp.AddTool(s.mcp, &mcp.Tool{
 		Name: "run_route",
-		Description: "Run a saved route, optionally from start_id, and block until it " +
-			"finishes: 'idle' or the failed step's error.",
+		Description: "Run a saved route, or its start_id..end_id slice, and block until " +
+			"it finishes: 'idle' or the failed step's error.",
 	}, s.handleRunRoute)
 
 	mcp.AddTool(s.mcp, &mcp.Tool{
@@ -750,7 +751,7 @@ func (s *Server) handleRunRoute(
 	if in.Serial == "" || in.Name == "" {
 		return nil, nil, fmt.Errorf("serial and name are required")
 	}
-	err := s.api.runRoute(in.Serial, in.Name, in.StartID, in.Args)
+	err := s.api.runRoute(in)
 	if err != nil {
 		return nil, nil, err
 	}

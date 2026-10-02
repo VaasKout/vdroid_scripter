@@ -251,7 +251,7 @@ The server keeps running after the AI session ends, so later sessions find it al
 | `save_route`, `delete_route` | Write a route from steps without running them, or remove one |
 | `edit_route` | Change one step of a route (timeout, delay, landmarks) or delete it |
 | `set_mode` | Switch between the navigator and explorer modes |
-| `run_route` | Queue a saved route, optionally from a given step id, with `args` for its `%s` placeholders |
+| `run_route` | Queue a saved route, or only the steps from `start_id` to `end_id`, with `args` for its `%s` placeholders |
 | `stop_server` | Stop the local server process |
 
 ### Talking to the agent
@@ -284,7 +284,7 @@ The MCP server ships its own instructions to the AI, so you do not have to expla
 * **Recovery.** A failed step clears the rest of the queue and names the target it could not find. The agent scans, applies your instruction to what it sees, then queues the remaining steps again from the failed one.
 * **Routes.** A route is recorded only in explorer mode, or written with `save_route` when you ask. A route can take arguments: record it with a real value, then ask the agent to make that value an argument. It replaces the value with `%s`, and `run_route` then takes `args`, one value per `%s` in step order. A wrong number of values is refused before anything runs.
 * **Modes.** There are two, and the agent starts in **navigator**. It switches only when you tell it to. In both modes, actions you dictate ("tap this, then that") run exactly as asked, and the agent finds its way on if one fails.
-  * **Navigator** records nothing. A goal is reached only along saved routes, chaining them and entering mid-route where the screen fits; a goal no route reaches is reported as a job for explorer. When a route step fails because of the route itself, such as a timeout that is too short or a target that appears twice, the agent fixes that step with `edit_route`, reruns from there, and lists every fix.
+  * **Navigator** records nothing. Any request that is not a direct order to run named steps is treated as a goal, and the agent works the way out itself: it reads the saved routes, chains them, runs only the slice of each that the goal needs, and fills in arguments. You describe the task in words; the agent picks the first and last step of the slice by matching your description to the route's steps. It does not ask you which route to use or for step ids. A goal no chain of routes reaches is reported as a job for explorer. When a route step fails because of the route itself, such as a timeout that is too short or a target that appears twice, the agent fixes that step with `edit_route`, reruns from there, and lists every fix.
   * **Explorer**, given a route name, carries a goal through on its own and records its work into that route as it goes. The steps that succeed go in; failed attempts and the agent's own visibility checks stay out. Everything you dictate is recorded too: your actions and the visibility checks you ask for.
 * **Curation.** Library images come from the Android client or, for a vision-capable agent, from `save_image`: after a `capture` it picks the icon's rectangle and saves it under a `<app>_<screen>_<what>` name — only for targets with no readable text and no YOLO class. Actions come from the client or from `record_action`, and only when you ask for a recording.
 * **No adb.** The agent never touches the device with `adb` directly — no input, no `screencap`. Every interaction is a step, every look is `scan` or `capture`.

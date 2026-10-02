@@ -2,11 +2,13 @@ package server
 
 import (
 	"android_vision_scripter/internal/usecases"
-	"android_vision_scripter/pkg/core/strutils"
 	"android_vision_scripter/pkg/models"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
+	"strconv"
+	"strings"
 )
 
 // Route paths
@@ -19,6 +21,7 @@ const (
 // Route query keys
 const (
 	StartIDKey = "start_id"
+	EndIDKey   = "end_id"
 	ArgsKey    = "args"
 )
 
@@ -116,24 +119,26 @@ func (s *serverImpl) handleRunRoute(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var startID int
-	rawStartID := r.URL.Query().Get(StartIDKey)
-	if rawStartID != "" {
-		startID = strutils.ToInt(rawStartID)
-		if startID < 1 {
-			http.Error(w, "invalid start_id: "+rawStartID, http.StatusBadRequest)
-			return
-		}
+	startID, err := stepIDQuery(r, StartIDKey)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	endID, err := stepIDQuery(r, EndIDKey)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
 	}
 
 	params := &usecases.RunRouteParams{
 		Serial:   serial,
 		Name:     name,
 		StartID:  startID,
+		EndID:    endID,
 		Args:     r.URL.Query()[ArgsKey],
 		BasePort: s.serverProps.SocketPort,
 	}
-	err := s.interactor.RunRoute(params)
+	err = s.interactor.RunRoute(params)
 	if errors.Is(err, usecases.ErrRecordingInProgress) {
 		http.Error(w, err.Error(), http.StatusConflict)
 		return
@@ -147,4 +152,18 @@ func (s *serverImpl) handleRunRoute(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.sendStatusOk(w)
+}
+
+func stepIDQuery(r *http.Request, key string) (int, error) {
+	value := r.URL.Query().Get(key)
+	raw := strings.TrimSpace(value)
+	if raw == "" {
+		return 0, nil
+	}
+
+	id, err := strconv.Atoi(raw)
+	if err != nil || id < 0 {
+		return 0, fmt.Errorf("invalid %s: %s", key, raw)
+	}
+	return id, nil
 }

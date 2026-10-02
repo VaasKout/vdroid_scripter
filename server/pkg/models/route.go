@@ -36,22 +36,42 @@ func (r *Route) StampStepIDs() {
 	}
 }
 
-// StepsFromID ...
-func (r *Route) StepsFromID(startID int) ([]Step, error) {
+// StepsBetween ...
+func (r *Route) StepsBetween(startID int, endID int) ([]Step, error) {
 	if r == nil {
 		return nil, errors.New("route is empty")
 	}
+	if startID > endID {
+		endID = 0
+	}
+
+	start := 0
+	if startID > 0 {
+		index, err := r.stepIndex(startID)
+		if err != nil {
+			return nil, fmt.Errorf("start_id %w", err)
+		}
+		start = index
+	}
+
+	end := len(r.Steps)
+	if endID > 0 {
+		index, err := r.stepIndex(endID)
+		if err != nil {
+			return nil, fmt.Errorf("end_id %w", err)
+		}
+		end = index + 1
+	}
+	return r.Steps[start:end], nil
+}
+
+func (r *Route) stepIndex(id int) (int, error) {
 	for index, step := range r.Steps {
-		if step.ID == startID {
-			return r.Steps[index:], nil
+		if step.ID == id {
+			return index, nil
 		}
 	}
-	return nil, fmt.Errorf(
-		"start_id %d not found: route %s has %d steps",
-		startID,
-		r.Name,
-		len(r.Steps),
-	)
+	return 0, fmt.Errorf("%d not found: route %s has %d steps", id, r.Name, len(r.Steps))
 }
 
 // ArgsCount ...

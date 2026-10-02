@@ -364,7 +364,10 @@ Loads a saved route and queues its steps on the device — exactly equivalent
 to `GET /routes/{name}` followed by `POST /devices/{serial}/queue_steps` with
 the route's steps. With `start_id` the queue starts from the step carrying
 that id (inclusive), skipping everything before it — for rerunning a route
-from a known mid-flow point. Whichever step the run starts from gets
+from a known mid-flow point. With `end_id` it stops after the step carrying
+that id (inclusive), skipping everything after it. Both together run just
+that slice. An `end_id` lower than `start_id` is ignored, and the run goes to
+the end of the route. Whichever step the run starts from gets
 `delay: 0`, overriding the stored value: a route start has no previous
 action to settle.
 
@@ -375,19 +378,21 @@ value used by two steps is passed twice. For a route that types `%s` and
 then taps `В корзину` next to `%s`:
 `/run_route?serial=…&name=shop_add_item&args=Молоко&args=Молоко`. The
 count must match exactly: a route without placeholders takes no `args`.
-Arguments always cover the whole route, also when `start_id` skips the
-first steps. In `image` and `yolo` landmarks `%s` has no special meaning.
+Arguments always cover the whole route, also when `start_id` or `end_id`
+cut steps off. In `image` and `yolo` landmarks `%s` has no special meaning.
 
-- **Query params:** `serial` and `name` (both required); `start_id` —
-  optional step id (`1..N`, stamped on save) to start from; omitted means
-  the whole route; `args` — repeated, one per `%s` of the route.
+- **Query params:** `serial` and `name` (both required); `start_id` and
+  `end_id` — optional step ids (`1..N`, stamped on save) of the first and
+  the last step to run; omitted or `0` means from the first step and to the
+  last, so `end_id` alone runs the route from its start up to that step;
+  `args` — repeated, one per `%s` of the route.
 - **Response `200`:** `{ "status": "ok" }` — the steps were queued. Track the
   outcome via [`GET /devices/{serial}/session`](#get-devicesserialsession).
-- **Errors:** `400` if a query is missing, `start_id` is not a positive
-  integer, or the number of `args` differs from the route's placeholders
+- **Errors:** `400` if a query is missing, `start_id` or `end_id` is not a
+  whole number of 0 or more, or the number of `args` differs from the route's placeholders
   (`wrong route args: route <name> needs N, got M`); `500` when the route
   doesn't exist, no step carries the given
-  `start_id` (nothing is queued), a referenced asset is gone, or the
+  `start_id` or `end_id` (nothing is queued), a referenced asset is gone, or the
   session couldn't be started.
 
 ## Session / streaming

@@ -16,6 +16,7 @@ type RunRouteParams struct {
 	Serial   string
 	Name     string
 	StartID  int
+	EndID    int
 	Args     []string
 	BasePort int
 }
@@ -109,11 +110,9 @@ func (i *interactorImpl) RunRoute(params *RunRouteParams) error {
 		return err
 	}
 	route.Steps = steps
-	if params.StartID > 0 {
-		steps, err = route.StepsFromID(params.StartID)
-		if err != nil {
-			return err
-		}
+	steps, err = route.StepsBetween(params.StartID, params.EndID)
+	if err != nil {
+		return err
 	}
 	models.ClearStartDelay(steps)
 	return i.RunSteps(params.Serial, steps, params.BasePort)
