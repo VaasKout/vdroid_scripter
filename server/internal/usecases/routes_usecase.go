@@ -11,13 +11,22 @@ import (
 	"strings"
 )
 
+// RunRouteParams ...
+type RunRouteParams struct {
+	Serial   string
+	Name     string
+	StartID  int
+	Args     []string
+	BasePort int
+}
+
 // RouteUseCase ...
 type RouteUseCase interface {
 	GetRoutes() []string
 	GetRoute(name string) (*models.Route, error)
 	SaveRoute(route *models.Route) error
 	DeleteRoute(name string) bool
-	RunRoute(serial string, name string, startID int, basePort int) error
+	RunRoute(params *RunRouteParams) error
 }
 
 func (i *interactorImpl) GetRoutes() []string {
@@ -85,19 +94,27 @@ func (i *interactorImpl) DeleteRoute(name string) bool {
 	return i.filesDB.DeleteFileByName(routesDir, strings.TrimSpace(name)+file.JSONExt)
 }
 
-func (i *interactorImpl) RunRoute(serial string, name string, startID int, basePort int) error {
-	route, err := i.GetRoute(name)
+func (i *interactorImpl) RunRoute(params *RunRouteParams) error {
+	if params == nil {
+		return errors.New("params are empty")
+	}
+
+	route, err := i.GetRoute(params.Name)
 	if err != nil {
 		return err
 	}
 
-	steps := route.Steps
-	if startID > 0 {
-		steps, err = route.StepsFromID(startID)
+	steps, err := route.StepsWithArgs(params.Args)
+	if err != nil {
+		return err
+	}
+	route.Steps = steps
+	if params.StartID > 0 {
+		steps, err = route.StepsFromID(params.StartID)
 		if err != nil {
 			return err
 		}
 	}
 	models.ClearStartDelay(steps)
-	return i.RunSteps(serial, steps, basePort)
+	return i.RunSteps(params.Serial, steps, params.BasePort)
 }

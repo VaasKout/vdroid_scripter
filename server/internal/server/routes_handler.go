@@ -19,6 +19,7 @@ const (
 // Route query keys
 const (
 	StartIDKey = "start_id"
+	ArgsKey    = "args"
 )
 
 func (s *serverImpl) handleRouteFunctions() {
@@ -125,9 +126,20 @@ func (s *serverImpl) handleRunRoute(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	err := s.interactor.RunRoute(serial, name, startID, s.serverProps.SocketPort)
+	params := &usecases.RunRouteParams{
+		Serial:   serial,
+		Name:     name,
+		StartID:  startID,
+		Args:     r.URL.Query()[ArgsKey],
+		BasePort: s.serverProps.SocketPort,
+	}
+	err := s.interactor.RunRoute(params)
 	if errors.Is(err, usecases.ErrRecordingInProgress) {
 		http.Error(w, err.Error(), http.StatusConflict)
+		return
+	}
+	if errors.Is(err, models.ErrRouteArgs) {
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 	if err != nil {

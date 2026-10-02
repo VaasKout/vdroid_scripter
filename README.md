@@ -251,7 +251,7 @@ The server keeps running after the AI session ends, so later sessions find it al
 | `save_route`, `delete_route` | Write a route from steps without running them, or remove one |
 | `edit_route` | Change one step of a route (timeout, delay, landmarks) or delete it |
 | `set_mode` | Switch between the navigator and explorer modes |
-| `run_route` | Queue a saved route, optionally from a given step id |
+| `run_route` | Queue a saved route, optionally from a given step id, with `args` for its `%s` placeholders |
 | `stop_server` | Stop the local server process |
 
 ### Talking to the agent
@@ -282,7 +282,7 @@ The MCP server ships its own instructions to the AI, so you do not have to expla
 * **Duplicates.** When a value matches several places, the agent puts a unique nearby landmark first in the chain. With no such neighbour, the first match in reading order wins.
 * **Timing.** An omitted `delay` becomes 0 on the first step of a batch and 1000 ms on later steps. An omitted `timeout` becomes 5000 ms. The agent raises the timeout for targets that appear after a launch or a load.
 * **Recovery.** A failed step clears the rest of the queue and names the target it could not find. The agent scans, applies your instruction to what it sees, then queues the remaining steps again from the failed one.
-* **Routes.** A route is recorded only in explorer mode, or written with `save_route` when you ask.
+* **Routes.** A route is recorded only in explorer mode, or written with `save_route` when you ask. A route can take arguments: record it with a real value, then ask the agent to make that value an argument. It replaces the value with `%s`, and `run_route` then takes `args`, one value per `%s` in step order. A wrong number of values is refused before anything runs.
 * **Modes.** There are two, and the agent starts in **navigator**. It switches only when you tell it to. In both modes, actions you dictate ("tap this, then that") run exactly as asked, and the agent finds its way on if one fails.
   * **Navigator** records nothing. A goal is reached only along saved routes, chaining them and entering mid-route where the screen fits; a goal no route reaches is reported as a job for explorer. When a route step fails because of the route itself, such as a timeout that is too short or a target that appears twice, the agent fixes that step with `edit_route`, reruns from there, and lists every fix.
   * **Explorer**, given a route name, carries a goal through on its own and records its work into that route as it goes. The steps that succeed go in; failed attempts and the agent's own visibility checks stay out. Everything you dictate is recorded too: your actions and the visibility checks you ask for.

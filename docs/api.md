@@ -368,13 +368,25 @@ from a known mid-flow point. Whichever step the run starts from gets
 `delay: 0`, overriding the stored value: a route start has no previous
 action to settle.
 
+A route can take **arguments**. Every `%s` inside the `value` of a `text`
+landmark — a text target or the text of a `type_text` step — is a
+placeholder, and `args` fills them in step order, one value per `%s` — a
+value used by two steps is passed twice. For a route that types `%s` and
+then taps `В корзину` next to `%s`:
+`/run_route?serial=…&name=shop_add_item&args=Молоко&args=Молоко`. The
+count must match exactly: a route without placeholders takes no `args`.
+Arguments always cover the whole route, also when `start_id` skips the
+first steps. In `image` and `yolo` landmarks `%s` has no special meaning.
+
 - **Query params:** `serial` and `name` (both required); `start_id` —
   optional step id (`1..N`, stamped on save) to start from; omitted means
-  the whole route.
+  the whole route; `args` — repeated, one per `%s` of the route.
 - **Response `200`:** `{ "status": "ok" }` — the steps were queued. Track the
   outcome via [`GET /devices/{serial}/session`](#get-devicesserialsession).
-- **Errors:** `400` if a query is missing or `start_id` is not a positive
-  integer, `500` when the route doesn't exist, no step carries the given
+- **Errors:** `400` if a query is missing, `start_id` is not a positive
+  integer, or the number of `args` differs from the route's placeholders
+  (`wrong route args: route <name> needs N, got M`); `500` when the route
+  doesn't exist, no step carries the given
   `start_id` (nothing is queued), a referenced asset is gone, or the
   session couldn't be started.
 

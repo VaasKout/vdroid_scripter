@@ -219,3 +219,53 @@ func (s *Step) description() string {
 	}
 	return s.Event
 }
+
+// ArgsCount ...
+func (l *Landmark) ArgsCount() int {
+	if l == nil || l.Type != Text {
+		return 0
+	}
+	return strings.Count(l.Value, RouteArgPlaceholder)
+}
+
+// ArgsCount ...
+func (s *Step) ArgsCount() int {
+	if s == nil {
+		return 0
+	}
+
+	count := 0
+	for _, landmark := range s.Landmarks {
+		count += landmark.ArgsCount()
+	}
+	return count
+}
+
+// WithArgs ...
+func (s Step) WithArgs(args []string) Step {
+	landmarks := make([]Landmark, 0, len(s.Landmarks))
+	used := 0
+	for _, landmark := range s.Landmarks {
+		count := landmark.ArgsCount()
+		if count > 0 {
+			landmarkArgs := args[used : used+count]
+			landmark.Value = fillPlaceholders(landmark.Value, landmarkArgs)
+		}
+		landmarks = append(landmarks, landmark)
+		used += count
+	}
+	s.Landmarks = landmarks
+	return s
+}
+
+func fillPlaceholders(value string, args []string) string {
+	parts := strings.Split(value, RouteArgPlaceholder)
+	filled := &strings.Builder{}
+	for index, part := range parts {
+		filled.WriteString(part)
+		if index < len(args) {
+			filled.WriteString(args[index])
+		}
+	}
+	return filled.String()
+}

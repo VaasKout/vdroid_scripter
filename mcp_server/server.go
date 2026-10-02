@@ -28,6 +28,9 @@ const (
 	firstStepDelayMs = 0
 
 	scanMinConfidence = 40
+
+	routeArgPlaceholder = "%s"
+	textLandmark        = "text"
 )
 
 const serverInstructions = `vdroid-scripter drives Android devices with CV-located steps composed from a human-curated library.
@@ -50,7 +53,7 @@ Curation: a target with no readable text and no yolo class needs a library image
 
 Abstract tasks (explorer only): when the user states a goal ("write John a message in Telegram", "turn off Wi-Fi"), derive the steps yourself and carry it through without asking, screen by screen: scan, turn text and yolo classes into landmarks, queue what you are sure of, read the outcome, look again, until done, then report; type message text with type_text in its own locale.
 
-Routes: a route is a saved flow — a name and the steps that ran to success, with ids 1..N and their delay/timeout. run_route returns its outcome like queue_steps; start_id runs from that step — on the user's ask, or to rerun the unchanged remainder after a recovered failure; the start step gets delay 0, an unknown id runs nothing. Never create or modify a route unless the user asks, apart from explorer recording and navigator route repair.
+Routes: a route is a saved flow — a name and the steps that ran to success, with ids 1..N and their delay/timeout. run_route returns its outcome like queue_steps; start_id runs from that step — on the user's ask, or to rerun the unchanged remainder after a recovered failure; the start step gets delay 0, an unknown id runs nothing. Never create or modify a route unless the user asks, apart from explorer recording and navigator route repair. A %s inside a text landmark's value (a text target or the text to type) is an argument: run_route takes args, one value per %s in step order (the same value twice when two steps use it), and refuses a wrong count — get_route shows it. To make a recorded value an argument, on the user's ask replace it with %s through edit_route.
 
 Modes: navigator (the start mode) and explorer; the mode holds until the user changes it (see Rules). In both, dictated steps run as asked (Literal execution), with recovery on failure.
 navigator records nothing, and dictated steps never change a route. A goal is reached only across saved routes: get_routes, get_route and scan show where the phone is and which route leads on, or which step to enter via start_id; chain run_route calls; a goal no route reaches needs explorer: say so. When a route run fails, scan; for a route defect, fix the step with edit_route and rerun from it without asking: the target is on screen now -> raise its timeout; it appears in several places or the previous tap hit the wrong one -> landmarks with a unique neighbour first; the screen is mid-transition -> raise its delay; the step repeats the one before and undoes it -> delete it. At most two fixes per failing step; anything else (another screen, a popup, a missing app) is no defect: report it. List every fix in your answer.
@@ -140,9 +143,10 @@ type routeNameInput struct {
 }
 
 type runRouteInput struct {
-	Serial  string `json:"serial" jsonschema:"device serial"`
-	Name    string `json:"name" jsonschema:"route name"`
-	StartID int    `json:"start_id,omitempty" jsonschema:"step id to start from; omit for the whole route"`
+	Serial  string   `json:"serial" jsonschema:"device serial"`
+	Name    string   `json:"name" jsonschema:"route name"`
+	StartID int      `json:"start_id,omitempty" jsonschema:"step id to start from; omit for the whole route"`
+	Args    []string `json:"args,omitempty" jsonschema:"one value per %s of the route, in step order"`
 }
 
 type recordActionInput struct {
@@ -663,8 +667,8 @@ func formatRoute(route routeResponse) string {
 	var lines strings.Builder
 	fmt.Fprintf(
 		&lines,
-		"route %s, %d steps: id event timeout/delay landmarks (check = empty event)",
-		route.Name, len(route.Steps),
+		"route %s, %d steps, %d args: id event timeout/delay landmarks (check = empty event)",
+		route.Name, len(route.Steps), routeArgsCount(route),
 	)
 	for _, step := range route.Steps {
 		fmt.Fprintf(&lines, "\n%d %s %d/%d", step.ID, stepEvent(step.Event), step.Timeout, step.Delay)
@@ -674,6 +678,19 @@ func formatRoute(route routeResponse) string {
 		lines.WriteString(" " + formatChain(step.Landmarks))
 	}
 	return lines.String()
+}
+
+func routeArgsCount(route routeResponse) int {
+	count := 0
+	for _, step := range route.Steps {
+		for _, landmark := range step.Landmarks {
+			if landmark.Type != textLandmark {
+				continue
+			}
+			count += strings.Count(landmark.Value, routeArgPlaceholder)
+		}
+	}
+	return count
 }
 
 func stepEvent(event string) string {
@@ -733,7 +750,7 @@ func (s *Server) handleRunRoute(
 	if in.Serial == "" || in.Name == "" {
 		return nil, nil, fmt.Errorf("serial and name are required")
 	}
-	err := s.api.runRoute(in.Serial, in.Name, in.StartID)
+	err := s.api.runRoute(in.Serial, in.Name, in.StartID, in.Args)
 	if err != nil {
 		return nil, nil, err
 	}

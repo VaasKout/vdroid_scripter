@@ -6,6 +6,12 @@ import (
 	"fmt"
 )
 
+// RouteArgPlaceholder ...
+const RouteArgPlaceholder = "%s"
+
+// ErrRouteArgs ...
+var ErrRouteArgs = errors.New("wrong route args")
+
 // Route ...
 type Route struct {
 	Name  string `json:"name"`
@@ -46,4 +52,46 @@ func (r *Route) StepsFromID(startID int) ([]Step, error) {
 		r.Name,
 		len(r.Steps),
 	)
+}
+
+// ArgsCount ...
+func (r *Route) ArgsCount() int {
+	if r == nil {
+		return 0
+	}
+
+	count := 0
+	for _, step := range r.Steps {
+		count += step.ArgsCount()
+	}
+	return count
+}
+
+// StepsWithArgs ...
+func (r *Route) StepsWithArgs(args []string) ([]Step, error) {
+	if r == nil {
+		return nil, errors.New("route is empty")
+	}
+
+	needed := r.ArgsCount()
+	if len(args) != needed {
+		return nil, fmt.Errorf(
+			"%w: route %s needs %d, got %d",
+			ErrRouteArgs,
+			r.Name,
+			needed,
+			len(args),
+		)
+	}
+
+	steps := make([]Step, 0, len(r.Steps))
+	used := 0
+	for _, step := range r.Steps {
+		count := step.ArgsCount()
+		stepArgs := args[used : used+count]
+		filled := step.WithArgs(stepArgs)
+		steps = append(steps, filled)
+		used += count
+	}
+	return steps, nil
 }
