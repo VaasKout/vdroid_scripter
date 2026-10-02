@@ -326,7 +326,7 @@ Do not expose the server to the public internet or to untrusted networks. Screen
 
 ## Project status
 
-This is **beta-1.0**. The core flow is in place, and the project may still contain bugs.
+This is **beta-2.0**. The core flow is in place, and the project may still contain bugs.
 If you run into a problem, feel free to open an [issue](https://github.com/VaasKout/android_vision_scripter/issues).
 
 ## Acknowledgments

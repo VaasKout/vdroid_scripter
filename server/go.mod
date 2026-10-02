@@ -1,6 +1,6 @@
 module android_vision_scripter
 
-go 1.27.0
+go 1.27.1
 
 require (
 	github.com/joho/godotenv v1.5.1

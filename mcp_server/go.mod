@@ -1,8 +1,8 @@
 module android_vision_scripter/mcp_server
 
-go 1.27.0
+go 1.27.1
 
-require github.com/modelcontextprotocol/go-sdk v1.7.0
+require github.com/modelcontextprotocol/go-sdk v1.8.0
 
 require (
 	github.com/google/jsonschema-go v0.4.3 // indirect
