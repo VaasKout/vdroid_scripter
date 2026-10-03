@@ -348,6 +348,16 @@ func (c *apiClient) deleteRoute(name string) error {
 	return err
 }
 
+func (c *apiClient) deleteImage(name string) error {
+	_, err := c.request(http.MethodDelete, "/images/"+url.PathEscape(name), nil)
+	return err
+}
+
+func (c *apiClient) deleteAction(name string) error {
+	_, err := c.request(http.MethodDelete, "/actions/"+url.PathEscape(name), nil)
+	return err
+}
+
 func (c *apiClient) runRoute(in runRouteInput) error {
 	var query = url.Values{}
 	query.Set("serial", in.Serial)

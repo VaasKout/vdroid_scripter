@@ -50,6 +50,8 @@ Perception: scan is the first way to see the screen, capture the second. Scan wh
 
 Curation: a target with no readable text and no yolo class needs a library image: take one from get_library, otherwise (with vision) capture, pick the icon's tight rectangle in the reported pixels — only the icon, no badge or highlight that changes — and save_image it as <app>_<screen>_<what>[_variant], on your own initiative; saved images make the next run capture-free. Ask the user for a library item only when you have no vision and no text, yolo class or generated swipe reaches the target. Actions come from the Android client, or from record_action on the user's ask.
 
+Deleting: delete_route, delete_image and delete_action run ONLY when the user explicitly asks to delete that item — never on your own initiative: not to clean up, not to fix a failed step, not to replace an item (saving under the same name overwrites). No exceptions.
+
 Routes: a route is a saved flow — a name and the steps that ran to success, ids 1..N with their delay/timeout. run_route returns its outcome like queue_steps. start_id and end_id run only that slice, both inclusive; without start_id it runs from step 1, without end_id (or with one below start_id) to the end; the start step gets delay 0, an unknown id runs nothing. You find the ids, the user never gives them: get_route lists each step's event and landmarks, so match the described task ("just get to the search", "continue from the cart") to the first and the last step that belong to it. A %s inside a text landmark's value (a text target or the text to type) is an argument: run_route takes args, one value per %s in step order (the same value twice when two steps use it), and refuses a wrong count — get_route shows it. A route stores no locale for a landmark with %s: args_locale gives the args' language at run time (for a typed argument the keyboard's language); omitted, they run as eng. On the user's ask make a recorded value an argument by replacing it with %s through edit_route. Otherwise never create or modify a route unless the user asks, apart from explorer recording and navigator route repair.
 
 Modes: navigator (the start mode) and explorer; the mode holds until the user changes it (see Rules). Dictated steps run as asked in both.
@@ -138,6 +140,10 @@ type saveRouteInput struct {
 
 type routeNameInput struct {
 	Name string `json:"name" jsonschema:"route name"`
+}
+
+type libraryNameInput struct {
+	Name string `json:"name" jsonschema:"library item name"`
 }
 
 type runRouteInput struct {
@@ -251,8 +257,18 @@ func (s *Server) registerTools() {
 
 	mcp.AddTool(s.mcp, &mcp.Tool{
 		Name:        "delete_route",
-		Description: "Delete a saved route by name.",
+		Description: "Delete a saved route by name. Only on the user's ask.",
 	}, s.handleDeleteRoute)
+
+	mcp.AddTool(s.mcp, &mcp.Tool{
+		Name:        "delete_image",
+		Description: "Delete a library image by name. Only on the user's ask.",
+	}, s.handleDeleteImage)
+
+	mcp.AddTool(s.mcp, &mcp.Tool{
+		Name:        "delete_action",
+		Description: "Delete a library action by name. Only on the user's ask.",
+	}, s.handleDeleteAction)
 
 	mcp.AddTool(s.mcp, &mcp.Tool{
 		Name: "run_route",
@@ -747,6 +763,36 @@ func (s *Server) handleDeleteRoute(
 		return nil, nil, err
 	}
 	return textResult("deleted route " + in.Name), nil, nil
+}
+
+func (s *Server) handleDeleteImage(
+	ctx context.Context,
+	req *mcp.CallToolRequest,
+	in libraryNameInput,
+) (*mcp.CallToolResult, any, error) {
+	if in.Name == "" {
+		return nil, nil, fmt.Errorf("name is required")
+	}
+	err := s.api.deleteImage(in.Name)
+	if err != nil {
+		return nil, nil, err
+	}
+	return textResult("deleted image " + in.Name), nil, nil
+}
+
+func (s *Server) handleDeleteAction(
+	ctx context.Context,
+	req *mcp.CallToolRequest,
+	in libraryNameInput,
+) (*mcp.CallToolResult, any, error) {
+	if in.Name == "" {
+		return nil, nil, fmt.Errorf("name is required")
+	}
+	err := s.api.deleteAction(in.Name)
+	if err != nil {
+		return nil, nil, err
+	}
+	return textResult("deleted action " + in.Name), nil, nil
 }
 
 func (s *Server) handleRunRoute(

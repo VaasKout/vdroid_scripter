@@ -239,6 +239,7 @@ The server keeps running after the AI session ends, so later sessions find it al
 | `ping` | Check that the server is reachable, starting it when it is not |
 | `list_devices` | Connected devices and their serials |
 | `get_library` | Names of the library images and actions |
+| `delete_image`, `delete_action` | Remove a library image or action by name |
 | `scan` | The agent's perception: the landmarks on the current screen, one `type left,top,right,bottom value` line each |
 | `capture` | The current screen as a JPEG — only for agents that can see images, and only where `scan` is not enough |
 | `save_image` | Crop a rectangle of the current screen into a library image — for vision-capable agents curating icon targets |
@@ -287,6 +288,7 @@ The MCP server ships its own instructions to the AI, so you do not have to expla
   * **Navigator** records nothing. Any request that is not a direct order to run named steps is treated as a goal, and the agent works the way out itself: it reads the saved routes, chains them, runs only the slice of each that the goal needs, and fills in arguments. You describe the task in words; the agent picks the first and last step of the slice by matching your description to the route's steps. It does not ask you which route to use or for step ids. A goal no chain of routes reaches is reported as a job for explorer. When a route step fails because of the route itself, such as a timeout that is too short or a target that appears twice, the agent fixes that step with `edit_route`, reruns from there, and lists every fix.
   * **Explorer**, given a route name, carries a goal through on its own and records its work into that route as it goes. The steps that succeed go in; failed attempts and the agent's own visibility checks stay out. Everything you dictate is recorded too: your actions and the visibility checks you ask for.
 * **Curation.** Library images come from the Android client or, for a vision-capable agent, from `save_image`: after a `capture` it picks the icon's rectangle and saves it under a `<app>_<screen>_<what>` name — only for targets with no readable text and no YOLO class. Actions come from the client or from `record_action`, and only when you ask for a recording.
+* **Deleting.** A route, image or action is removed only when you ask for that item by name. The agent never cleans up the library on its own, not even to replace an item: saving under the same name overwrites it.
 * **No adb.** The agent never touches the device with `adb` directly — no input, no `screencap`. Every interaction is a step, every look is `scan` or `capture`.
 
 ## Recording gestures
