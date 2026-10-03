@@ -15,17 +15,19 @@ import (
 )
 
 type apiClient struct {
-	baseURL    string
-	client     *http.Client
-	pingClient *http.Client
-	startMu    sync.Mutex
+	baseURL      string
+	client       *http.Client
+	recordClient *http.Client
+	pingClient   *http.Client
+	startMu      sync.Mutex
 }
 
 func newAPIClient(baseURL string) *apiClient {
 	return &apiClient{
-		baseURL:    baseURL,
-		client:     &http.Client{Timeout: 60 * time.Second},
-		pingClient: &http.Client{Timeout: pingTimeout},
+		baseURL:      baseURL,
+		client:       &http.Client{Timeout: 60 * time.Second},
+		recordClient: &http.Client{},
+		pingClient:   &http.Client{Timeout: pingTimeout},
 	}
 }
 
@@ -35,7 +37,16 @@ func (c *apiClient) request(method string, path string, reqBody io.Reader) ([]by
 }
 
 func (c *apiClient) requestStatus(method string, path string, reqBody io.Reader) ([]byte, int, error) {
-	body, status, err := c.send(method, path, reqBody)
+	return c.requestStatusWith(c.client, method, path, reqBody)
+}
+
+func (c *apiClient) requestStatusWith(
+	client *http.Client,
+	method string,
+	path string,
+	reqBody io.Reader,
+) ([]byte, int, error) {
+	body, status, err := c.sendWith(client, method, path, reqBody)
 	if err == nil {
 		return body, status, nil
 	}
@@ -49,7 +60,7 @@ func (c *apiClient) requestStatus(method string, path string, reqBody io.Reader)
 	if err := rewind(reqBody); err != nil {
 		return nil, 0, err
 	}
-	return c.send(method, path, reqBody)
+	return c.sendWith(client, method, path, reqBody)
 }
 
 func rewind(reqBody io.Reader) error {
@@ -62,6 +73,15 @@ func rewind(reqBody io.Reader) error {
 }
 
 func (c *apiClient) send(method string, path string, reqBody io.Reader) ([]byte, int, error) {
+	return c.sendWith(c.client, method, path, reqBody)
+}
+
+func (c *apiClient) sendWith(
+	client *http.Client,
+	method string,
+	path string,
+	reqBody io.Reader,
+) ([]byte, int, error) {
 	req, err := http.NewRequest(method, c.baseURL+path, reqBody)
 	if err != nil {
 		return nil, 0, err
@@ -70,7 +90,7 @@ func (c *apiClient) send(method string, path string, reqBody io.Reader) ([]byte,
 		req.Header.Set("Content-Type", "application/json")
 	}
 
-	resp, err := c.client.Do(req)
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -215,13 +235,13 @@ func (c *apiClient) queueSteps(serial string, steps []stepInput) error {
 	return err
 }
 
-func (c *apiClient) recordAction(serial string, name string) (bool, error) {
-	payload, err := json.Marshal(map[string]string{"name": name})
+func (c *apiClient) recordAction(serial string, name string, timeout int) (bool, error) {
+	payload, err := json.Marshal(map[string]any{"name": name, "timeout": timeout})
 	if err != nil {
 		return false, err
 	}
 	var path = "/devices/" + url.PathEscape(serial) + "/record"
-	_, status, err := c.requestStatus(http.MethodPost, path, bytes.NewReader(payload))
+	_, status, err := c.requestStatusWith(c.recordClient, http.MethodPost, path, bytes.NewReader(payload))
 	if err != nil {
 		return false, err
 	}

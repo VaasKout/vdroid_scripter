@@ -37,7 +37,8 @@ type AdbAPI interface {
 
 	RecordTouches(
 		serial string,
-		duration time.Duration,
+		idle time.Duration,
+		limit time.Duration,
 		screenWidth int,
 		screenHeight int,
 	) (*models.Action, error)
@@ -144,7 +145,8 @@ func (c *cmdImpl) ForwardTCPPort(serial string, port int, tag string) error {
 
 func (c *cmdImpl) RecordTouches(
 	serial string,
-	duration time.Duration,
+	idle time.Duration,
+	limit time.Duration,
 	screenWidth int,
 	screenHeight int,
 ) (*models.Action, error) {
@@ -154,7 +156,7 @@ func (c *cmdImpl) RecordTouches(
 	}
 
 	var command = fmt.Sprintf("adb -s %s shell getevent -lt", serial)
-	output, err := c.executeWithTimeout(command, duration)
+	output, err := c.executeUntilIdle(command, idle, limit, axesByDevice)
 	if err != nil {
 		return nil, err
 	}

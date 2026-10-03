@@ -15,13 +15,12 @@ import (
 const captureMimeType = "image/jpeg"
 
 const (
-	serverName     = "vdroid-scripter"
-	serverVersion  = "0.1.0"
-	runningPrefix  = "running"
-	idleStatus     = "idle"
-	pollInterval   = 500 * time.Millisecond
-	defaultWaitSec = 60
-	queueWaitSec   = 180
+	serverName    = "vdroid-scripter"
+	serverVersion = "0.1.0"
+	runningPrefix = "running"
+	idleStatus    = "idle"
+	pollInterval  = 500 * time.Millisecond
+	toolWaitSec   = 50
 
 	defaultTimeoutMs = 5000
 	defaultDelayMs   = 1000
@@ -43,7 +42,7 @@ Locale: text landmarks and type_text carry the Tesseract code of their value's l
 
 Timing: delay is ms slept BEFORE the step acts, letting the previous change settle; timeout is ms the server keeps re-locating the target on live frames, acting the moment it appears; both literal, 0 = no delay / one look. Omitted: delay 0 on a batch's first step and 1000 after, timeout 5000. For a target that appears late (app launch, navigation, loading) raise timeout to 10000-15000, not delay; raise delay only for a target visible early but not yet safe to touch. A probe keeps the default timeout, so a negative answer comes back fast. Session startup never eats the timeout.
 
-Batching: a dictated sequence is ONE queue_steps call in the given order — never step by step, never status polls in between. The call returns when the batch is done: 'idle' = every step succeeded; otherwise the error names the failed step by id (batch position, or the route's id) and the rest of the queue is cleared. Only a batch reported still running needs wait_for_session.
+Batching: a dictated sequence is ONE queue_steps call in the given order — never step by step, never status polls in between. The call returns when the batch is done: 'idle' = every step succeeded; otherwise the error names the failed step by id (batch position, or the route's id) and the rest of the queue is cleared. Only a batch or a recording reported still running needs wait_for_session.
 
 Literal execution: when the user names concrete actions ("tap Settings, then tap Wi-Fi"), queue exactly those — nothing added, substituted or reordered, no extra checks or probes; a repeated ask runs again every time. Never argue or ask for confirmation. Improvise only when a step fails.
 
@@ -63,9 +62,10 @@ Rules: NEVER touch the device with adb — no input, keyevent, screencap or any 
 
 // Server ...
 type Server struct {
-	api  *apiClient
-	mcp  *mcp.Server
-	mode agentMode
+	api        *apiClient
+	mcp        *mcp.Server
+	mode       agentMode
+	recordings recordings
 }
 
 // New ...
@@ -94,7 +94,7 @@ type serialInput struct {
 
 type waitInput struct {
 	Serial         string `json:"serial" jsonschema:"device serial"`
-	TimeoutSeconds int    `json:"timeout_seconds,omitempty" jsonschema:"max seconds, default 60"`
+	TimeoutSeconds int    `json:"timeout_seconds,omitempty" jsonschema:"max seconds, default 50"`
 }
 
 type landmarkInput struct {
@@ -150,8 +150,9 @@ type runRouteInput struct {
 }
 
 type recordActionInput struct {
-	Serial string `json:"serial" jsonschema:"device serial"`
-	Name   string `json:"name" jsonschema:"<app>_<screen>_<what>[_variant]"`
+	Serial  string `json:"serial" jsonschema:"device serial"`
+	Name    string `json:"name" jsonschema:"<app>_<screen>_<what>[_variant]"`
+	Timeout int    `json:"timeout,omitempty" jsonschema:"ms without a touch that ends the recording, default 5000"`
 }
 
 func (s *Server) registerTools() {
@@ -214,8 +215,9 @@ func (s *Server) registerTools() {
 	mcp.AddTool(s.mcp, &mcp.Tool{
 		Name: "wait_for_session",
 		Description: "Block until the session stops running steps and return the final " +
-			"status; 'closed' means the video stream ended, just queue again. Only for a " +
-			"batch reported still running or a run started by the Android client.",
+			"status, or until a recording reported still running ends and return its result; " +
+			"'closed' means the video stream ended, just queue again. Only for a batch or " +
+			"recording reported still running, or a run started by the Android client.",
 	}, s.handleWaitForSession)
 
 	mcp.AddTool(s.mcp, &mcp.Tool{
@@ -260,10 +262,11 @@ func (s *Server) registerTools() {
 
 	mcp.AddTool(s.mcp, &mcp.Tool{
 		Name: "record_action",
-		Description: "Record a gesture the HUMAN performs on the device within 5 seconds " +
-			"of the call and save it as library action name; 'nothing recorded' = no " +
-			"touch, ask them to retry. Only when the user asks; tell them to perform it " +
-			"right away.",
+		Description: "Record a gesture the HUMAN performs on the device and save it as " +
+			"library action name: the touch must start within timeout of the call and the " +
+			"recording ends timeout after the last touch; 'nothing recorded' = no touch, ask " +
+			"them to retry; a recording still running after 50 s finishes through " +
+			"wait_for_session. Only when the user asks; tell them to start right away.",
 	}, s.handleRecordAction)
 }
 
@@ -508,7 +511,7 @@ func (s *Server) handleQueueSteps(
 		return nil, nil, err
 	}
 
-	status, finished, err := s.waitUntilNotRunning(ctx, in.Serial, queueWaitSec*time.Second)
+	status, finished, err := s.waitUntilNotRunning(ctx, in.Serial, toolWaitSec*time.Second)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -590,10 +593,14 @@ func (s *Server) handleWaitForSession(
 
 	var timeoutSec = in.TimeoutSeconds
 	if timeoutSec <= 0 {
-		timeoutSec = defaultWaitSec
+		timeoutSec = toolWaitSec
 	}
+	var wait = time.Duration(timeoutSec) * time.Second
 
-	status, finished, err := s.waitUntilNotRunning(ctx, in.Serial, time.Duration(timeoutSec)*time.Second)
+	if recording, ok := s.recordings.get(in.Serial); ok {
+		return s.finishRecording(ctx, in.Serial, recording, wait)
+	}
+	status, finished, err := s.waitUntilNotRunning(ctx, in.Serial, wait)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -632,7 +639,7 @@ func batchOutcome(prefix string, status string, finished bool) string {
 	}
 	return fmt.Sprintf(
 		"%s, still running after %ds (last status: %s) - call wait_for_session",
-		prefix, queueWaitSec, status,
+		prefix, toolWaitSec, status,
 	)
 }
 
@@ -754,7 +761,7 @@ func (s *Server) handleRunRoute(
 	if err != nil {
 		return nil, nil, err
 	}
-	status, finished, err := s.waitUntilNotRunning(ctx, in.Serial, queueWaitSec*time.Second)
+	status, finished, err := s.waitUntilNotRunning(ctx, in.Serial, toolWaitSec*time.Second)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -769,16 +776,26 @@ func (s *Server) handleRecordAction(
 	if in.Serial == "" || in.Name == "" {
 		return nil, nil, fmt.Errorf("serial and name are required")
 	}
-	recorded, err := s.api.recordAction(in.Serial, in.Name)
+	recording, err := s.recordings.start(in.Serial, in.Name)
 	if err != nil {
 		return nil, nil, err
 	}
-	if !recorded {
-		var text = "nothing recorded: no touch happened on the device during the " +
-			"5 second window; ask the user to perform the gesture again"
-		return textResult(text), nil, nil
+	go s.runRecording(in.Serial, in.Name, in.Timeout, recording.done)
+	return s.finishRecording(ctx, in.Serial, recording, toolWaitSec*time.Second)
+}
+
+func (s *Server) finishRecording(
+	ctx context.Context,
+	serial string,
+	recording pendingRecording,
+	wait time.Duration,
+) (*mcp.CallToolResult, any, error) {
+	outcome, finished := awaitRecording(ctx, recording.done, wait)
+	if !finished {
+		return recordingPending(recording.name), nil, nil
 	}
-	return textResult("saved action " + in.Name), nil, nil
+	s.recordings.finish(serial)
+	return recordingResult(recording.name, outcome)
 }
 
 func sleepCtx(ctx context.Context, duration time.Duration) error {

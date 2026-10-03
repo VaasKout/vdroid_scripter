@@ -12,8 +12,10 @@ const (
 	StatusError         = "unable to find %s %s on screen"
 )
 
-// RecordDurationSeconds ...
-const RecordDurationSeconds = 5
+const (
+	RecordTimeoutMs          = 5000
+	RecordMaxDurationSeconds = 600
+)
 
 // Session ...
 type Session struct {

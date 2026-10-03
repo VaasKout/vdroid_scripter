@@ -61,6 +61,15 @@ type touchClock struct {
 	startMs int64
 }
 
+func isTouchLine(line string, axesByDevice map[string]touchAxes) bool {
+	match := eventLineRegexp.FindStringSubmatch(line)
+	if match == nil {
+		return false
+	}
+	_, ok := axesByDevice[match[3]]
+	return ok
+}
+
 func parseAxisRanges(output string) map[string]map[string]axisRange {
 	rangesByDevice := map[string]map[string]axisRange{}
 	var current string

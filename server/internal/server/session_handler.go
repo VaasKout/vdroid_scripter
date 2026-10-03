@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"time"
 )
 
 // Session paths
@@ -15,10 +16,6 @@ const (
 	DeviceSession = Devices + "/{" + SerialKey + "}/session"
 	DeviceRecord  = Devices + "/{" + SerialKey + "}/record"
 )
-
-type recordRequest struct {
-	Name string `json:"name"`
-}
 
 func (s *serverImpl) handleSessionFunctions() {
 	http.HandleFunc(DeviceSession, func(w http.ResponseWriter, r *http.Request) {
@@ -59,14 +56,18 @@ func (s *serverImpl) handleRecordAction(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	var request recordRequest
+	var request struct {
+		Name    string `json:"name"`
+		Timeout int    `json:"timeout"`
+	}
 	err := json.NewDecoder(r.Body).Decode(&request)
 	if err != nil || !file.ValidName(request.Name) {
 		http.Error(w, `valid "name" required`, http.StatusBadRequest)
 		return
 	}
 
-	recorded, err := s.interactor.RecordAction(serial, request.Name, s.serverProps.SocketPort)
+	timeout := time.Duration(request.Timeout) * time.Millisecond
+	recorded, err := s.interactor.RecordAction(serial, request.Name, timeout, s.serverProps.SocketPort)
 	if errors.Is(err, usecases.ErrDeviceBusy) {
 		http.Error(w, err.Error(), http.StatusConflict)
 		return

@@ -49,7 +49,7 @@ This document describes every HTTP endpoint exposed by the server, defined in
 | POST | `/devices/{serial}/session` | Open a session: start scrcpy and the video/control sockets |
 | GET | `/devices/{serial}/session` | Get the active session's ports |
 | DELETE | `/devices/{serial}/session` | Close the session |
-| POST | `/devices/{serial}/record` | Record a gesture performed on the device for 5 seconds and save it as a library action |
+| POST | `/devices/{serial}/record` | Record a gesture performed on the device, until `timeout` ms pass without a touch, and save it as a library action |
 
 ## Devices
 
@@ -462,24 +462,31 @@ Records a gesture the human performs on the device and saves it as a
 library action — the server-side counterpart of the Android client's
 recorder, made for clients without a screen of their own (the MCP). If the
 device has no open session, one is opened automatically (as for
-`queue_steps`). The session status becomes `recording`, the server listens
-to the touch panel through `adb shell getevent` for **5 seconds**, and the
-call blocks for that whole window — tell the human to perform the gesture
-right after sending the request. Only the first finger is kept; raw panel
+`queue_steps`). The session status becomes `recording` and the server
+listens to the touch panel through `adb shell getevent` with an **idle
+timer** of `timeout` milliseconds (5000 when omitted): the first touch must
+come within that time of the call, every touch event restarts the timer, and
+the recording stops one timeout after the last touch — or after
+**10 minutes** at the most. The call blocks until then,
+so tell the human to start the gesture right after sending the request; it
+may then take as long as it needs. Only the first finger is kept; raw panel
 coordinates are scaled to the session's video frame size (the size every
 replayed touch must carry), the device's natural orientation is assumed, and
 the events are stored exactly like a client-recorded [`Action`](#action)
-with times relative to the first touch.
+with times relative to the first touch — the idle tail that ends the
+recording is not part of it.
 While recording, `queue_steps` and `run_route` answer `409`, and the session
 worker does not start queued steps.
 
 - **Path params:** `serial` (required).
-- **Request body:** `{ "name": "shop_catalog_swipe_1" }` — the library
-  action name (trimmed, no path separators); an existing action with the
-  same name is overwritten.
+- **Request body:** `{ "name": "shop_catalog_swipe_1", "timeout": 5000 }` —
+  the library action name (trimmed, no path separators; an existing action
+  with the same name is overwritten) and the optional idle timeout in
+  milliseconds: a value above `0` is used as given, anything else means
+  `5000`.
 - **Response `200`:** `{ "status": "ok" }` — the action was saved.
-- **Response `204`:** no touch happened during the window; nothing was
-  saved.
+- **Response `204`:** no touch happened within the timeout after the call;
+  nothing was saved.
 - **Errors:** `400` on invalid JSON or a bad `name`; `409` when the device is
   running steps or already recording; `500` when the session could not be
   started, adb failed, or the file could not be written.

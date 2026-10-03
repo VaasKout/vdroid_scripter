@@ -22,7 +22,7 @@ type SessionUseCase interface {
 	CloseAllSessions()
 	GetPortsJSON(serial string) map[string]string
 	GetSessionStatus(serial string) string
-	RecordAction(serial string, name string, basePort int) (bool, error)
+	RecordAction(serial string, name string, timeout time.Duration, basePort int) (bool, error)
 }
 
 func (i *interactorImpl) StartSession(serial string, basePort int) bool {
@@ -235,9 +235,17 @@ func (i *interactorImpl) finishSessionStep(serial string) {
 	i.changeStatus(serial, models.StatusIdle)
 }
 
-func (i *interactorImpl) RecordAction(serial string, name string, basePort int) (bool, error) {
+func (i *interactorImpl) RecordAction(
+	serial string,
+	name string,
+	timeout time.Duration,
+	basePort int,
+) (bool, error) {
 	serial = strings.TrimSpace(serial)
 	name = strings.TrimSpace(name)
+	if timeout <= 0 {
+		timeout = models.RecordTimeoutMs * time.Millisecond
+	}
 	if serial == "" {
 		return false, errors.New(SerialIsEmptyError)
 	}
@@ -247,7 +255,7 @@ func (i *interactorImpl) RecordAction(serial string, name string, basePort int) 
 	if err := i.ensureSessionIsRunning(serial, basePort); err != nil {
 		return false, err
 	}
-    defer i.changeStatus(serial, models.StatusIdle)
+	defer i.changeStatus(serial, models.StatusIdle)
 
 	session, ok := i.sessionsCache.Get(serial)
 	if !ok || len(session.Query) != 0 || session.IsBusy() {
@@ -255,18 +263,14 @@ func (i *interactorImpl) RecordAction(serial string, name string, basePort int) 
 	}
 	i.changeStatus(serial, models.StatusRecording)
 	i.logger.Info(fmt.Sprintf(
-		"recording %s on %s for %ds... ⏳", name, serial, models.RecordDurationSeconds,
+		"recording %s on %s until %s without input... ⏳", name, serial, timeout,
 	))
 	width, height, err := i.scrcpy.GetScreenSize(serial)
 	if err != nil {
 		return false, err
 	}
-	action, err := i.cmd.RecordTouches(
-		serial,
-		time.Duration(models.RecordDurationSeconds)*time.Second,
-		width,
-		height,
-	)
+	limit := time.Duration(models.RecordMaxDurationSeconds) * time.Second
+	action, err := i.cmd.RecordTouches(serial, timeout, limit, width, height)
 	if err != nil {
 		return false, err
 	}

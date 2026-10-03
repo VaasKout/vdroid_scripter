@@ -243,7 +243,7 @@ The server keeps running after the AI session ends, so later sessions find it al
 | `capture` | The current screen as a JPEG — only for agents that can see images, and only where `scan` is not enough |
 | `save_image` | Crop a rectangle of the current screen into a library image — for vision-capable agents curating icon targets |
 | `queue_steps` | Queue a whole sequence of steps in one call |
-| `wait_for_session` | Block until the queue finishes, then report `idle` or the error — only after `queue_steps`/`run_route` reported a batch still running, or for a run started from the app |
+| `wait_for_session` | Block until the queue finishes, then report `idle` or the error — only after `queue_steps`/`run_route` reported a batch still running, `record_action` a recording still running, or for a run started from the app |
 | `get_session_status` | The current session status |
 | `close_session` | Close the device session |
 | `record_action` | Record a gesture the human performs on the device, see below |
@@ -263,7 +263,7 @@ Once the MCP server is registered, describe the flow in plain words. The agent t
 * "Type hello into the search field."
 * "If the Accept button is visible, tap it. Then open the menu."
 * "Save this flow as `shop_checkout`." and later "Run `shop_checkout` on the emulator."
-* "Record a gesture as `gallery_photo_drag_1`." The agent starts a 5 second window, and you perform the gesture on the device.
+* "Record a gesture as `gallery_photo_drag_1`." The agent starts the recorder, you perform the gesture on the device, and the recording ends 5 seconds after your last touch. "Record `menu_long_drag` with a 10 second timeout" gives you longer pauses.
 
 Anything written on the screen needs nothing from the library. Text landmarks and the generated events cover it. The library is only needed for a target with no readable text, such as an icon, and for a recorded gesture.
 
@@ -272,7 +272,7 @@ Anything written on the screen needs nothing from the library. Text landmarks an
 The MCP server ships its own instructions to the AI, so you do not have to explain the tool. In short:
 
 * **Start with `ping`**, then `list_devices` for a serial. `ping` brings the server up when it is down.
-* **Batch.** A dictated sequence becomes one `queue_steps` call, which blocks until the batch is done and reports `idle` or the failed step. The agent does not queue step by step and does not poll the status in between; `wait_for_session` is only for a batch that ran past the call's three-minute wait.
+* **Batch.** A dictated sequence becomes one `queue_steps` call, which blocks until the batch is done and reports `idle` or the failed step. The agent does not queue step by step and does not poll the status in between; `wait_for_session` is only for a batch that ran past the call's 50 second wait, or a recording that did.
 * **Text is free.** An instruction phrased in words visible on screen is a chain of `tap` steps with `text` landmarks.
 * **Locale.** Text landmarks and `type_text` carry the Tesseract language code of their value, `eng` by default. Text is passed exactly as written, never transliterated or translated.
 * **Perception.** `scan` is the way to look at the screen. The agent scans when a step failed, when the instruction is conditional, or when you ask what is on screen. It does not scan habitually between steps. The MCP hands the agent a compact table rather than the server's JSON, and leaves out text the OCR read with confidence below 40 (icon glyphs and stray punctuation), saying how many entries it dropped.
@@ -294,7 +294,7 @@ The MCP server ships its own instructions to the AI, so you do not have to expla
 A library action can be recorded in two ways.
 
 * **In the Android client.** On the streaming screen, press the plus icon, name the action, choose the custom action type, and perform the gesture on the streamed screen.
-* **On the device itself.** `POST /devices/{serial}/record` with `{"name": "<action name>"}`, or the `record_action` MCP tool, listens to the device's touch panel for 5 seconds. Perform the gesture on the device right after the call. The reply is `200` when the action was saved and `204` when no touch happened in the window. Only the first finger is kept, and the device's natural orientation is assumed. While a device is recording, queueing steps on it is refused with `409`.
+* **On the device itself.** `POST /devices/{serial}/record` with `{"name": "<action name>", "timeout": 5000}`, or the `record_action` MCP tool, listens to the device's touch panel. Start the gesture within the timeout (milliseconds, 5000 when omitted); every touch restarts that timer, so the gesture may take as long as you need, and the recording ends one timeout after your last touch (or after 10 minutes at the most). The reply is `200` when the action was saved and `204` when no touch happened within the first timeout. The idle tail is not part of the action: its times start at the first touch and end at the last. Only the first finger is kept, and the device's natural orientation is assumed. While a device is recording, queueing steps on it is refused with `409`.
 
 ## API reference
 
