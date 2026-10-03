@@ -247,11 +247,13 @@ func (i *interactorImpl) RecordAction(serial string, name string, basePort int) 
 	if err := i.ensureSessionIsRunning(serial, basePort); err != nil {
 		return false, err
 	}
-	if !i.startRecording(serial) {
+    defer i.changeStatus(serial, models.StatusIdle)
+
+	session, ok := i.sessionsCache.Get(serial)
+	if !ok || len(session.Query) != 0 || session.IsBusy() {
 		return false, ErrDeviceBusy
 	}
-	defer i.changeStatus(serial, models.StatusIdle)
-
+	i.changeStatus(serial, models.StatusRecording)
 	i.logger.Info(fmt.Sprintf(
 		"recording %s on %s for %ds... ⏳", name, serial, models.RecordDurationSeconds,
 	))
@@ -279,13 +281,4 @@ func (i *interactorImpl) RecordAction(serial string, name string, basePort int) 
 	}
 	i.logger.Info(fmt.Sprintf("recorded %s with %d events ✅", name, len(action.Events)))
 	return true, nil
-}
-
-func (i *interactorImpl) startRecording(serial string) bool {
-	session, ok := i.sessionsCache.Get(serial)
-	if !ok || len(session.Query) != 0 || session.IsBusy() {
-		return false
-	}
-	i.changeStatus(serial, models.StatusRecording)
-	return true
 }
