@@ -171,16 +171,40 @@ func (i *interactorImpl) GetSessionStatus(serial string) string {
 	return session.Status
 }
 
+func (i *interactorImpl) changeStatus(serial string, status string) {
+	session, ok := i.sessionsCache.Get(serial)
+	if !ok {
+		return
+	}
+	session.Status = status
+	i.sessionsCache.Add(serial, session)
+}
+
+func (i *interactorImpl) updateQueue(serial string, query []models.Step) {
+	session, ok := i.sessionsCache.Get(serial)
+	if !ok {
+		return
+	}
+	session.Query = query
+	i.sessionsCache.Add(serial, session)
+}
+
+func runningStatus(step models.Step) string {
+	return fmt.Sprintf(models.StatusRunningStep, step.ToString())
+}
+
 func (i *interactorImpl) addStepsToQueue(serial string, steps []models.Step) bool {
 	session, ok := i.sessionsCache.Get(serial)
 	if !ok {
 		return false
 	}
-	session.Query = append(session.Query, steps...)
-	if !session.IsBusy() {
-		session.Status = fmt.Sprintf(models.StatusRunningStep, steps[0].ToString())
+	query := append(session.Query, steps...)
+	i.updateQueue(serial, query)
+	if session.IsBusy() {
+		return true
 	}
-	i.sessionsCache.Add(serial, session)
+	status := runningStatus(steps[0])
+	i.changeStatus(serial, status)
 	return true
 }
 
@@ -191,20 +215,16 @@ func (i *interactorImpl) popNextStep(serial string) (models.Step, bool) {
 	}
 
 	step := session.Query[0]
-	session.Query = session.Query[1:]
-	session.Status = fmt.Sprintf(models.StatusRunningStep, step.ToString())
-	i.sessionsCache.Add(serial, session)
+	rest := session.Query[1:]
+	i.updateQueue(serial, rest)
+	status := runningStatus(step)
+	i.changeStatus(serial, status)
 	return step, true
 }
 
 func (i *interactorImpl) failSessionQueue(serial string, err error) {
-	session, ok := i.sessionsCache.Get(serial)
-	if !ok {
-		return
-	}
-	session.Status = err.Error()
-	session.Query = nil
-	i.sessionsCache.Add(serial, session)
+	i.updateQueue(serial, nil)
+	i.changeStatus(serial, err.Error())
 }
 
 func (i *interactorImpl) finishSessionStep(serial string) {
@@ -212,8 +232,7 @@ func (i *interactorImpl) finishSessionStep(serial string) {
 	if !ok || len(session.Query) != 0 {
 		return
 	}
-	session.Status = models.StatusIdle
-	i.sessionsCache.Add(serial, session)
+	i.changeStatus(serial, models.StatusIdle)
 }
 
 func (i *interactorImpl) RecordAction(serial string, name string, basePort int) (bool, error) {
@@ -231,7 +250,7 @@ func (i *interactorImpl) RecordAction(serial string, name string, basePort int) 
 	if !i.startRecording(serial) {
 		return false, ErrDeviceBusy
 	}
-	defer i.finishRecording(serial)
+	defer i.changeStatus(serial, models.StatusIdle)
 
 	i.logger.Info(fmt.Sprintf(
 		"recording %s on %s for %ds... ⏳", name, serial, models.RecordDurationSeconds,
@@ -264,22 +283,9 @@ func (i *interactorImpl) RecordAction(serial string, name string, basePort int) 
 
 func (i *interactorImpl) startRecording(serial string) bool {
 	session, ok := i.sessionsCache.Get(serial)
-	if !ok || len(session.Query) != 0 {
+	if !ok || len(session.Query) != 0 || session.IsBusy() {
 		return false
 	}
-	if session.IsBusy() {
-		return false
-	}
-	session.Status = models.StatusRecording
-	i.sessionsCache.Add(serial, session)
+	i.changeStatus(serial, models.StatusRecording)
 	return true
-}
-
-func (i *interactorImpl) finishRecording(serial string) {
-	session, ok := i.sessionsCache.Get(serial)
-	if !ok || session.Status != models.StatusRecording {
-		return
-	}
-	session.Status = models.StatusIdle
-	i.sessionsCache.Add(serial, session)
 }
