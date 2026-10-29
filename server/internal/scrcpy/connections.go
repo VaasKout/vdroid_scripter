@@ -59,39 +59,40 @@ func (s *scrcpyImpl) ReadVideoStream(serial string, clientCh chan []byte) {
 		return
 	}
 
-	var frameBuf = make([]byte, BufSize)
+	var frameBuf = make([]byte, HeaderSize+InitialPacketSize)
 	var handlerCh = make(chan []byte, 10)
 	defer close(handlerCh)
 
 	go s.handleFramesManually(scrcpyData.Data, handlerCh)
+	var streamErr error
 	for {
-		headerSize, err := io.ReadFull(scrcpyData.VideoConn, frameBuf[:HeaderSize])
+		_, err := io.ReadFull(scrcpyData.VideoConn, frameBuf[:HeaderSize])
 		if err != nil {
-			s.logAPI.Error(fmt.Sprintf("reading head error: %s", err.Error()))
+			streamErr = fmt.Errorf("reading header: %w", err)
+			s.logAPI.Error(streamErr.Error())
 			break
 		}
 
-		if headerSize != HeaderSize {
-			s.logAPI.Error(fmt.Sprintf("header size is not compatible %d/%d", headerSize, HeaderSize))
+		packetSize := int(binary.BigEndian.Uint32(frameBuf[8:12]))
+		if packetSize <= 0 || packetSize > MaxPacketSize {
+			streamErr = fmt.Errorf("bad header, packet size %d", packetSize)
+			s.logAPI.Error(streamErr.Error())
 			break
 		}
 
-		var freeSpace = BufSize - headerSize
-		packetSize := binary.BigEndian.Uint32(frameBuf[8:12])
-		if int(packetSize) <= 0 || int(packetSize) > freeSpace {
-			s.logAPI.Error(fmt.Sprintf("bad header data packeSize: %d", packetSize))
-			break
+		var totalSize = HeaderSize + packetSize
+		if totalSize > len(frameBuf) {
+			s.logAPI.Info(fmt.Sprintf("video packet of %d bytes, growing the read buffer", packetSize))
+			grown := make([]byte, totalSize)
+			copy(grown, frameBuf[:HeaderSize])
+			frameBuf = grown
 		}
 
-		var totalSize = headerSize + int(packetSize)
-		size, err := io.ReadFull(scrcpyData.VideoConn, frameBuf[headerSize:totalSize])
+		_, err = io.ReadFull(scrcpyData.VideoConn, frameBuf[HeaderSize:totalSize])
 		if err != nil {
-			s.logAPI.Error(fmt.Sprintf("packet reading error: %s", err.Error()))
+			streamErr = fmt.Errorf("reading packet of %d bytes: %w", packetSize, err)
+			s.logAPI.Error(streamErr.Error())
 			break
-		}
-
-		if size < 0 || size < int(packetSize) {
-			s.logAPI.Error(fmt.Sprintf("size is not compatible %d/%d", size, packetSize))
 		}
 
 		var bufCopy = make([]byte, totalSize)
@@ -105,6 +106,7 @@ func (s *scrcpyImpl) ReadVideoStream(serial string, clientCh chan []byte) {
 		default:
 		}
 	}
+	scrcpyData.markStreamEnded(streamErr)
 }
 
 func (s *scrcpyImpl) handleFramesManually(data *DecoderData, handlerCh <-chan []byte) {
@@ -114,12 +116,7 @@ func (s *scrcpyImpl) handleFramesManually(data *DecoderData, handlerCh <-chan []
 			s.logAPI.Info("closing manual frames handler... 🛑")
 			return
 		}
-
-		var packetSize = binary.BigEndian.Uint32(buf[8:12])
-		var totalSize = HeaderSize + int(packetSize)
-		copy(data.HeaderBuf, buf[:HeaderSize])
-		copy(data.Buf[:packetSize], buf[HeaderSize:totalSize])
-		s.handlePackets(data)
+		s.handlePacket(data, buf)
 	}
 }
 
@@ -127,6 +124,9 @@ func (s *scrcpyImpl) GetMatFromLastFrame(serial string, rgb bool) (*gocv.Mat, er
 	scrcpyData, ok := s.scrcpyCache.Get(serial)
 	if !ok || scrcpyData == nil {
 		return nil, fmt.Errorf("video connecton for %s is not active", serial)
+	}
+	if err := scrcpyData.streamEnded(); err != nil {
+		return nil, fmt.Errorf("video stream for %s ended: %w", serial, err)
 	}
 
 	mat := s.frameToMat(scrcpyData.Data, rgb)

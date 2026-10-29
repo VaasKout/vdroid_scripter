@@ -10,8 +10,9 @@ import (
 
 // Size of different buffers
 const (
-	BufSize    = 1 * 1024 * 1024 //1MB
-	HeaderSize = 12
+	HeaderSize        = 12
+	InitialPacketSize = 1 * 1024 * 1024
+	MaxPacketSize     = 64 * 1024 * 1024
 )
 
 // PTS flags
@@ -26,8 +27,6 @@ const (
 type DecoderData struct {
 	Decoder *h264.Decoder
 
-	Buf            []byte
-	HeaderBuf      []byte
 	ConfigFrameBuf []byte
 }
 
@@ -39,9 +38,7 @@ func (d *DecoderData) Free() {
 	if d.Decoder != nil {
 		d.Decoder.Close()
 	}
-	d.HeaderBuf = []byte{}
 	d.ConfigFrameBuf = []byte{}
-	d.Buf = []byte{}
 }
 
 // Allocate ...
@@ -56,8 +53,6 @@ func (d *DecoderData) Allocate(width, height int) error {
 	}
 
 	d.Decoder = decoder
-	d.HeaderBuf = make([]byte, HeaderSize)
-	d.Buf = make([]byte, BufSize)
 	return nil
 }
 
@@ -69,39 +64,36 @@ func (d *DecoderData) GetSize() (width, height int) {
 	return d.Decoder.Size()
 }
 
-func (s *scrcpyImpl) handlePackets(data *DecoderData) error {
+func (s *scrcpyImpl) handlePacket(data *DecoderData, packet []byte) error {
 	if data == nil || data.Decoder == nil {
 		return fmt.Errorf("decoder data is nil")
 	}
-	if len(data.HeaderBuf) < HeaderSize {
-		return fmt.Errorf("data is empty")
+	if len(packet) < HeaderSize {
+		return fmt.Errorf("packet is shorter than its header")
 	}
 
-	pts := binary.BigEndian.Uint64(data.HeaderBuf[0:8])
-	packetSize := binary.BigEndian.Uint32(data.HeaderBuf[8:12])
-	if pts <= 0 || int(packetSize) == 0 {
+	pts := binary.BigEndian.Uint64(packet[0:8])
+	packetSize := int(binary.BigEndian.Uint32(packet[8:12]))
+	if pts <= 0 || packetSize == 0 || len(packet) < HeaderSize+packetSize {
+		return nil
+	}
+	payload := packet[HeaderSize : HeaderSize+packetSize]
+
+	if pts&SCPacketFlagConfig != 0 {
+		data.ConfigFrameBuf = append([]byte{}, payload...)
 		return nil
 	}
 
-	var configSize = len(data.ConfigFrameBuf)
-	var neededSpace = configSize + int(packetSize)
-	if configSize > 0 {
-		copy(data.Buf[configSize:], data.Buf[:len(data.Buf)])
-		copy(data.Buf[:configSize], data.ConfigFrameBuf)
+	frame := payload
+	if len(data.ConfigFrameBuf) > 0 {
+		frame = make([]byte, 0, len(data.ConfigFrameBuf)+len(payload))
+		frame = append(frame, data.ConfigFrameBuf...)
+		frame = append(frame, payload...)
 		data.ConfigFrameBuf = []byte{}
 	}
 
-	if pts&SCPacketFlagConfig != 0 {
-		data.ConfigFrameBuf = append([]byte{}, data.Buf[:neededSpace]...)
-		return nil
-	}
-
 	keyFrame := pts&SCPacketFlagKeyFrame != 0
-	err := data.Decoder.Decode(
-		data.Buf[:neededSpace],
-		keyFrame,
-		int64(pts&SCPacketPtsMask),
-	)
+	err := data.Decoder.Decode(frame, keyFrame, int64(pts&SCPacketPtsMask))
 	if err != nil {
 		s.logAPI.Error(fmt.Sprintf("decoding packet failed: %s", err.Error()))
 	}

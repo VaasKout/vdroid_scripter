@@ -14,6 +14,7 @@ import (
 	"net"
 	"net/http"
 	"path/filepath"
+	"sync"
 	"time"
 )
 
@@ -36,6 +37,23 @@ type Data struct {
 	VideoConn   net.Conn
 	ControlConn net.Conn
 	Data        *DecoderData
+
+	streamMu  sync.Mutex
+	streamErr error
+}
+
+func (d *Data) markStreamEnded(err error) {
+	d.streamMu.Lock()
+	defer d.streamMu.Unlock()
+	if d.streamErr == nil {
+		d.streamErr = err
+	}
+}
+
+func (d *Data) streamEnded() error {
+	d.streamMu.Lock()
+	defer d.streamMu.Unlock()
+	return d.streamErr
 }
 
 // Scrcpy ...

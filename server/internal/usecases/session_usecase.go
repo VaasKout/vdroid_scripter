@@ -53,7 +53,8 @@ func (i *interactorImpl) ensureSessionIsRunning(serial string, basePort int) err
 	if !i.StartSession(serial, basePort) {
 		return fmt.Errorf("couldn't start scrcpy server for %s", serial)
 	}
-	go i.scrcpy.ReadVideoStream(serial, nil)
+	session, _ := i.sessionsCache.Get(serial)
+	go i.readVideoStream(serial, session.DoneCh)
 
 	deadline := time.Now().Add(time.Duration(models.FirstFrameTimeout) * time.Second)
 	for time.Now().Before(deadline) {
@@ -68,6 +69,16 @@ func (i *interactorImpl) ensureSessionIsRunning(serial string, basePort int) err
 	return fmt.Errorf("no video frame received from %s", serial)
 }
 
+func (i *interactorImpl) readVideoStream(serial string, doneCh chan struct{}) {
+	i.scrcpy.ReadVideoStream(serial, nil)
+	current, ok := i.sessionsCache.Get(serial)
+	if !ok || current.DoneCh != doneCh {
+		return
+	}
+	i.logger.Error(fmt.Sprintf("video stream for %s ended: closing the session, the next command reopens it", serial))
+	i.CloseSession(serial)
+}
+
 func (i *interactorImpl) CloseSession(serial string) {
 	i.logger.Info(
 		fmt.Sprintf(
@@ -75,11 +86,11 @@ func (i *interactorImpl) CloseSession(serial string) {
 			serial,
 		),
 	)
-	i.scrcpy.CloseScrcpyServer(serial)
 	if connection, ok := i.sessionsCache.Get(serial); ok {
 		close(connection.DoneCh)
 		i.sessionsCache.Delete(serial)
 	}
+	i.scrcpy.CloseScrcpyServer(serial)
 	i.setScrcpyState(serial, false)
 }
 

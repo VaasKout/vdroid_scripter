@@ -2,15 +2,15 @@ package bashcmd
 
 import (
 	"fmt"
-	"os"
-	"strconv"
-	"strings"
+	"regexp"
+	"syscall"
+	"time"
 )
 
 // Path properties
 const (
 	ScrCpyDefaultPath = "/data/local/tmp/scrcpy-server.jar"
-	ScrcpyProcessName = "scrcpy"
+	scrcpyStopGrace   = 3 * time.Second
 )
 
 // ScrcpyCmdConfig ...
@@ -100,43 +100,37 @@ func (c *cmdImpl) ConnectToScrcpy(serial string, config *ScrcpyCmdConfig) error 
 		command += " stay_awake=true"
 	}
 
-	return c.executeInBackground(command)
-}
-
-func (c *cmdImpl) scrcpyPids(serial string) []string {
-	var filteredPids []string
-	pids := c.pidsOfProcess(ScrcpyProcessName)
-	if len(pids) > 0 {
-		psList := c.psAuxList(ScrcpyProcessName)
-		for _, ps := range psList {
-			for _, pid := range pids {
-				var hasSerial = strings.Contains(ps, serial)
-				var hasPid = strings.Contains(ps, pid)
-
-				if hasSerial && hasPid {
-					filteredPids = append(filteredPids, pid)
-				}
-			}
-		}
+	proc, err := c.startInBackground(command)
+	if err != nil {
+		return err
 	}
-	return filteredPids
+	c.scrcpyMu.Lock()
+	previous := c.scrcpyProcs[serial]
+	c.scrcpyProcs[serial] = proc
+	c.scrcpyMu.Unlock()
+	if previous != nil {
+		c.stopProc(previous, scrcpyStopGrace)
+	}
+	return nil
 }
 
-// KillScrcpy ...
+func scrcpyLaunchPattern(serial string) string {
+	return "^adb -s " + regexp.QuoteMeta(serial) + " shell CLASSPATH=" + regexp.QuoteMeta(ScrCpyDefaultPath)
+}
+
 func (c *cmdImpl) KillScrcpy(serial string) {
-	pids := c.scrcpyPids(serial)
-	for _, pid := range pids {
-		pidInt, err := strconv.Atoi(pid)
-		if err != nil {
-			fmt.Printf("Failed to convert pid to int: %s\n", pid)
-			continue
-		}
-		proc, _ := os.FindProcess(pidInt)
-		proc.Kill()
-		c.logger.Info("-------")
-		c.logger.Info(fmt.Sprintf("Killing process %d for %s... ⏳", pidInt, serial))
-		proc.Wait()
-		c.logger.Info(fmt.Sprintf("Killed process %d for %s ✅", pidInt, serial))
-		c.logger.Info("-------")
+	c.scrcpyMu.Lock()
+	proc := c.scrcpyProcs[serial]
+	delete(c.scrcpyProcs, serial)
+	c.scrcpyMu.Unlock()
+	if proc != nil {
+		c.logger.Info(fmt.Sprintf("stopping scrcpy shell %d for %s... ⏳", proc.cmd.Process.Pid, serial))
+		c.stopProc(proc, scrcpyStopGrace)
+		c.logger.Info(fmt.Sprintf("scrcpy shell for %s stopped ✅", serial))
+	}
+
+	for _, pid := range c.pidsMatching(scrcpyLaunchPattern(serial)) {
+		c.logger.Info(fmt.Sprintf("killing stray scrcpy shell %d for %s... ⏳", pid, serial))
+		_ = syscall.Kill(pid, syscall.SIGKILL)
 	}
 }

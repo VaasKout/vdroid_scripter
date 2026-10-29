@@ -10,7 +10,9 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 )
@@ -23,6 +25,14 @@ type CmdAPI interface {
 type cmdImpl struct {
 	logger  *logger.Logger
 	filesDB filesdb.FilesDB
+
+	scrcpyMu    sync.Mutex
+	scrcpyProcs map[string]*backgroundProc
+}
+
+type backgroundProc struct {
+	cmd  *exec.Cmd
+	done chan struct{}
 }
 
 // New instance of CmdAPI
@@ -31,8 +41,9 @@ func New(
 	logger *logger.Logger,
 ) CmdAPI {
 	return &cmdImpl{
-		logger:  logger,
-		filesDB: filesDB,
+		logger:      logger,
+		filesDB:     filesDB,
+		scrcpyProcs: make(map[string]*backgroundProc),
 	}
 }
 
@@ -151,42 +162,56 @@ func collectUntilIdle(
 	}
 }
 
-func (c *cmdImpl) executeInBackground(cmd string) error {
+func (c *cmdImpl) startInBackground(cmd string) (*backgroundProc, error) {
 	if cmd == "" {
-		return fmt.Errorf("cmd is empty")
+		return nil, fmt.Errorf("cmd is empty")
 	}
 
 	c.logger.Info("-------")
 	cmdExec := exec.Command("bash", "-c", cmd)
 	cmdExec.Stdin = os.Stdin
 	cmdExec.Stderr = os.Stderr
+	cmdExec.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	err := cmdExec.Start()
 	if err != nil {
 		c.logger.Error(fmt.Sprintf("(%s) error during starting in background: %s", cmd, err.Error()))
-		return err
+		return nil, err
 	}
 	c.logger.Info(fmt.Sprintf("(%s) Starting in background... ⏳", cmd))
-	return nil
+
+	proc := &backgroundProc{cmd: cmdExec, done: make(chan struct{})}
+	go proc.wait()
+	return proc, nil
 }
 
-func (c *cmdImpl) pidsOfProcess(name string) []string {
-	result, err := c.ExecuteCommand(fmt.Sprintf("pgrep -f %s", name))
-	if err != nil {
-		return []string{}
-	}
-	var formattedResult = strings.TrimSpace(result)
-	return strings.Split(formattedResult, "\n")
+func (p *backgroundProc) wait() {
+	_ = p.cmd.Wait()
+	close(p.done)
 }
 
-func (c *cmdImpl) psAuxList(filter string) []string {
-	var cmd = "ps aux"
-	if filter != "" {
-		cmd = fmt.Sprintf("%s | grep %s", cmd, filter)
+func (c *cmdImpl) stopProc(proc *backgroundProc, grace time.Duration) {
+	pid := proc.cmd.Process.Pid
+	_ = syscall.Kill(-pid, syscall.SIGTERM)
+	select {
+	case <-proc.done:
+		return
+	case <-time.After(grace):
 	}
-	result, err := c.ExecuteCommand(cmd)
+	_ = syscall.Kill(-pid, syscall.SIGKILL)
+	<-proc.done
+}
+
+func (c *cmdImpl) pidsMatching(pattern string) []int {
+	output, err := exec.Command("pgrep", "-f", pattern).Output()
 	if err != nil {
-		return []string{}
+		return nil
 	}
-	var formattedResult = strings.TrimSpace(result)
-	return strings.Split(formattedResult, "\n")
+	var pids []int
+	for _, field := range strings.Fields(string(output)) {
+		pid, err := strconv.Atoi(field)
+		if err == nil && pid > 0 {
+			pids = append(pids, pid)
+		}
+	}
+	return pids
 }
