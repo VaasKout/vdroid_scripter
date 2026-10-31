@@ -74,6 +74,7 @@ Returns all ADB devices currently visible to the server.
         "locale": "en-US",
         "model": "Pixel 6 Pro",
         "os_version": "14",
+        "model_os": "pixel_6_pro_14",
         "manufacturer": "Google",
         "marketing_name": "Pixel 6 Pro",
         "density": 560,
@@ -168,9 +169,30 @@ same way (see [Step](#step)). Scaling cannot help when another Android
 version or vendor skin draws the element differently — save a second image
 under a variant name for that.
 
+### Device-specific items
+
+An item whose name ends in `_<model_os>` — the device's
+[`model_os`](#adbdevice), for example `home_sm_a155f_14` — is the variant of
+`home` for that device model and Android version; an item without such a
+suffix is common to every device. Steps, routes and `scan` name the item
+**without** the suffix: when a step runs, the server looks for
+`<name>_<model_os>` of the session's device first and falls back to `<name>`,
+so one route runs on every device and each device gets its own variant. A
+missing item is reported as `event not found in library: <name> (tried
+<name>_<model_os>, <name>)` (`image not found in library: ...` for images). A
+route is validated when it is saved against the devices connected at that
+moment: a name passes when the common item or a variant for any connected
+device exists. `GET /library` lists every item under its full name and
+deletion takes the full name too. New items are common unless the request
+says otherwise: [`POST /save_image`](#post-save_image) and
+[`POST /devices/{serial}/record`](#post-devicesserialrecord) take
+`"device_specific": true`, append the device's suffix themselves and return
+the final name; `POST /save_action` stores the name as sent, so a client
+appends the suffix itself.
+
 ### `GET /library`
 
-Lists everything in the library.
+Lists everything in the library, device-specific items under their full names.
 
 - **Response `200`:**
   ```json
@@ -193,15 +215,21 @@ has no open session, one is opened automatically like `/devices/{serial}/scan`.
   ```json
   {
     "serial": "ABCD1234",
-    "rectangle": { "left_x": 100, "right_x": 300, "top_y": 200, "bottom_y": 260, "label": "catalog_cart_icon" }
+    "rectangle": { "left_x": 100, "right_x": 300, "top_y": 200, "bottom_y": 260, "label": "catalog_cart_icon" },
+    "device_specific": false
   }
   ```
   The image name comes from `rectangle.label` — required, no path separators.
-  `serial` and a non-empty `rectangle` are required. An existing image with the
-  same name is overwritten.
-- **Response `200`:** `{ "status": "ok" }`
+  `serial` and a non-empty `rectangle` are required. `device_specific`
+  (optional, default `false`) appends `_<model_os>` of the device to the name,
+  making the image a [device-specific variant](#device-specific-items). An
+  existing image with the same final name is overwritten.
+- **Response `200`:** `{ "status": "ok", "name": "catalog_cart_icon" }` — `name`
+  is the name the image was saved under, with the suffix when `device_specific`
+  was set.
 - **Errors:** `400` on invalid JSON, a bad `label`, or a missing field, `500` when
-  no frame is available, the rectangle lies outside the frame, or the write
+  no frame is available, the rectangle lies outside the frame, the device's
+  model or Android version is unknown for a device-specific save, or the write
   fails (the message says which).
 
 ### `POST /save_action`
@@ -257,7 +285,9 @@ sorted in reading order (top-to-bottom, left-to-right).
 - **Path params:** `serial` (required).
 - **Query params:**
   - `images` — comma-separated library image names to search for; every name
-    must exist in the library
+    must exist in the library, as a common item or as the device's
+    [variant](#device-specific-items), and the result names the match as
+    listed here
   - `locale` — Tesseract language code for the OCR pass (default `eng`)
 - **Response `200`:**
   ```json
@@ -479,12 +509,16 @@ While recording, `queue_steps` and `run_route` answer `409`, and the session
 worker does not start queued steps.
 
 - **Path params:** `serial` (required).
-- **Request body:** `{ "name": "shop_catalog_swipe_1", "timeout": 5000 }` —
+- **Request body:** `{ "name": "shop_catalog_swipe_1", "timeout": 5000, "device_specific": false }` —
   the library action name (trimmed, no path separators; an existing action
-  with the same name is overwritten) and the optional idle timeout in
-  milliseconds: a value above `0` is used as given, anything else means
-  `5000`.
-- **Response `200`:** `{ "status": "ok" }` — the action was saved.
+  with the same final name is overwritten), the optional idle timeout in
+  milliseconds (a value above `0` is used as given, anything else means
+  `5000`) and the optional `device_specific`, which appends `_<model_os>` of
+  the device to the name, making the action a
+  [device-specific variant](#device-specific-items).
+- **Response `200`:** `{ "status": "ok", "name": "shop_catalog_swipe_1" }` — the
+  action was saved under `name`, with the suffix when `device_specific` was
+  set.
 - **Response `204`:** no touch happened within the timeout after the call;
   nothing was saved.
 - **Errors:** `400` on invalid JSON or a bad `name`; `409` when the device is
@@ -505,6 +539,7 @@ worker does not start queued steps.
 | Locale | `locale` | string | First system locale |
 | Model | `model` | string | |
 | OsVersion | `os_version` | string | |
+| ModelOs | `model_os` | string | `<model>_<os_version>` lowercased, every character that is not a letter or digit turned into `_` (`SM-A155F` on Android 14 → `sm_a155f_14`): the suffix that marks a [device-specific library item](#device-specific-items). Empty when the model or the version is unknown |
 | Manufacturer | `manufacturer` | string | |
 | MarketingName | `marketing_name` | string | |
 | Density | `density` | int | Screen density in dpi from `wm density` (the override when set); `0` when unknown. Used to scale library images |
@@ -545,7 +580,7 @@ worker does not start queued steps.
 | Field | JSON | Type | Notes |
 | ----- | ---- | ---- | ----- |
 | ID | `id` | int | omitempty; stamped automatically when a route is saved (position in the route, `1..N`, overwriting anything sent) — addressable via [`GET /run_route`](#get-run_route)'s `start_id`. `queue_steps` fills a missing id with the step's 1-based position in the batch, so session statuses always name a step (`running step 3: ...`). |
-| Event | `event` | string | `tap`, `long_tap`, `type_text`, a generated swipe (`swipe_up`, `swipe_down`, `swipe_left`, `swipe_right`), the name of a library event, or **empty for a visibility check** |
+| Event | `event` | string | `tap`, `long_tap`, `type_text`, a generated swipe (`swipe_up`, `swipe_down`, `swipe_left`, `swipe_right`), the name of a library event (the session device's `_<model_os>` [variant](#device-specific-items) when one exists), or **empty for a visibility check** |
 | Landmarks | `landmarks` | []Landmark | omitempty; the target chain — resolved in order on one frame, each landmark found nearest to the previous one, the event applies to the **last** one. Empty only for a target-less library event replay. |
 | Timeout | `timeout` | int | omitempty; milliseconds to locate the landmarks before failing — taken literally, no default: omitted or `0` means **one look** at the current frame, no waiting; otherwise the runner grabs the latest video frame and retries back to back until the deadline. Session auto-open waits for the first video frame (up to ~15s) before any step runs, so startup never counts against it. |
 | Delay | `delay` | int | omitempty; milliseconds slept **before** the step acts — paces the flow and lets the previous action's screen change settle; taken literally, no default: omitted or `0` means **no delay**. |
@@ -554,7 +589,7 @@ worker does not start queued steps.
 
 | Field | JSON | Type | Notes |
 | ----- | ---- | ---- | ----- |
-| Type | `type` | string | `image` (template match against `images/<value>.png`), `text` (OCR), or `yolo` (detection class) |
+| Type | `type` | string | `image` (template match against `images/<value>_<model_os>.png` when the session's device has that [variant](#device-specific-items), else `images/<value>.png`), `text` (OCR), or `yolo` (detection class) |
 | Value | `value` | string | Library image name, OCR text, or YOLO class name — for `type_text`'s last landmark, the text to type |
 | Locale | `locale` | string | OCR language for `text` landmarks; on `type_text`'s last landmark it selects the keyboard layout (`numeric` = the numeric keypad). omitempty — an empty locale is read as `eng` when the step runs |
 

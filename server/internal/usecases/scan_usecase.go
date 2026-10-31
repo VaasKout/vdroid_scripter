@@ -6,7 +6,6 @@ import (
 	"android_vision_scripter/pkg/models"
 	"errors"
 	"fmt"
-	"path/filepath"
 	"sort"
 	"strings"
 
@@ -47,7 +46,7 @@ func (i *interactorImpl) Scan(
 		return nil, errors.New(SerialIsEmptyError)
 	}
 
-	imagePaths, err := i.libraryImagePaths(images)
+	imagePaths, err := i.libraryImagePaths(serial, images)
 	if err != nil {
 		return nil, err
 	}
@@ -147,27 +146,25 @@ func (i *interactorImpl) latestFrame(serial string, rgb bool) (*gocv.Mat, error)
 	return mat, nil
 }
 
-func (i *interactorImpl) libraryImagePaths(images []string) (map[string]string, error) {
+func (i *interactorImpl) libraryImagePaths(
+	serial string,
+	images []string,
+) (map[string]string, error) {
 	paths := map[string]string{}
 	if len(images) == 0 {
 		return paths, nil
 	}
 
+	device, _ := i.devicesCache.Get(serial)
 	imagesDir := i.filesDB.CreateImagesDir()
-	if imagesDir == "" {
-		return nil, errors.New("images dir not found")
-	}
-
 	for _, name := range images {
 		name = strings.TrimSpace(name)
 		if !file.ValidName(name) {
 			return nil, fmt.Errorf("invalid image name: %s", name)
 		}
-
-		imageName := name + file.PngExt
-		imagePath := filepath.Join(imagesDir, imageName)
-		if !file.Exists(imagePath) {
-			return nil, fmt.Errorf("image not found in library: %s", name)
+		imagePath, ok := libraryPath(imagesDir, name, file.PngExt, device.ModelOs)
+		if !ok {
+			return nil, libraryNotFound("image", name, device.ModelOs)
 		}
 		paths[name] = imagePath
 	}

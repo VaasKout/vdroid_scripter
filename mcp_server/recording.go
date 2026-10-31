@@ -9,6 +9,47 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
+type recordActionInput struct {
+	Serial         string `json:"serial" jsonschema:"device serial"`
+	Name           string `json:"name" jsonschema:"<app>_<screen>_<what>[_variant]"`
+	Timeout        int    `json:"timeout,omitempty" jsonschema:"ms without a touch that ends the recording, default 5000"`
+	DeviceSpecific bool   `json:"device_specific,omitempty" jsonschema:"true only when the user wants the action for this device alone; the server appends _<model_os> to name"`
+}
+
+func (s *Server) handleRecordAction(
+	ctx context.Context,
+	req *mcp.CallToolRequest,
+	in recordActionInput,
+) (*mcp.CallToolResult, any, error) {
+	if in.Serial == "" || in.Name == "" {
+		return nil, nil, fmt.Errorf("serial and name are required")
+	}
+	name, err := s.libraryName(in.Serial, in.Name, in.DeviceSpecific)
+	if err != nil {
+		return nil, nil, err
+	}
+	recording, err := s.recordings.start(in.Serial, name)
+	if err != nil {
+		return nil, nil, err
+	}
+	go s.runRecording(in.Serial, name, in.Timeout, recording.done)
+	return s.finishRecording(ctx, in.Serial, recording, toolWaitSec*time.Second)
+}
+
+func (s *Server) finishRecording(
+	ctx context.Context,
+	serial string,
+	recording pendingRecording,
+	wait time.Duration,
+) (*mcp.CallToolResult, any, error) {
+	outcome, finished := awaitRecording(ctx, recording.done, wait)
+	if !finished {
+		return recordingPending(recording.name), nil, nil
+	}
+	s.recordings.finish(serial)
+	return recordingResult(recording.name, outcome)
+}
+
 const nothingRecorded = "nothing recorded: no touch happened on the device within the timeout " +
 	"after the call; ask the user to perform the gesture again"
 

@@ -5,6 +5,7 @@ import (
 	"android_vision_scripter/pkg/models"
 	"encoding/json"
 	"net/http"
+	"strings"
 )
 
 // Library paths
@@ -73,8 +74,9 @@ func (s *serverImpl) handleSaveImage(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 
 	var data = struct {
-		Serial    string           `json:"serial"`
-		Rectangle models.Rectangle `json:"rectangle"`
+		Serial         string           `json:"serial"`
+		Rectangle      models.Rectangle `json:"rectangle"`
+		DeviceSpecific bool             `json:"device_specific"`
 	}{}
 	err := json.NewDecoder(r.Body).Decode(&data)
 	if err != nil || data.Serial == "" ||
@@ -83,12 +85,32 @@ func (s *serverImpl) handleSaveImage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	name := strings.TrimSpace(data.Rectangle.Label)
+	if data.DeviceSpecific {
+		name = s.interactor.GetDeviceSpecificName(data.Serial, name)
+		if name == "" {
+			http.Error(
+				w,
+				"device model and Android version are unknown, cannot name a device-specific item",
+				http.StatusInternalServerError,
+			)
+			return
+		}
+	}
+	data.Rectangle.Label = name
+
 	err = s.interactor.SaveImage(data.Serial, &data.Rectangle, s.serverProps.SocketPort)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	s.sendStatusOk(w)
+
+	var response = map[string]string{
+		"status": "ok",
+		"name":   name,
+	}
+	s.setHeaders(w)
+	json.NewEncoder(w).Encode(response)
 }
 
 func (s *serverImpl) handleSaveAction(w http.ResponseWriter, r *http.Request) {

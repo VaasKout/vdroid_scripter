@@ -45,6 +45,8 @@ A human curates a small library of named resources, stored as plain files on the
 
 Names are flat and unique per kind. The convention is to put the context into the name, `<app>_<screen>_<what>[_variant]`, for example `shop_catalog_swipe_1`. Saving under an existing name overwrites it.
 
+An item can belong to one kind of device. A name that ends in `_<model_os>`, the device's lowercase model and Android version as `GET /devices` reports it, for example `home_sm_a155f_14`, is the variant of `home` for that device, and `home` without the suffix is common to every device. Steps and routes use the common name: when a step runs, the server takes the current device's variant when there is one and the common item otherwise, so one route serves several devices and each gets its own home gesture or vendor-drawn icon. Everything is common unless you ask for a device-specific item, which `save_image` and the recorder create with `device_specific`.
+
 ### Steps
 
 A **step** is the runtime unit: one event applied to a target found on screen.
@@ -238,16 +240,16 @@ The server keeps running after the AI session ends, so later sessions find it al
 | ---- | ------- |
 | `ping` | Check that the server is reachable, starting it when it is not |
 | `list_devices` | Connected devices and their serials |
-| `get_library` | Names of the library images and actions |
+| `get_library` | Names of the library images and actions: the common items and, given the device serial, that device's variants, other devices' variants hidden |
 | `delete_image`, `delete_action` | Remove a library image or action by name |
 | `scan` | The agent's perception: the landmarks on the current screen, one `type left,top,right,bottom value` line each |
 | `capture` | The current screen as a JPEG — only for agents that can see images, and only where `scan` is not enough |
-| `save_image` | Crop a rectangle of the current screen into a library image — for vision-capable agents curating icon targets |
+| `save_image` | Crop a rectangle of the current screen into a library image — for vision-capable agents curating icon targets; `device_specific` makes it a variant for this device only, on your ask |
 | `queue_steps` | Queue a whole sequence of steps in one call |
 | `wait_for_session` | Block until the queue finishes, then report `idle` or the error — only after `queue_steps`/`run_route` reported a batch still running, `record_action` a recording still running, or for a run started from the app |
 | `get_session_status` | The current session status |
 | `close_session` | Close the device session |
-| `record_action` | Record a gesture the human performs on the device, see below |
+| `record_action` | Record a gesture the human performs on the device, see below; `device_specific` makes it a variant for this device only, on your ask |
 | `get_routes`, `get_route` | List and read saved routes |
 | `save_route`, `delete_route` | Write a route from steps without running them, or remove one |
 | `edit_route` | Change one step of a route (timeout, delay, landmarks) or delete it |
@@ -288,6 +290,7 @@ The MCP server ships its own instructions to the AI, so you do not have to expla
   * **Navigator** records nothing. Any request that is not a direct order to run named steps is treated as a goal, and the agent works the way out itself: it reads the saved routes, chains them, runs only the slice of each that the goal needs, and fills in arguments. You describe the task in words; the agent picks the first and last step of the slice by matching your description to the route's steps. It does not ask you which route to use or for step ids. A goal no chain of routes reaches is reported as a job for explorer. When a route step fails because of the route itself, such as a timeout that is too short or a target that appears twice, the agent fixes that step with `edit_route`, reruns from there, and lists every fix.
   * **Explorer**, given a route name, carries a goal through on its own and records its work into that route as it goes. The steps that succeed go in; failed attempts and the agent's own visibility checks stay out. Everything you dictate is recorded too: your actions and the visibility checks you ask for.
 * **Curation.** Library images come from the Android client or, for a vision-capable agent, from `save_image`: after a `capture` it picks the icon's rectangle and saves it under a `<app>_<screen>_<what>` name — only for targets with no readable text and no YOLO class. Actions come from the client or from `record_action`, and only when you ask for a recording.
+* **Device-specific items.** A library name ending in `_<model_os>` belongs to one device model and Android version; the agent refers to items by the common name and the server runs the device's variant when it has one. New images and actions are common unless you say the item is for this device only; then the agent sets `device_specific` and the server appends the suffix. The agent never writes the suffix itself and never records a suffixed name into a route.
 * **Deleting.** A route, image or action is removed only when you ask for that item by name. The agent never cleans up the library on its own, not even to replace an item: saving under the same name overwrites it.
 * **No adb.** The agent never touches the device with `adb` directly — no input, no `screencap`. Every interaction is a step, every look is `scan` or `capture`.
 
@@ -296,7 +299,7 @@ The MCP server ships its own instructions to the AI, so you do not have to expla
 A library action can be recorded in two ways.
 
 * **In the Android client.** On the streaming screen, press the plus icon, name the action, choose the custom action type, and perform the gesture on the streamed screen.
-* **On the device itself.** `POST /devices/{serial}/record` with `{"name": "<action name>", "timeout": 5000}`, or the `record_action` MCP tool, listens to the device's touch panel. Start the gesture within the timeout (milliseconds, 5000 when omitted); every touch restarts that timer, so the gesture may take as long as you need, and the recording ends one timeout after your last touch (or after 10 minutes at the most). The reply is `200` when the action was saved and `204` when no touch happened within the first timeout. The idle tail is not part of the action: its times start at the first touch and end at the last. Only the first finger is kept, and the device's natural orientation is assumed. While a device is recording, queueing steps on it is refused with `409`.
+* **On the device itself.** `POST /devices/{serial}/record` with `{"name": "<action name>", "timeout": 5000}` (plus `"device_specific": true` for a variant of this device only), or the `record_action` MCP tool, listens to the device's touch panel. Start the gesture within the timeout (milliseconds, 5000 when omitted); every touch restarts that timer, so the gesture may take as long as you need, and the recording ends one timeout after your last touch (or after 10 minutes at the most). The reply is `200` when the action was saved and `204` when no touch happened within the first timeout. The idle tail is not part of the action: its times start at the first touch and end at the last. Only the first finger is kept, and the device's natural orientation is assumed. While a device is recording, queueing steps on it is refused with `409`.
 
 ## API reference
 

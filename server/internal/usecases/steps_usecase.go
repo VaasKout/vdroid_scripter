@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"image"
-	"path/filepath"
 	"strings"
 	"time"
 	"unicode"
@@ -42,7 +41,8 @@ func (i *interactorImpl) RunSteps(
 		return errors.New("invalid steps")
 	}
 
-	if err := i.checkStepAssets(steps); err != nil {
+	device, _ := i.devicesCache.Get(serial)
+	if err := i.checkStepAssets(steps, device.ModelOs); err != nil {
 		return err
 	}
 	models.FillStepIDs(steps)
@@ -61,15 +61,13 @@ func (i *interactorImpl) RunSteps(
 	return nil
 }
 
-func (i *interactorImpl) checkStepAssets(steps []models.Step) error {
+func (i *interactorImpl) checkStepAssets(steps []models.Step, tags ...string) error {
+	actionsDir := i.filesDB.CreateActionsDir()
+	imagesDir := i.filesDB.CreateImagesDir()
 	for _, step := range steps {
 		if step.IsCustomEvent() {
-			actionPath := filepath.Join(
-				i.filesDB.CreateActionsDir(),
-				strings.TrimSpace(step.Event)+file.JSONExt,
-			)
-			if !file.Exists(actionPath) {
-				return fmt.Errorf("event not found in library: %s", step.Event)
+			if _, ok := libraryPath(actionsDir, step.Event, file.JSONExt, tags...); !ok {
+				return libraryNotFound("event", step.Event, tags...)
 			}
 		}
 
@@ -85,13 +83,8 @@ func (i *interactorImpl) checkStepAssets(steps []models.Step) error {
 			if landmark.Type != models.Image {
 				continue
 			}
-
-			imagePath := filepath.Join(
-				i.filesDB.CreateImagesDir(),
-				strings.TrimSpace(landmark.Value)+file.PngExt,
-			)
-			if !file.Exists(imagePath) {
-				return fmt.Errorf("image not found in library: %s", landmark.Value)
+			if _, ok := libraryPath(imagesDir, landmark.Value, file.PngExt, tags...); !ok {
+				return libraryNotFound("image", landmark.Value, tags...)
 			}
 		}
 	}
@@ -201,7 +194,7 @@ func (i *interactorImpl) typeTextStep(serial string, step *models.Step) error {
 }
 
 func (i *interactorImpl) playCustomEvent(serial string, step *models.Step) error {
-	action, err := i.getAction(step.Event)
+	action, err := i.getAction(serial, step.Event)
 	if err != nil {
 		return err
 	}
@@ -290,13 +283,11 @@ func (i *interactorImpl) findLandmarkCandidates(
 	landmark *models.Landmark,
 ) ([]image.Rectangle, error) {
 	if landmark.Type == models.Image {
+		device, _ := i.devicesCache.Get(serial)
 		imagesDir := i.filesDB.CreateImagesDir()
-		if imagesDir == "" {
-			return nil, errors.New("images dir not found")
-		}
-		tmpImage := filepath.Join(imagesDir, strings.TrimSpace(landmark.Value)+file.PngExt)
-		if !file.Exists(tmpImage) {
-			return nil, fmt.Errorf("image not found in library: %s", landmark.Value)
+		tmpImage, ok := libraryPath(imagesDir, landmark.Value, file.PngExt, device.ModelOs)
+		if !ok {
+			return nil, libraryNotFound("image", landmark.Value, device.ModelOs)
 		}
 		scale := i.imageScale(serial, tmpImage)
 		rectangles, err := i.cv.FindImages(mat, tmpImage, scale)

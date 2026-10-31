@@ -71,6 +71,7 @@ func (c *cmdImpl) GetAdbDevice(serial string) *models.AdbDevice {
 	adbDevice.Manufacturer = c.GetProp(serial, Manufacturer)
 	adbDevice.MarketingName = c.GetProp(serial, MarketingName)
 	adbDevice.Density = c.GetDensity(serial)
+	adbDevice.ModelOs = adbDevice.ToModelOs()
 	return adbDevice
 }
 

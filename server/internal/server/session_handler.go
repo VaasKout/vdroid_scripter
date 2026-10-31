@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -57,8 +58,9 @@ func (s *serverImpl) handleRecordAction(w http.ResponseWriter, r *http.Request) 
 	}
 
 	var request struct {
-		Name    string `json:"name"`
-		Timeout int    `json:"timeout"`
+		Name           string `json:"name"`
+		Timeout        int    `json:"timeout"`
+		DeviceSpecific bool   `json:"device_specific"`
 	}
 	err := json.NewDecoder(r.Body).Decode(&request)
 	if err != nil || !file.ValidName(request.Name) {
@@ -66,8 +68,21 @@ func (s *serverImpl) handleRecordAction(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	name := strings.TrimSpace(request.Name)
+	if request.DeviceSpecific {
+		name = s.interactor.GetDeviceSpecificName(serial, name)
+		if name == "" {
+			http.Error(
+				w,
+				"device model and Android version are unknown, cannot name a device-specific item",
+				http.StatusInternalServerError,
+			)
+			return
+		}
+	}
+
 	timeout := time.Duration(request.Timeout) * time.Millisecond
-	recorded, err := s.interactor.RecordAction(serial, request.Name, timeout, s.serverProps.SocketPort)
+	recorded, err := s.interactor.RecordAction(serial, name, timeout, s.serverProps.SocketPort)
 	if errors.Is(err, usecases.ErrDeviceBusy) {
 		http.Error(w, err.Error(), http.StatusConflict)
 		return
@@ -80,7 +95,13 @@ func (s *serverImpl) handleRecordAction(w http.ResponseWriter, r *http.Request) 
 		w.WriteHeader(http.StatusNoContent)
 		return
 	}
-	s.sendStatusOk(w)
+
+	var response = map[string]string{
+		"status": "ok",
+		"name":   name,
+	}
+	s.setHeaders(w)
+	json.NewEncoder(w).Encode(response)
 }
 
 func (s *serverImpl) handleGetSession(w http.ResponseWriter, r *http.Request) {

@@ -126,6 +126,7 @@ type deviceInfo struct {
 	Locale        string `json:"locale"`
 	Model         string `json:"model"`
 	OsVersion     string `json:"os_version"`
+	ModelOs       string `json:"model_os"`
 	MarketingName string `json:"marketing_name"`
 	ScrcpyRunning bool   `json:"scrcpy_running"`
 }
@@ -208,17 +209,42 @@ type saveImageRectangle struct {
 }
 
 type saveImageRequest struct {
-	Serial    string             `json:"serial"`
-	Rectangle saveImageRectangle `json:"rectangle"`
+	Serial         string             `json:"serial"`
+	Rectangle      saveImageRectangle `json:"rectangle"`
+	DeviceSpecific bool               `json:"device_specific,omitempty"`
 }
 
-func (c *apiClient) saveImage(serial string, rectangle saveImageRectangle) error {
-	body, err := json.Marshal(saveImageRequest{Serial: serial, Rectangle: rectangle})
-	if err != nil {
-		return err
+type savedResponse struct {
+	Name string `json:"name"`
+}
+
+func savedName(body []byte, fallback string) string {
+	var saved savedResponse
+	if json.Unmarshal(body, &saved) != nil || saved.Name == "" {
+		return fallback
 	}
-	_, err = c.request(http.MethodPost, "/save_image", bytes.NewReader(body))
-	return err
+	return saved.Name
+}
+
+func (c *apiClient) saveImage(
+	serial string,
+	rectangle saveImageRectangle,
+	deviceSpecific bool,
+) (string, error) {
+	request := saveImageRequest{
+		Serial:         serial,
+		Rectangle:      rectangle,
+		DeviceSpecific: deviceSpecific,
+	}
+	body, err := json.Marshal(request)
+	if err != nil {
+		return "", err
+	}
+	response, err := c.request(http.MethodPost, "/save_image", bytes.NewReader(body))
+	if err != nil {
+		return "", err
+	}
+	return savedName(response, rectangle.Label), nil
 }
 
 func (c *apiClient) queueSteps(serial string, steps []stepInput) error {

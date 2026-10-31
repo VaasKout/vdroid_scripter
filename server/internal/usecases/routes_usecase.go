@@ -68,7 +68,11 @@ func (i *interactorImpl) SaveRoute(route *models.Route) error {
 		return errors.New("invalid route")
 	}
 	route.ClearArgLocales()
-	if err := i.checkStepAssets(route.Steps); err != nil {
+	tags := []string{}
+	for _, device := range i.devicesCache.GetDataArray() {
+		tags = append(tags, device.ModelOs)
+	}
+	if err := i.checkStepAssets(route.Steps, tags...); err != nil {
 		return err
 	}
 	route.StampStepIDs()

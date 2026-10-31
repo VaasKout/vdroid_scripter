@@ -9,11 +9,14 @@ import (
 	"image"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 
 	"gocv.io/x/gocv"
 )
+
+const modelOsSeparator = "_"
 
 // LibraryResponse ...
 type LibraryResponse struct {
@@ -25,6 +28,7 @@ type LibraryResponse struct {
 type LibraryUseCase interface {
 	GetLibrary() *LibraryResponse
 	SaveImage(serial string, rectangle *models.Rectangle, basePort int) error
+	GetDeviceSpecificName(serial string, name string) string
 	DeleteImage(name string) bool
 	SaveAction(action *models.Action) bool
 	DeleteAction(name string) bool
@@ -176,16 +180,16 @@ func (i *interactorImpl) SaveAction(action *models.Action) bool {
 	return err == nil
 }
 
-func (i *interactorImpl) getAction(name string) (*models.Action, error) {
-	actionsDir := i.filesDB.CreateActionsDir()
-	if actionsDir == "" {
-		return nil, errors.New("actions dir not found")
+func (i *interactorImpl) getAction(serial string, name string) (*models.Action, error) {
+	device, _ := i.devicesCache.Get(serial)
+	actionPath, ok := libraryPath(i.filesDB.CreateActionsDir(), name, file.JSONExt, device.ModelOs)
+	if !ok {
+		return nil, libraryNotFound("action", name, device.ModelOs)
 	}
 
-	actionPath := filepath.Join(actionsDir, strings.TrimSpace(name)+file.JSONExt)
 	bytes, err := os.ReadFile(actionPath)
 	if err != nil {
-		return nil, fmt.Errorf("action not found in library: %s", name)
+		return nil, err
 	}
 
 	var action = &models.Action{}
@@ -209,4 +213,52 @@ func (i *interactorImpl) DeleteAction(name string) bool {
 		return false
 	}
 	return i.filesDB.DeleteFileByName(actionsDir, strings.TrimSpace(name)+file.JSONExt)
+}
+
+func (i *interactorImpl) GetDeviceSpecificName(serial string, name string) string {
+	name = strings.TrimSpace(name)
+	device, _ := i.devicesCache.Get(serial)
+	if name == "" || device.ModelOs == "" {
+		return ""
+	}
+	suffix := modelOsSeparator + device.ModelOs
+	if strings.HasSuffix(name, suffix) {
+		return name
+	}
+	return name + suffix
+}
+
+func libraryPath(dir string, name string, ext string, tags ...string) (string, bool) {
+	if dir == "" {
+		return "", false
+	}
+	for _, candidate := range libraryCandidates(name, tags...) {
+		path := filepath.Join(dir, candidate+ext)
+		if file.Exists(path) {
+			return path, true
+		}
+	}
+	return "", false
+}
+
+func libraryCandidates(name string, tags ...string) []string {
+	name = strings.TrimSpace(name)
+	candidates := make([]string, 0, len(tags)+1)
+	for _, tag := range slices.Compact(slices.Sorted(slices.Values(tags))) {
+		if tag != "" {
+			candidates = append(candidates, name+modelOsSeparator+tag)
+		}
+	}
+	return append(candidates, name)
+}
+
+func libraryNotFound(kind string, name string, tags ...string) error {
+	candidates := libraryCandidates(name, tags...)
+	if len(candidates) == 1 {
+		return fmt.Errorf("%s not found in library: %s", kind, name)
+	}
+	return fmt.Errorf(
+		"%s not found in library: %s (tried %s)",
+		kind, name, strings.Join(candidates, ", "),
+	)
 }
