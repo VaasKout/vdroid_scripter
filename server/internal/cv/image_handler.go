@@ -38,10 +38,10 @@ func (c *cvImpl) FindImages(
 	}
 
 	templateMat, err := readTemplate(template, scale)
-	defer templateMat.Close()
 	if err != nil {
 		return nil, err
 	}
+	defer templateMat.Close()
 
 	rectangles := []image.Rectangle{}
 	if templateMat.Cols() > img.Cols() || templateMat.Rows() > img.Rows() {
@@ -76,7 +76,8 @@ func (c *cvImpl) FindImages(
 func readTemplate(path string, scale float64) (gocv.Mat, error) {
 	templateMat := gocv.IMRead(path, gocv.IMReadColor)
 	if templateMat.Empty() {
-		return templateMat, errors.New("could not read template")
+		templateMat.Close()
+		return gocv.Mat{}, errors.New("could not read template")
 	}
 	if scale <= 0 || scale == 1 {
 		return templateMat, nil
@@ -92,7 +93,11 @@ func readTemplate(path string, scale float64) (gocv.Mat, error) {
 
 	scaledMat := gocv.NewMat()
 	err := gocv.Resize(templateMat, &scaledMat, image.Pt(width, height), 0, 0, interpolation)
-	return scaledMat, err
+	if err != nil {
+		scaledMat.Close()
+		return gocv.Mat{}, err
+	}
+	return scaledMat, nil
 }
 
 func suppressMatch(result *gocv.Mat, loc image.Point, width int, height int) {

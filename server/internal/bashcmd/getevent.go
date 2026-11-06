@@ -4,6 +4,7 @@ import (
 	"android_vision_scripter/pkg/models"
 	"math"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 )
@@ -17,13 +18,28 @@ const (
 
 	releasedTrackingID = "ffffffff"
 	synReport          = "SYN_REPORT"
+	evKey              = "EV_KEY"
+	keyDown            = "DOWN"
+	keyUp              = "UP"
 )
 
 var (
 	inputDeviceRegexp = regexp.MustCompile(`^add device \d+: (/dev/input/event\d+)`)
 	absRangeRegexp    = regexp.MustCompile(`([0-9a-f]{4})\s+: value -?\d+, min (-?\d+), max (-?\d+)`)
-	eventLineRegexp   = regexp.MustCompile(`^\[\s*(\d+)\.(\d+)\]\s+(/dev/input/event\d+):\s+\S+\s+(\S+)\s+(\S+)`)
+	eventLineRegexp   = regexp.MustCompile(`^\[\s*(\d+)\.(\d+)\]\s+(/dev/input/event\d+):\s+(\S+)\s+(\S+)\s+(\S+)`)
 )
+
+var androidKeycodes = map[string]int{
+	"KEY_HOME": 3, "0066": 3,
+	"KEY_HOMEPAGE": 3, "00ac": 3,
+	"KEY_BACK": 4, "009e": 4,
+	"KEY_MENU": 82, "008b": 82,
+	"KEY_APPSELECT": 187, "0244": 187, "00fe": 187,
+	"KEY_VOLUMEUP": 24, "0073": 24,
+	"KEY_VOLUMEDOWN": 25, "0072": 25,
+	"KEY_CAMERA": 27, "00d4": 27,
+	"KEY_SEARCH": 84, "00d9": 84,
+}
 
 type axisRange struct {
 	min int
@@ -56,18 +72,61 @@ type touchDevice struct {
 	y            int
 }
 
-type touchClock struct {
+type gestureClock struct {
 	started bool
 	startMs int64
 }
 
-func isTouchLine(line string, axesByDevice map[string]touchAxes) bool {
+type eventLine struct {
+	timeMs int64
+	path   string
+	kind   string
+	code   string
+	value  string
+}
+
+func parseEventLine(line string) (eventLine, bool) {
 	match := eventLineRegexp.FindStringSubmatch(line)
 	if match == nil {
+		return eventLine{}, false
+	}
+	return eventLine{
+		timeMs: parseTimeMs(match[1], match[2]),
+		path:   match[3],
+		kind:   match[4],
+		code:   match[5],
+		value:  match[6],
+	}, true
+}
+
+func (l eventLine) keycode() (int, bool) {
+	if l.kind != evKey {
+		return 0, false
+	}
+	keycode, ok := androidKeycodes[l.code]
+	return keycode, ok
+}
+
+func isGestureLine(line string, axesByDevice map[string]touchAxes) bool {
+	parsed, ok := parseEventLine(line)
+	if !ok {
 		return false
 	}
-	_, ok := axesByDevice[match[3]]
-	return ok
+	if _, key := parsed.keycode(); key {
+		return true
+	}
+	_, touch := axesByDevice[parsed.path]
+	return touch
+}
+
+func keyAction(value string) (byte, bool) {
+	switch value {
+	case keyDown:
+		return models.KeyActionDown, true
+	case keyUp:
+		return models.KeyActionUp, true
+	}
+	return 0, false
 }
 
 func parseAxisRanges(output string) map[string]map[string]axisRange {
@@ -108,43 +167,92 @@ func pickAxes(
 	return result
 }
 
-func parseTouches(
+type gestureParser struct {
+	axesByDevice map[string]touchAxes
+	width        int
+	height       int
+	devices      map[string]*touchDevice
+	clock        gestureClock
+	ignored      map[string]bool
+	events       []models.Event
+}
+
+func parseGesture(
 	output string,
 	axesByDevice map[string]touchAxes,
 	width int,
 	height int,
-) []models.Event {
-	devices := map[string]*touchDevice{}
-	clock := &touchClock{}
-	var events []models.Event
-	for _, line := range strings.Split(output, "\n") {
-		match := eventLineRegexp.FindStringSubmatch(line)
-		if match == nil {
-			continue
-		}
-		path := match[3]
-		axes, ok := axesByDevice[path]
-		if !ok {
-			continue
-		}
-		device, ok := devices[path]
-		if !ok {
-			device = newTouchDevice(axes, width, height)
-			devices[path] = device
-		}
-
-		code, value := match[4], match[5]
-		if code != synReport {
-			device.apply(code, value)
-			continue
-		}
-		timeMs := clock.relative(parseTimeMs(match[1], match[2]))
-		event, ok := device.commit(timeMs)
-		if ok {
-			events = append(events, event)
-		}
+) ([]models.Event, []string) {
+	parser := &gestureParser{
+		axesByDevice: axesByDevice,
+		width:        width,
+		height:       height,
+		devices:      map[string]*touchDevice{},
+		ignored:      map[string]bool{},
 	}
-	return events
+	for _, line := range strings.Split(output, "\n") {
+		parsed, ok := parseEventLine(line)
+		if !ok {
+			continue
+		}
+		parser.add(parsed)
+	}
+	return parser.events, sortedKeys(parser.ignored)
+}
+
+func (p *gestureParser) add(line eventLine) {
+	if keycode, key := line.keycode(); key {
+		p.addKey(line, keycode)
+		return
+	}
+	if axes, touch := p.axesByDevice[line.path]; touch {
+		p.addTouch(line, axes)
+		return
+	}
+	if line.kind == evKey {
+		p.ignored[line.code] = true
+	}
+}
+
+func (p *gestureParser) addKey(line eventLine, keycode int) {
+	action, pressed := keyAction(line.value)
+	if !pressed {
+		return
+	}
+	timeMs := p.clock.relative(line.timeMs)
+	p.events = append(p.events, models.NewKeyEvent(timeMs, action, keycode))
+}
+
+func (p *gestureParser) addTouch(line eventLine, axes touchAxes) {
+	device := p.device(line.path, axes)
+	if line.code != synReport {
+		device.apply(line.code, line.value)
+		return
+	}
+	event, ok := device.commit(p.clock.relative(line.timeMs))
+	if !ok {
+		return
+	}
+	p.events = append(p.events, event)
+}
+
+func (p *gestureParser) device(path string, axes touchAxes) *touchDevice {
+	device, ok := p.devices[path]
+	if ok {
+		return device
+	}
+	device = newTouchDevice(axes, p.width, p.height)
+	p.devices[path] = device
+	return device
+}
+
+func sortedKeys(set map[string]bool) []string {
+	keys := make([]string, 0, len(set))
+	for key := range set {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	return keys
 }
 
 func newTouchDevice(axes touchAxes, width int, height int) *touchDevice {
@@ -156,7 +264,7 @@ func newTouchDevice(axes touchAxes, width int, height int) *touchDevice {
 	}
 }
 
-func (c *touchClock) relative(timeMs int64) int64 {
+func (c *gestureClock) relative(timeMs int64) int64 {
 	if !c.started {
 		c.started = true
 		c.startMs = timeMs

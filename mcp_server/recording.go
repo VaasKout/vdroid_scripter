@@ -12,7 +12,7 @@ import (
 type recordActionInput struct {
 	Serial         string `json:"serial" jsonschema:"device serial"`
 	Name           string `json:"name" jsonschema:"<app>_<screen>_<what>[_variant]"`
-	Timeout        int    `json:"timeout,omitempty" jsonschema:"ms without a touch that ends the recording, default 5000"`
+	Timeout        int    `json:"timeout,omitempty" jsonschema:"ms without a touch or key press that ends the recording, default 5000"`
 	DeviceSpecific bool   `json:"device_specific,omitempty" jsonschema:"true only when the user wants the action for this device alone; the server appends _<model_os> to name"`
 }
 
@@ -50,8 +50,8 @@ func (s *Server) finishRecording(
 	return recordingResult(recording.name, outcome)
 }
 
-const nothingRecorded = "nothing recorded: no touch happened on the device within the timeout " +
-	"after the call; ask the user to perform the gesture again"
+const nothingRecorded = "nothing recorded: no touch or hardware key happened on the device within " +
+	"the timeout after the call; ask the user to perform the gesture again"
 
 type recordOutcome struct {
 	saved bool

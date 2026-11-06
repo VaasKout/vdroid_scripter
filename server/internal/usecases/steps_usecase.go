@@ -440,15 +440,10 @@ func (i *interactorImpl) playEvent(
 	rect *image.Rectangle,
 	events []models.Event,
 ) {
-	var offsetX = 0
-	var offsetY = 0
+	offsetX, offsetY := touchOffset(rect, events)
 	var lastTimeStamp int64
-	for index, event := range events {
+	for _, event := range events {
 		var data = &event.Data
-		if index == 0 {
-			offsetX, offsetY = data.CountOffset(rect)
-		}
-
 		data.ApplyOffset(offsetX, offsetY)
 		var delay = event.Time - lastTimeStamp
 		time.Sleep(time.Duration(delay) * time.Millisecond)
@@ -456,4 +451,13 @@ func (i *interactorImpl) playEvent(
 
 		i.scrcpy.WriteControlData(serial, *data)
 	}
+}
+
+func touchOffset(rect *image.Rectangle, events []models.Event) (int, int) {
+	for _, event := range events {
+		if event.Data.IsTouch() {
+			return event.Data.CountOffset(rect)
+		}
+	}
+	return 0, 0
 }

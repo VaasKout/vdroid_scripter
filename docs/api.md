@@ -49,7 +49,7 @@ This document describes every HTTP endpoint exposed by the server, defined in
 | POST | `/devices/{serial}/session` | Open a session: start scrcpy and the video/control sockets |
 | GET | `/devices/{serial}/session` | Get the active session's ports |
 | DELETE | `/devices/{serial}/session` | Close the session |
-| POST | `/devices/{serial}/record` | Record a gesture performed on the device, until `timeout` ms pass without a touch, and save it as a library action |
+| POST | `/devices/{serial}/record` | Record a gesture performed on the device, touches and hardware keys, until `timeout` ms pass without input, and save it as a library action |
 
 ## Devices
 
@@ -110,7 +110,7 @@ bare landmark deterministically takes the first candidate on screen.
 | `tap` / `long_tap` | Generated tap pair placed at a random point inside the last landmark's region. Landmarks required. |
 | `swipe_up` / `swipe_down` / `swipe_left` / `swipe_right` | Generated human-like swipe named by the finger's direction: fixed length (half the screen dimension), curved Bézier path with per-point jitter, eased 300–500ms timing, random start point inside the middle half of the screen (25% start margin) with the end point kept at least 5% from the screen edge. With landmarks, the swipe starts inside the last landmark's region instead. Reserved names — a library action with the same name is shadowed. Landmarks optional. |
 | `type_text` | The **last landmark's `value` is the text to type** and its `locale` is the keyboard language (`eng` when omitted). The keyboard must already be open: the server reads its letter rows off the live frame, matches them against the layout of that language (QWERTY, AZERTY, QWERTZ, ЙЦУКЕН and the other European layouts), and taps the keys. Letters, space and, when the keyboard shows a number row, digits are typed; capitals go through Shift. Any other character fails the step. A `locale` of `numeric` selects the numeric keypad instead (the `123`, `456`, `789` rows with `0` below), for number and phone fields and for dial pads drawn by the app itself. Nothing about keyboards is stored. |
-| any other name | The library event with that name is replayed: **offset into the found region** when landmarks are given (first touch moved into the last landmark's region, relative shape preserved), **verbatim** without them. A gesture recorded on a different screen size is scaled to the current one first (each axis by current ÷ recorded size), so it covers the same share of the screen. |
+| any other name | The library event with that name is replayed: **offset into the found region** when landmarks are given (first touch moved into the last landmark's region, relative shape preserved), **verbatim** without them. A gesture recorded on a different screen size is scaled to the current one first (each axis by current ÷ recorded size), so it covers the same share of the screen. Hardware key presses in the gesture are replayed as key events with their recorded timing; offset and scaling leave them alone. |
 
 ### `POST /devices/{serial}/queue_steps`
 
@@ -493,18 +493,22 @@ library action — the server-side counterpart of the Android client's
 recorder, made for clients without a screen of their own (the MCP). If the
 device has no open session, one is opened automatically (as for
 `queue_steps`). The session status becomes `recording` and the server
-listens to the touch panel through `adb shell getevent` with an **idle
-timer** of `timeout` milliseconds (5000 when omitted): the first touch must
-come within that time of the call, every touch event restarts the timer, and
-the recording stops one timeout after the last touch — or after
-**10 minutes** at the most. The call blocks until then,
-so tell the human to start the gesture right after sending the request; it
-may then take as long as it needs. Only the first finger is kept; raw panel
+listens to the touch panel and the hardware keys through `adb shell getevent`
+with an **idle timer** of `timeout` milliseconds (5000 when omitted): the
+first touch or key press must come within that time of the call, every touch
+or key event restarts the timer, and the recording stops one timeout after
+the last one — or after **10 minutes** at the most. The call blocks until
+then, so tell the human to start the gesture right after sending the request;
+it may then take as long as it needs. Only the first finger is kept; raw panel
 coordinates are scaled to the session's video frame size (the size every
 replayed touch must carry), the device's natural orientation is assumed, and
 the events are stored exactly like a client-recorded [`Action`](#action)
-with times relative to the first touch — the idle tail that ends the
-recording is not part of it.
+with times relative to the first input — the idle tail that ends the
+recording is not part of it. Hardware keys become key events: volume up and
+down, home (`KEY_HOME`, `KEY_HOMEPAGE`), back, menu, recents
+(`KEY_APPSELECT`, Samsung's `00fe`), camera and search. The power key and
+any other key are dropped and listed in the server log, since replaying
+power would put the device to sleep under the following steps.
 While recording, `queue_steps` and `run_route` answer `409`, and the session
 worker does not start queued steps.
 
@@ -519,8 +523,8 @@ worker does not start queued steps.
 - **Response `200`:** `{ "status": "ok", "name": "shop_catalog_swipe_1" }` — the
   action was saved under `name`, with the suffix when `device_specific` was
   set.
-- **Response `204`:** no touch happened within the timeout after the call;
-  nothing was saved.
+- **Response `204`:** no touch or key press happened within the timeout after
+  the call; nothing was saved.
 - **Errors:** `400` on invalid JSON or a bad `name`; `409` when the device is
   running steps or already recording; `500` when the session could not be
   started, adb failed, or the file could not be written.
@@ -598,7 +602,7 @@ worker does not start queued steps.
 | Field | JSON | Type | Notes |
 | ----- | ---- | ---- | ----- |
 | Time | `time` | int64 | Timestamp / delay |
-| Data | `data` | ControlBytes | Serialized as an **array of ints** (one per byte), 32 bytes (`ControlBytesSize`) |
+| Data | `data` | ControlBytes | Serialized as an **array of ints** (one per byte): a touch is the 32-byte scrcpy inject-touch message (`ControlBytesSize`), a hardware key the 14-byte scrcpy inject-keycode message (`KeyControlBytesSize`: type 0, action 0 = down / 1 = up, Android keycode, repeat 0, meta state 0). Offset and scaling apply to touches only |
 
 ### Action
 

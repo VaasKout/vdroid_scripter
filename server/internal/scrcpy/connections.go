@@ -19,7 +19,7 @@ type Connection interface {
 }
 
 func (s *scrcpyImpl) WriteControlData(serial string, data []byte) {
-	if len(data) != models.ControlBytesSize {
+	if !models.ControlBytes(data).Valid() {
 		return
 	}
 	if scrcpyData, ok := s.scrcpyCache.Get(serial); ok {
@@ -34,7 +34,7 @@ func (s *scrcpyImpl) WriteControlData(serial string, data []byte) {
 			)
 			return
 		}
-		if n != models.ControlBytesSize {
+		if n != len(data) {
 			s.logAPI.Error(
 				fmt.Sprintf("invalid control buffer size: %d", n),
 			)

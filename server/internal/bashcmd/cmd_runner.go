@@ -153,7 +153,7 @@ func collectUntilIdle(
 			}
 			output.WriteString(line)
 			output.WriteByte('\n')
-			if isTouchLine(line, axesByDevice) {
+			if isGestureLine(line, axesByDevice) {
 				timer.Reset(idle)
 			}
 		case <-timer.C:

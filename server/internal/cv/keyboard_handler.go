@@ -110,10 +110,10 @@ func (c *cvImpl) readKeyboardGlyphs(img *gocv.Mat, lang string, whitelist string
 	}
 
 	edges, err := c.createEdges(&scaled)
-	defer edges.Close()
 	if err != nil {
 		return nil, err
 	}
+	defer edges.Close()
 
 	symbols, err := tesseract.RecognizeSymbols(
 		edges.ToBytes(),

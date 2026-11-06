@@ -25,26 +25,26 @@ var fanDirections = []image.Point{
 
 func (c *cvImpl) createTextEdges(img *gocv.Mat) (gocv.Mat, error) {
 	if img.Empty() {
-		return gocv.NewMat(), errors.New("createTextEdges img empty")
+		return gocv.Mat{}, errors.New("createTextEdges img empty")
 	}
 	gray := gocv.NewMat()
 	defer gray.Close()
 	err := gocv.CvtColor(*img, &gray, gocv.ColorBGRToGray)
 	if err != nil {
-		return gocv.NewMat(), err
+		return gocv.Mat{}, err
 	}
 
 	ink, err := localInk(&gray)
-	defer ink.Close()
 	if err != nil {
-		return gocv.NewMat(), err
+		return gocv.Mat{}, err
 	}
+	defer ink.Close()
 
 	solid := solidRegions(&gray)
 	defer solid.Close()
 	err = dropSolidShapes(&ink, &solid)
 	if err != nil {
-		return gocv.NewMat(), err
+		return gocv.Mat{}, err
 	}
 
 	edges := gocv.NewMat()
@@ -53,23 +53,23 @@ func (c *cvImpl) createTextEdges(img *gocv.Mat) (gocv.Mat, error) {
 }
 
 func localInk(gray *gocv.Mat) (gocv.Mat, error) {
-	ink := gocv.NewMat()
 	kernel := oddKernel(gray.Cols())
 
 	background := gocv.NewMat()
 	defer background.Close()
 	err := gocv.MedianBlur(*gray, &background, kernel)
 	if err != nil {
-		return ink, err
+		return gocv.Mat{}, err
 	}
 
 	contrast := gocv.NewMat()
 	defer contrast.Close()
 	err = gocv.AbsDiff(*gray, background, &contrast)
 	if err != nil {
-		return ink, err
+		return gocv.Mat{}, err
 	}
 
+	ink := gocv.NewMat()
 	gocv.Threshold(contrast, &ink, inkMinContrast, MaxThreshHold, gocv.ThresholdBinary)
 	return ink, nil
 }

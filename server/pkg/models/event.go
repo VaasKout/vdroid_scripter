@@ -10,7 +10,8 @@ import (
 
 // Size of control bytes buffer
 const (
-	ControlBytesSize = 32
+	ControlBytesSize    = 32
+	KeyControlBytesSize = 14
 )
 
 // Touch event properties
@@ -42,6 +43,13 @@ const (
 	ActionDown byte = 0
 	ActionUp   byte = 1
 	ActionMove byte = 2
+)
+
+const (
+	TypeInjectKeycode byte = 0
+
+	KeyActionDown byte = 0
+	KeyActionUp   byte = 1
 )
 
 // Generated event names
@@ -82,6 +90,28 @@ func NewTouchEvent(
 		Time: timeMs,
 		Data: generateTouchData(action, x, y, screenWidth, screenHeight, pressure),
 	}
+}
+
+func NewKeyEvent(timeMs int64, action byte, keycode int) Event {
+	data := make(ControlBytes, KeyControlBytesSize)
+	data[0] = TypeInjectKeycode
+	data[1] = action
+	binary.BigEndian.PutUint32(data[2:6], uint32(keycode))
+	return Event{Time: timeMs, Data: data}
+}
+
+func (b ControlBytes) IsTouch() bool {
+	return len(b) == ControlBytesSize
+}
+
+func (b ControlBytes) Valid() bool {
+	switch len(b) {
+	case ControlBytesSize:
+		return true
+	case KeyControlBytesSize:
+		return b[0] == TypeInjectKeycode
+	}
+	return false
 }
 
 // GenerateTapEvents ...
@@ -281,7 +311,7 @@ func (b *ControlBytes) UnmarshalJSON(data []byte) error {
 func (b *ControlBytes) CountOffset(
 	stepZone *image.Rectangle,
 ) (int, int) {
-	if ImageRectIsEmpty(stepZone) || b == nil || len(*b) != ControlBytesSize {
+	if ImageRectIsEmpty(stepZone) || b == nil || !b.IsTouch() {
 		return 0, 0
 	}
 
@@ -292,7 +322,7 @@ func (b *ControlBytes) CountOffset(
 
 // ApplyOffset ...
 func (b *ControlBytes) ApplyOffset(x, y int) {
-	if b == nil || len(*b) != ControlBytesSize || (x == 0 && y == 0) {
+	if b == nil || !b.IsTouch() || (x == 0 && y == 0) {
 		return
 	}
 
@@ -304,7 +334,7 @@ func (b *ControlBytes) ApplyOffset(x, y int) {
 }
 
 func (b ControlBytes) rescale(fromWidth int, fromHeight int, toWidth int, toHeight int) {
-	if len(b) != ControlBytesSize {
+	if !b.IsTouch() {
 		return
 	}
 

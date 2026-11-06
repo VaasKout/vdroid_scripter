@@ -41,7 +41,7 @@ The server never needs coordinates from you. It finds things on the live screen 
 A human curates a small library of named resources, stored as plain files on the server:
 
 * **Images** are template crops taken from the device screen, for example an icon that has no text. Each is saved with the screen density of its device and resized to the density of the phone it is searched on, so one crop serves phones of different resolutions as long as they draw the element the same way.
-* **Actions** are recorded gestures, for example an app-specific swipe or a drag.
+* **Actions** are recorded gestures, for example an app-specific swipe, a drag or a press of a hardware key (home, back, volume).
 
 Names are flat and unique per kind. The convention is to put the context into the name, `<app>_<screen>_<what>[_variant]`, for example `shop_catalog_swipe_1`. Saving under an existing name overwrites it.
 
@@ -299,7 +299,7 @@ The MCP server ships its own instructions to the AI, so you do not have to expla
 A library action can be recorded in two ways.
 
 * **In the Android client.** On the streaming screen, press the plus icon, name the action, choose the custom action type, and perform the gesture on the streamed screen.
-* **On the device itself.** `POST /devices/{serial}/record` with `{"name": "<action name>", "timeout": 5000}` (plus `"device_specific": true` for a variant of this device only), or the `record_action` MCP tool, listens to the device's touch panel. Start the gesture within the timeout (milliseconds, 5000 when omitted); every touch restarts that timer, so the gesture may take as long as you need, and the recording ends one timeout after your last touch (or after 10 minutes at the most). The reply is `200` when the action was saved and `204` when no touch happened within the first timeout. The idle tail is not part of the action: its times start at the first touch and end at the last. Only the first finger is kept, and the device's natural orientation is assumed. While a device is recording, queueing steps on it is refused with `409`.
+* **On the device itself.** `POST /devices/{serial}/record` with `{"name": "<action name>", "timeout": 5000}` (plus `"device_specific": true` for a variant of this device only), or the `record_action` MCP tool, listens to the device's touch panel and hardware keys. Start the gesture within the timeout (milliseconds, 5000 when omitted); every touch or key press restarts that timer, so the gesture may take as long as you need, and the recording ends one timeout after your last input (or after 10 minutes at the most). The reply is `200` when the action was saved and `204` when nothing happened within the first timeout. The idle tail is not part of the action: its times start at the first input and end at the last. Only the first finger is kept, and the device's natural orientation is assumed. Hardware keys are kept with their timing: volume, home, back, menu, recents, camera and search; the power key is dropped, because replaying it would put the device to sleep. While a device is recording, queueing steps on it is refused with `409`.
 
 ## API reference
 

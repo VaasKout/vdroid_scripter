@@ -35,7 +35,7 @@ type AdbAPI interface {
 	PushFile(serial string, path string, dest string) error
 	ForwardTCPPort(serial string, port int, tag string) error
 
-	RecordTouches(
+	RecordGesture(
 		serial string,
 		idle time.Duration,
 		limit time.Duration,
@@ -144,7 +144,7 @@ func (c *cmdImpl) ForwardTCPPort(serial string, port int, tag string) error {
 	return err
 }
 
-func (c *cmdImpl) RecordTouches(
+func (c *cmdImpl) RecordGesture(
 	serial string,
 	idle time.Duration,
 	limit time.Duration,
@@ -161,10 +161,14 @@ func (c *cmdImpl) RecordTouches(
 	if err != nil {
 		return nil, err
 	}
+	events, ignored := parseGesture(output, axesByDevice, screenWidth, screenHeight)
+	if len(ignored) > 0 {
+		c.logger.Info(fmt.Sprintf("keys ignored while recording on %s: %s", serial, strings.Join(ignored, ", ")))
+	}
 	return &models.Action{
 		ScreenWidth:  screenWidth,
 		ScreenHeight: screenHeight,
-		Events:       parseTouches(output, axesByDevice, screenWidth, screenHeight),
+		Events:       events,
 	}, nil
 }
 

@@ -281,7 +281,7 @@ func (i *interactorImpl) RecordAction(
 		return false, err
 	}
 	limit := time.Duration(models.RecordMaxDurationSeconds) * time.Second
-	action, err := i.cmd.RecordTouches(serial, timeout, limit, width, height)
+	action, err := i.cmd.RecordGesture(serial, timeout, limit, width, height)
 	if err != nil {
 		return false, err
 	}

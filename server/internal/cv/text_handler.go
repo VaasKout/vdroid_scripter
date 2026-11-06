@@ -216,20 +216,20 @@ func (c *cvImpl) FindTextRectangles(
 	}
 
 	localEdges, err := c.createTextEdges(img)
-	defer localEdges.Close()
 	if err != nil {
 		return []OCRResult{}, err
 	}
+	defer localEdges.Close()
 	localResults, err := recognizeText(&localEdges, params)
 	if err != nil {
 		return []OCRResult{}, err
 	}
 
 	globalEdges, err := c.createEdges(img)
-	defer globalEdges.Close()
 	if err != nil {
 		return []OCRResult{}, err
 	}
+	defer globalEdges.Close()
 	globalResults, err := recognizeText(&globalEdges, params)
 	if err != nil {
 		return []OCRResult{}, err
@@ -298,13 +298,13 @@ func sameSpot(first models.Rectangle, second models.Rectangle) bool {
 
 func (c *cvImpl) createEdges(img *gocv.Mat) (gocv.Mat, error) {
 	if img.Empty() {
-		return gocv.NewMat(), errors.New("createEdges img empty")
+		return gocv.Mat{}, errors.New("createEdges img empty")
 	}
 	gray := gocv.NewMat()
 	defer gray.Close()
 	err := gocv.CvtColor(*img, &gray, gocv.ColorBGRToGray)
 	if err != nil {
-		return gocv.NewMat(), err
+		return gocv.Mat{}, err
 	}
 
 	edges := gocv.NewMat()
@@ -313,7 +313,7 @@ func (c *cvImpl) createEdges(img *gocv.Mat) (gocv.Mat, error) {
 	err = rebinarizeDarkRegions(&edges, &gray)
 	if err != nil {
 		edges.Close()
-		return gocv.NewMat(), err
+		return gocv.Mat{}, err
 	}
 
 	if gocv.CountNonZero(edges)*2 < edges.Rows()*edges.Cols() {
@@ -401,15 +401,15 @@ func (p *darkRegionPass) markRegion(index int) (bool, error) {
 	}
 
 	filled, err := filledContour(p.contours, index, p.edges.Rows(), p.edges.Cols())
+	if err != nil {
+		return false, err
+	}
 	defer filled.Close()
-	if err != nil {
-		return false, err
-	}
 	islands, err := lightIslands(&filled, p.edges, p.minArea)
-	defer islands.Close()
 	if err != nil {
 		return false, err
 	}
+	defer islands.Close()
 	if solidFillRatio(p.inverted, &filled, &islands, rect) < darkRegionMinFillRatio {
 		return false, nil
 	}
@@ -428,7 +428,11 @@ func filledContour(contours gocv.PointsVector, index int, rows int, cols int) (g
 	filled := gocv.Zeros(rows, cols, gocv.MatTypeCV8UC1)
 	white := color.RGBA{R: 255, G: 255, B: 255, A: 255}
 	err := gocv.DrawContours(&filled, contours, index, white, -1)
-	return filled, err
+	if err != nil {
+		filled.Close()
+		return gocv.Mat{}, err
+	}
+	return filled, nil
 }
 
 func lightIslands(filled *gocv.Mat, edges *gocv.Mat, minArea float64) (gocv.Mat, error) {
@@ -457,7 +461,8 @@ func lightIslands(filled *gocv.Mat, edges *gocv.Mat, minArea float64) (gocv.Mat,
 
 		err := gocv.DrawContours(&islands, contours, i, white, -1)
 		if err != nil {
-			return islands, err
+			islands.Close()
+			return gocv.Mat{}, err
 		}
 	}
 	return islands, nil
