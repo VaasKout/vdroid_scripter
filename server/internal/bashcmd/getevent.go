@@ -37,6 +37,7 @@ var androidKeycodes = map[string]int{
 	"KEY_APPSELECT": 187, "0244": 187, "00fe": 187,
 	"KEY_VOLUMEUP": 24, "0073": 24,
 	"KEY_VOLUMEDOWN": 25, "0072": 25,
+	"KEY_POWER": 26, "0074": 26,
 	"KEY_CAMERA": 27, "00d4": 27,
 	"KEY_SEARCH": 84, "00d9": 84,
 }

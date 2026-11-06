@@ -506,9 +506,9 @@ the events are stored exactly like a client-recorded [`Action`](#action)
 with times relative to the first input — the idle tail that ends the
 recording is not part of it. Hardware keys become key events: volume up and
 down, home (`KEY_HOME`, `KEY_HOMEPAGE`), back, menu, recents
-(`KEY_APPSELECT`, Samsung's `00fe`), camera and search. The power key and
-any other key are dropped and listed in the server log, since replaying
-power would put the device to sleep under the following steps.
+(`KEY_APPSELECT`, Samsung's `00fe`), camera, search and power. Any other
+key is dropped and listed in the server log. Mind that a replayed power
+press puts the device to sleep, or wakes it, under the following steps.
 While recording, `queue_steps` and `run_route` answer `409`, and the session
 worker does not start queued steps.
 

@@ -177,8 +177,8 @@ func (s *Server) registerTools() {
 	mcp.AddTool(s.mcp, &mcp.Tool{
 		Name: "record_action",
 		Description: "Record a gesture the HUMAN performs on the device and save it as " +
-			"library action name: touches and hardware keys (volume, home, back, menu, " +
-			"recents, camera; the power key is dropped) with their timing. The first touch " +
+			"library action name: touches and hardware keys (volume, power, home, back, " +
+			"menu, recents, camera) with their timing. The first touch " +
 			"or key must come within timeout of the call and the recording ends timeout " +
 			"after the last one; 'nothing recorded' = no input, ask them to retry; a " +
 			"recording still running after 50 s finishes through wait_for_session. Only " +
