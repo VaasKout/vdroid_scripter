@@ -2,35 +2,34 @@ package bashcmd
 
 import (
 	"android_vision_scripter/pkg/models"
-
 	"fmt"
 	"strconv"
 	"strings"
 	"time"
 )
 
-// Device properties contants
 const (
-	BrandProp     = "ro.product.brand"
-	ModelProp     = "ro.product.model"
-	DeviceProp    = "ro.product.device"
-	OsVersionProp = "ro.build.version.release"
-	LocaleSetting = "system_locales"
-
-	Manufacturer    = "ro.product.manufacturer"
-	MarketingName   = "ro.config.marketing_name"
-	LineageCodeName = "ro.lineage.device"
+	deviceInfoTimeout = 30
+	bootCompleted     = "1"
+	nullSetting       = "null"
+	densityWord       = "density:"
+	overrideWord      = "Override"
 )
 
-// Other constants
-const (
-	OverrideDensityPrefix = "Override density"
-)
+const deviceInfoScript = `echo boot=$(getprop sys.boot_completed); ` +
+	`echo model=$(getprop ro.product.model); ` +
+	`echo brand=$(getprop ro.product.brand); ` +
+	`echo device=$(getprop ro.product.device); ` +
+	`echo os=$(getprop ro.build.version.release); ` +
+	`echo manufacturer=$(getprop ro.product.manufacturer); ` +
+	`echo marketing=$(getprop ro.config.marketing_name); ` +
+	`echo locales=$(settings get system system_locales); ` +
+	`echo locale=$(getprop persist.sys.locale); ` +
+	`echo density=$(wm density)`
 
-// AdbAPI ...
 type AdbAPI interface {
-	GetDevicesList() []string
-	GetAdbDevice(serial string) *models.AdbDevice
+	TrackDevices() (<-chan []AdbEntry, error)
+	GetAdbDevice(serial string) models.AdbDevice
 
 	PushFile(serial string, path string, dest string) error
 	ForwardTCPPort(serial string, port int, tag string) error
@@ -44,92 +43,69 @@ type AdbAPI interface {
 	) (*models.Action, error)
 }
 
-func (c *cmdImpl) GetDevicesList() []string {
-	result, err := c.ExecuteCommand("adb devices | tail -n +2 | awk '{print $1}'")
+func (c *cmdImpl) GetAdbDevice(serial string) models.AdbDevice {
+	if serial == "" {
+		return models.AdbDevice{}
+	}
+	command := fmt.Sprintf("timeout %d adb -s %s shell '%s'", deviceInfoTimeout, serial, deviceInfoScript)
+	output, err := c.ExecuteCommand(command)
 	if err != nil {
-		return []string{}
+		return models.AdbDevice{}
 	}
-
-	result = strings.TrimSpace(result)
-	if result == "" {
-		return []string{}
-	}
-	return strings.Split(result, "\n")
+	return parseDeviceInfo(serial, output)
 }
 
-func (c *cmdImpl) GetAdbDevice(serial string) *models.AdbDevice {
-	var adbDevice = &models.AdbDevice{}
-	if serial == "" || !c.IsAdbConnected(serial) {
-		return adbDevice
+func parseDeviceInfo(serial string, output string) models.AdbDevice {
+	values := map[string]string{}
+	for _, line := range strings.Split(output, "\n") {
+		key, value, found := strings.Cut(line, "=")
+		if !found {
+			continue
+		}
+		values[strings.TrimSpace(key)] = strings.TrimSpace(value)
 	}
-	adbDevice.Serial = serial
-	adbDevice.Model = c.GetProp(serial, ModelProp)
-	adbDevice.Brand = c.GetProp(serial, BrandProp)
-	adbDevice.Device = c.GetProp(serial, DeviceProp)
-	adbDevice.Locale = c.GetSystemSetting(serial, LocaleSetting)
-	adbDevice.OsVersion = c.GetProp(serial, OsVersionProp)
-	adbDevice.Manufacturer = c.GetProp(serial, Manufacturer)
-	adbDevice.MarketingName = c.GetProp(serial, MarketingName)
-	adbDevice.Density = c.GetDensity(serial)
-	adbDevice.ModelOs = adbDevice.ToModelOs()
-	return adbDevice
+	device := models.AdbDevice{
+		Serial:        serial,
+		Model:         values["model"],
+		Brand:         values["brand"],
+		Device:        values["device"],
+		OsVersion:     values["os"],
+		Manufacturer:  values["manufacturer"],
+		MarketingName: values["marketing"],
+	}
+	if values["boot"] == bootCompleted {
+		device.Locale = deviceLocale(values["locales"], values["locale"])
+		device.Density = parseDensity(values["density"])
+	}
+	device.ModelOs = device.ToModelOs()
+	return device
 }
 
-func (c *cmdImpl) GetDensity(serial string) int {
-	command := fmt.Sprintf("adb -s %s shell wm density", serial)
-	result, err := c.ExecuteCommand(command)
-	if err != nil {
-		return 0
+func deviceLocale(locales string, fallback string) string {
+	if locales == "" || locales == nullSetting {
+		locales = fallback
 	}
-	return parseDensity(result)
+	first, _, _ := strings.Cut(locales, ",")
+	return strings.TrimSpace(first)
 }
 
 func parseDensity(output string) int {
 	density := 0
-	for _, line := range strings.Split(output, "\n") {
-		name, value, found := strings.Cut(line, ":")
-		if !found {
+	fields := strings.Fields(output)
+	for index := 1; index+1 < len(fields); index++ {
+		if fields[index] != densityWord {
 			continue
 		}
-		parsed, err := strconv.Atoi(strings.TrimSpace(value))
+		value, err := strconv.Atoi(fields[index+1])
 		if err != nil {
 			continue
 		}
-		if strings.HasPrefix(strings.TrimSpace(name), OverrideDensityPrefix) {
-			return parsed
+		if fields[index-1] == overrideWord {
+			return value
 		}
-		density = parsed
+		density = value
 	}
 	return density
-}
-
-func (c *cmdImpl) GetProp(serial string, prop string) string {
-	var command = fmt.Sprintf("adb -s %s shell getprop %s", serial, prop)
-	result, err := c.ExecuteCommand(command)
-	if err != nil {
-		return ""
-	}
-	result = strings.TrimSpace(result)
-	return result
-}
-
-func (c *cmdImpl) GetSystemSetting(serial string, prop string) string {
-	var command = fmt.Sprintf("adb -s %s shell settings get system %s", serial, prop)
-	result, err := c.ExecuteCommand(command)
-	if err != nil {
-		return ""
-	}
-	result = strings.TrimSpace(result)
-	return result
-}
-
-func (c *cmdImpl) IsAdbConnected(serial string) bool {
-	var command = fmt.Sprintf("adb devices | grep -w '%s'", serial)
-	result, err := c.ExecuteCommand(command)
-	if err != nil {
-		return false
-	}
-	return result != ""
 }
 
 func (c *cmdImpl) PushFile(serial string, path string, dest string) error {

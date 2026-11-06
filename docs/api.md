@@ -85,6 +85,8 @@ Returns all ADB devices currently visible to the server.
   ```
   `devices` is `[]` when none are connected.
 
+  The server follows `adb track-devices`, so a device is listed the moment adb reports it as `device` and dropped when it goes; devices adb lists as `unauthorized` or `offline` are left out until they are ready. Model, locale and density are read in one shell call when a device appears and read again every 10 s until every value is known, so a phone still booting is listed with partial metadata that is completed later; a device that reconnects is read again. `GET /devices` waits for the reads in progress before answering. `scrcpy_running` is true while a session is open.
+
 ## Steps
 
 A **step** is the unit of execution: an **event** applied to a chain of

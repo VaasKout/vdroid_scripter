@@ -1,4 +1,3 @@
-// Package models ...
 package models
 
 import (
@@ -6,7 +5,6 @@ import (
 	"unicode"
 )
 
-// AdbDevice ...
 type AdbDevice struct {
 	Serial        string `json:"serial"`
 	Brand         string `json:"brand"`
@@ -21,16 +19,31 @@ type AdbDevice struct {
 	ScrcpyRunning bool   `json:"scrcpy_running"`
 }
 
-// FilterLocales ...
-func (a *AdbDevice) FilterLocales() {
-	if a == nil || a.Locale == "" {
-		return
+func (a *AdbDevice) Update(fresh AdbDevice) {
+	a.Brand = firstNonEmpty(fresh.Brand, a.Brand)
+	a.Device = firstNonEmpty(fresh.Device, a.Device)
+	a.Locale = firstNonEmpty(fresh.Locale, a.Locale)
+	a.Model = firstNonEmpty(fresh.Model, a.Model)
+	a.OsVersion = firstNonEmpty(fresh.OsVersion, a.OsVersion)
+	a.Manufacturer = firstNonEmpty(fresh.Manufacturer, a.Manufacturer)
+	a.MarketingName = firstNonEmpty(fresh.MarketingName, a.MarketingName)
+	if fresh.Density > 0 {
+		a.Density = fresh.Density
 	}
-	var systemLocales = strings.Split(a.Locale, ",")
-	if len(systemLocales) == 0 {
-		return
+	a.ModelOs = a.ToModelOs()
+}
+
+func (a *AdbDevice) Ready() bool {
+	return a.ModelOs != "" && a.Locale != "" && a.Density > 0
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if value != "" {
+			return value
+		}
 	}
-	a.Locale = systemLocales[0]
+	return ""
 }
 
 func (a *AdbDevice) ToModelOs() string {

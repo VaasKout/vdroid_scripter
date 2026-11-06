@@ -18,13 +18,17 @@ const (
 	TestLogsDir = "./logs/"
 )
 
-func TestGetDeviceList(t *testing.T) {
+func TestTrackDevices(t *testing.T) {
 	var fileProps = &config.FilesProps{}
 	logAPI := logger.New(logger.INFO, true)
 	var filesDB = filesdb.New(fileProps)
 	var cmdRunner = bashcmd.New(filesDB, logAPI)
 
-	devices := cmdRunner.GetDevicesList()
+	updates, err := cmdRunner.TrackDevices()
+	if err != nil {
+		t.Fatal(err)
+	}
+	devices := <-updates
 	t.Log(devices)
 	t.Log(len(devices))
 }

@@ -132,6 +132,8 @@ adb devices
 
 An emulator works the same way and needs no setup.
 
+The server follows adb's device tracker instead of polling the phones: a device shows up in `GET /devices` the moment adb reports it as ready (unauthorized or offline ones stay out until then), and its model, locale and density are read once when it appears and completed later when a booting phone reported them as unknown. Nothing is asked of a phone that is already known, so a hundred devices cost the server nothing between changes.
+
 ## Running the server
 
 Connect a device and start the server:

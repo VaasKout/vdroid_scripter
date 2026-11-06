@@ -20,7 +20,7 @@ const (
 
 // Interactor ...
 type Interactor interface {
-	CmdUseCase
+	DevicesUseCase
 	ScrcpyUseCase
 	SessionUseCase
 	LibraryUseCase
@@ -39,6 +39,7 @@ type interactorImpl struct {
 
 	devicesCache  cache.Cache[models.AdbDevice]
 	sessionsCache cache.Cache[models.Session]
+	deviceFetches *deviceFetches
 }
 
 // New instance of interactor
@@ -52,6 +53,7 @@ func New(
 ) Interactor {
 	var devicesCache = cache.NewSafeCache[models.AdbDevice]()
 	var sessionsCache = cache.NewSafeCache[models.Session]()
+	var deviceFetches = newDeviceFetches()
 
 	var interactor = &interactorImpl{
 		cv:      cv,
@@ -63,8 +65,10 @@ func New(
 
 		devicesCache:  devicesCache,
 		sessionsCache: sessionsCache,
+		deviceFetches: deviceFetches,
 	}
 
-	go interactor.FillUpDevicesCache()
+	go interactor.watchDevices()
+	go interactor.retryDeviceFetches()
 	return interactor
 }

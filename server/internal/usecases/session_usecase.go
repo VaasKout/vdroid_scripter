@@ -28,6 +28,7 @@ type SessionUseCase interface {
 func (i *interactorImpl) StartSession(serial string, basePort int) bool {
 	i.logger.Info(fmt.Sprintf("closing old connections for %s... ⏳", serial))
 	i.CloseSession(serial)
+	i.refreshDevice(serial)
 
 	session := i.initPorts(basePort)
 	if session == nil {
@@ -40,7 +41,6 @@ func (i *interactorImpl) StartSession(serial string, basePort int) bool {
 	}
 
 	i.sessionsCache.Add(serial, *session)
-	i.setScrcpyState(serial, true)
 	go i.runSessionQueue(serial)
 	return true
 }
@@ -91,7 +91,6 @@ func (i *interactorImpl) CloseSession(serial string) {
 		i.sessionsCache.Delete(serial)
 	}
 	i.scrcpy.CloseScrcpyServer(serial)
-	i.setScrcpyState(serial, false)
 }
 
 func (i *interactorImpl) CloseAllSessions() {
