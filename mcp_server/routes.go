@@ -58,7 +58,7 @@ func formatRoute(route routeResponse) string {
 	var lines strings.Builder
 	fmt.Fprintf(
 		&lines,
-		"route %s, %d steps, %d args: id event timeout/delay landmarks (check = empty event)",
+		"route %s, %d steps, %d args: id event timeout/delay landmarks (in a chain a > b, b is found nearest to a and the event acts on b only; check = empty event)",
 		route.Name, len(route.Steps), routeArgsCount(route),
 	)
 	for _, step := range route.Steps {
