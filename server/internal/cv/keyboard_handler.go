@@ -94,10 +94,30 @@ func (c *cvImpl) DetectKeyboard(img *gocv.Mat, locale string) (*models.Keyboard,
 		return buildNumericKeyboard(rows, pitch, spacing), nil
 	}
 
-	numbers := matchNumberRow(ocrRows, rows[0], pitch, spacing)
+	numbers, err := c.findNumberRow(img, ocrRows, rows[0], pitch, spacing)
+	if err != nil {
+		return nil, err
+	}
 	keyboard := buildKeyboard(rows, numbers, pitch, spacing)
 	keyboard.Shifted = shiftedByCase(rows, layout.CaseGlyphs)
 	return keyboard, nil
+}
+
+func (c *cvImpl) findNumberRow(
+	img *gocv.Mat,
+	ocrRows [][]glyph,
+	top keyboardRow,
+	pitch float64,
+	spacing int,
+) (*keyboardRow, error) {
+	digits, err := c.readKeyboardGlyphs(img, DefaultOCRLanguage, NumericWhitelist)
+	if err != nil {
+		return nil, err
+	}
+	if numbers := matchNumberRow(groupGlyphRows(digits), top, pitch, spacing); numbers != nil {
+		return numbers, nil
+	}
+	return matchNumberRow(ocrRows, top, pitch, spacing), nil
 }
 
 func (c *cvImpl) readKeyboardGlyphs(img *gocv.Mat, lang string, whitelist string) ([]glyph, error) {
