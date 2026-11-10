@@ -240,7 +240,7 @@ func (c *apiClient) saveImage(
 	if err != nil {
 		return "", err
 	}
-	response, err := c.request(http.MethodPost, "/save_image", bytes.NewReader(body))
+	response, err := c.request(http.MethodPost, "/images/"+url.PathEscape(rectangle.Label), bytes.NewReader(body))
 	if err != nil {
 		return "", err
 	}
@@ -377,6 +377,26 @@ func (c *apiClient) deleteRoute(name string) error {
 func (c *apiClient) deleteImage(name string) error {
 	_, err := c.request(http.MethodDelete, "/images/"+url.PathEscape(name), nil)
 	return err
+}
+
+func (c *apiClient) renameImage(from string, to string) (string, error) {
+	return c.renameItem("/images/", from, to)
+}
+
+func (c *apiClient) renameAction(from string, to string) (string, error) {
+	return c.renameItem("/actions/", from, to)
+}
+
+func (c *apiClient) renameItem(prefix string, from string, to string) (string, error) {
+	body, err := json.Marshal(map[string]string{"name": to})
+	if err != nil {
+		return "", err
+	}
+	response, err := c.request(http.MethodPatch, prefix+url.PathEscape(from), bytes.NewReader(body))
+	if err != nil {
+		return "", err
+	}
+	return savedName(response, to), nil
 }
 
 func (c *apiClient) deleteAction(name string) error {

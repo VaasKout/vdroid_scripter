@@ -34,8 +34,10 @@ This document describes every HTTP endpoint exposed by the server, defined in
 | GET | `/devices` | List connected ADB devices |
 | POST | `/devices/{serial}/queue_steps` | Queue one or more steps to run in order on a device |
 | GET | `/library` | List image and action names in the library |
-| POST | `/save_image` | Crop and save a named template image into the library |
-| POST | `/save_action` | Save a named recorded gesture into the library |
+| POST | `/images/{name}` | Crop and save a template image into the library under that name |
+| POST | `/actions/{name}` | Save a recorded gesture into the library under that name |
+| PATCH | `/images/{name}` | Rename a library image |
+| PATCH | `/actions/{name}` | Rename a library action |
 | DELETE | `/images/{name}` | Delete a library image |
 | DELETE | `/actions/{name}` | Delete a library action |
 | GET | `/devices/{serial}/scan` | Scan the current screen and return the landmarks found |
@@ -185,11 +187,13 @@ missing item is reported as `event not found in library: <name> (tried
 route is validated when it is saved against the devices connected at that
 moment: a name passes when the common item or a variant for any connected
 device exists. `GET /library` lists every item under its full name and
-deletion takes the full name too. New items are common unless the request
-says otherwise: [`POST /save_image`](#post-save_image) and
+deletion takes the full name too; a rename ([`PATCH /images/{name}`](#patch-imagesname),
+[`PATCH /actions/{name}`](#patch-actionsname)) takes the common or the full name and keeps the
+suffix. New items are common unless the request
+says otherwise: [`POST /images/{name}`](#post-imagesname) and
 [`POST /devices/{serial}/record`](#post-devicesserialrecord) take
 `"device_specific": true`, append the device's suffix themselves and return
-the final name; `POST /save_action` stores the name as sent, so a client
+the final name; `POST /actions/{name}` stores the name as sent, so a client
 appends the suffix itself.
 
 ### `GET /library`
@@ -205,7 +209,7 @@ Lists everything in the library, device-specific items under their full names.
   ```
   Both arrays are sorted and `[]` when empty.
 
-### `POST /save_image`
+### `POST /images/{name}`
 
 Crops the given rectangle out of the device's **latest video frame** — the
 same frame `scan`, `rectangles` and `capture` see, in the same pixel
@@ -217,39 +221,39 @@ has no open session, one is opened automatically like `/devices/{serial}/scan`.
   ```json
   {
     "serial": "ABCD1234",
-    "rectangle": { "left_x": 100, "right_x": 300, "top_y": 200, "bottom_y": 260, "label": "catalog_cart_icon" },
+    "rectangle": { "left_x": 100, "right_x": 300, "top_y": 200, "bottom_y": 260 },
     "device_specific": false
   }
   ```
-  The image name comes from `rectangle.label` — required, no path separators.
-  `serial` and a non-empty `rectangle` are required. `device_specific`
+  The image name is `{name}` in the path — no path separators; a `label` in
+  the rectangle is ignored. `serial` and a non-empty `rectangle` are required. `device_specific`
   (optional, default `false`) appends `_<model_os>` of the device to the name,
   making the image a [device-specific variant](#device-specific-items). An
   existing image with the same final name is overwritten.
 - **Response `200`:** `{ "status": "ok", "name": "catalog_cart_icon" }` — `name`
   is the name the image was saved under, with the suffix when `device_specific`
   was set.
-- **Errors:** `400` on invalid JSON, a bad `label`, or a missing field, `500` when
+- **Errors:** `400` on invalid JSON, a bad name, or a missing field, `500` when
   no frame is available, the rectangle lies outside the frame, the device's
   model or Android version is unknown for a device-specific save, or the write
   fails (the message says which).
 
-### `POST /save_action`
+### `POST /actions/{name}`
 
-Saves a recorded gesture as `actions/<name>.json`. The body is a whole
-[`Action`](#action) object.
+Saves a recorded gesture as `actions/<name>.json`. The body is an
+[`Action`](#action) object; its name is `{name}` in the path.
 
 - **Request body:**
   ```json
   {
-    "name": "swipe_catalog_1",
     "screen_width": 1080,
     "screen_height": 2400,
     "events": [ /* Event, see models */ ]
   }
   ```
-  `name` (trimmed, no path separators) and a non-empty `events` array are
-  required. An existing action with the same name is overwritten.
+  `{name}` (trimmed, no path separators) and a non-empty `events` array are
+  required; a `name` in the body is ignored. An existing action with the same
+  name is overwritten.
 - **Response `200`:** `{ "status": "ok" }`
 - **Errors:** `400` on invalid JSON, a bad `name`, or empty `events`, `500` if
   not saved.
@@ -267,6 +271,26 @@ Deletes `actions/<name>.json`.
 
 - **Response `200`:** `{ "status": "ok" }`
 - **Errors:** `404` if no action with that name exists.
+
+### `PATCH /images/{name}`
+
+Renames an image in place: `images/<name>.png` and its `images/<name>.json`
+become `<new>.png` and `<new>.json`. `{name}` is the common or the full name;
+when it resolves to a device-specific variant (`<name>_<model_os>` of a
+connected device is tried first, then `<name>`), the new name gets the same
+suffix unless it already ends with it.
+
+- **Request body:** `{ "name": "catalog_basket_icon" }` — the new name, no path separators.
+- **Response `200`:** `{ "status": "ok", "name": "catalog_basket_icon_sm_a155f_14" }` — the name the image
+  now has.
+- **Errors:** `400` on invalid JSON or a bad name, `404` when no image matches
+  (`not found in library: <name> (tried ...)`), `409` when the new name
+  exists (`exists in library: <name>`), `500` when the rename fails.
+
+### `PATCH /actions/{name}`
+
+Renames an action in place, `actions/<name>.json` to `<new>.json`, with the
+same name resolution and the same responses as the image rename.
 
 ## Scan
 

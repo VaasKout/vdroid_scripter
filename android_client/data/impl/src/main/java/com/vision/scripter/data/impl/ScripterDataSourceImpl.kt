@@ -86,7 +86,7 @@ class ScripterDataSourceImpl @Inject constructor(
             rectangle = rectangle,
         )
         val body = Json.encodeToString(request)
-        val result = networkClient.post("save_image", body)
+        val result = networkClient.post("images/${encodePath(rectangle?.label.orEmpty())}", body)
         return result is ApiResponse.Success
     }
 
@@ -104,7 +104,7 @@ class ScripterDataSourceImpl @Inject constructor(
             events = events,
         )
         val body = Json.encodeToString(request)
-        val result = networkClient.post("save_action", body)
+        val result = networkClient.post("actions/${encodePath(name)}", body)
         return result is ApiResponse.Success
     }
 

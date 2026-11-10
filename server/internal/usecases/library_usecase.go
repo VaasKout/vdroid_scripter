@@ -30,8 +30,10 @@ type LibraryUseCase interface {
 	SaveImage(serial string, rectangle *models.Rectangle, basePort int) error
 	GetDeviceSpecificName(serial string, name string) string
 	DeleteImage(name string) bool
+	RenameImage(from string, to string) (string, error)
 	SaveAction(action *models.Action) bool
 	DeleteAction(name string) bool
+	RenameAction(from string, to string) (string, error)
 }
 
 func (i *interactorImpl) GetLibrary() *LibraryResponse {
@@ -213,6 +215,70 @@ func (i *interactorImpl) DeleteAction(name string) bool {
 		return false
 	}
 	return i.filesDB.DeleteFileByName(actionsDir, strings.TrimSpace(name)+file.JSONExt)
+}
+
+func (i *interactorImpl) RenameImage(from string, to string) (string, error) {
+	return renameLibraryItem(i.filesDB.CreateImagesDir(), from, to, i.deviceTags(), file.PngExt)
+}
+
+func (i *interactorImpl) RenameAction(from string, to string) (string, error) {
+	return renameLibraryItem(i.filesDB.CreateActionsDir(), from, to, i.deviceTags(), file.JSONExt)
+}
+
+func (i *interactorImpl) deviceTags() []string {
+	var tags []string
+	for _, device := range i.devicesCache.GetDataArray() {
+		if device.ModelOs != "" && !slices.Contains(tags, device.ModelOs) {
+			tags = append(tags, device.ModelOs)
+		}
+	}
+	return tags
+}
+
+func renameLibraryItem(
+	dir string,
+	from string,
+	to string,
+	tags []string,
+	mainExt string,
+) (string, error) {
+	from, to = strings.TrimSpace(from), strings.TrimSpace(to)
+	if dir == "" || !file.ValidName(from) || !file.ValidName(to) {
+		return "", errors.New("invalid name")
+	}
+	path, ok := libraryPath(dir, from, mainExt, tags...)
+	if !ok {
+		return "", fmt.Errorf("not found in library: %s (tried %s)", from, strings.Join(libraryCandidates(from, tags...), ", "))
+	}
+	source := file.GetFileName(path)
+	target := variantName(to, source, tags)
+	if target == source {
+		return source, nil
+	}
+	if file.Exists(filepath.Join(dir, target+mainExt)) {
+		return "", fmt.Errorf("exists in library: %s", target)
+	}
+	if err := os.Rename(filepath.Join(dir, source+mainExt), filepath.Join(dir, target+mainExt)); err != nil {
+		return "", err
+	}
+	infoPath := filepath.Join(dir, source+file.JSONExt)
+	if !file.Exists(infoPath) {
+		return target, nil
+	}
+	if err := os.Rename(infoPath, filepath.Join(dir, target+file.JSONExt)); err != nil {
+		return target, fmt.Errorf("renamed to %s, but its info file was not: %w", target, err)
+	}
+	return target, nil
+}
+
+func variantName(to string, source string, tags []string) string {
+	for _, tag := range tags {
+		suffix := modelOsSeparator + tag
+		if strings.HasSuffix(source, suffix) && !strings.HasSuffix(to, suffix) {
+			return to + suffix
+		}
+	}
+	return to
 }
 
 func (i *interactorImpl) GetDeviceSpecificName(serial string, name string) string {

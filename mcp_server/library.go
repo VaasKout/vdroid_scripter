@@ -27,6 +27,11 @@ type libraryNameInput struct {
 	Name string `json:"name" jsonschema:"library item name"`
 }
 
+type renameInput struct {
+	From string `json:"from" jsonschema:"current name, common or full"`
+	To   string `json:"to" jsonschema:"new name; a device-specific variant keeps its _<model_os> suffix"`
+}
+
 func (s *Server) handleGetLibrary(
 	ctx context.Context,
 	req *mcp.CallToolRequest,
@@ -107,6 +112,36 @@ func (s *Server) handleDeleteAction(
 		return nil, nil, err
 	}
 	return textResult("deleted action " + in.Name), nil, nil
+}
+
+func (s *Server) handleRenameImage(
+	ctx context.Context,
+	req *mcp.CallToolRequest,
+	in renameInput,
+) (*mcp.CallToolResult, any, error) {
+	if in.From == "" || in.To == "" {
+		return nil, nil, fmt.Errorf("from and to are required")
+	}
+	name, err := s.api.renameImage(in.From, in.To)
+	if err != nil {
+		return nil, nil, err
+	}
+	return textResult("renamed image " + in.From + " to " + name), nil, nil
+}
+
+func (s *Server) handleRenameAction(
+	ctx context.Context,
+	req *mcp.CallToolRequest,
+	in renameInput,
+) (*mcp.CallToolResult, any, error) {
+	if in.From == "" || in.To == "" {
+		return nil, nil, fmt.Errorf("from and to are required")
+	}
+	name, err := s.api.renameAction(in.From, in.To)
+	if err != nil {
+		return nil, nil, err
+	}
+	return textResult("renamed action " + in.From + " to " + name), nil, nil
 }
 
 const modelOsSeparator = "_"

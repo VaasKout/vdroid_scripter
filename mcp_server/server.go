@@ -169,6 +169,16 @@ func (s *Server) registerTools() {
 	}, s.handleDeleteAction)
 
 	mcp.AddTool(s.mcp, &mcp.Tool{
+		Name:        "rename_image",
+		Description: "Rename a library image in place, the same picture under the new name; a device-specific variant keeps its suffix. The only way to rename: never delete and save again.",
+	}, s.handleRenameImage)
+
+	mcp.AddTool(s.mcp, &mcp.Tool{
+		Name:        "rename_action",
+		Description: "Rename a library action in place, the same gesture under the new name; a device-specific variant keeps its suffix. The only way to rename: never delete and record again.",
+	}, s.handleRenameAction)
+
+	mcp.AddTool(s.mcp, &mcp.Tool{
 		Name: "run_route",
 		Description: "Run a saved route, or its start_id..end_id slice, and block until " +
 			"it finishes: 'idle' or the failed step's error.",

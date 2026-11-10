@@ -11,8 +11,6 @@ import (
 // Library paths
 const (
 	Library       = "/library"
-	SaveImage     = "/save_image"
-	SaveAction    = "/save_action"
 	ImagesByName  = "/images/{" + NameKey + "}"
 	ActionsByName = "/actions/{" + NameKey + "}"
 )
@@ -27,40 +25,42 @@ func (s *serverImpl) handleLibraryFunctions() {
 		http.Error(w, "use GET method", http.StatusMethodNotAllowed)
 	})
 
-	http.HandleFunc(SaveImage, func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc(ImagesByName, func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPost {
 			s.logURL(r)
 			s.handleSaveImage(w, r)
 			return
 		}
-		http.Error(w, "use POST method", http.StatusMethodNotAllowed)
-	})
-
-	http.HandleFunc(SaveAction, func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodPost {
+		if r.Method == http.MethodPatch {
 			s.logURL(r)
-			s.handleSaveAction(w, r)
+			s.handleRename(w, r, s.interactor.RenameImage)
 			return
 		}
-		http.Error(w, "use POST method", http.StatusMethodNotAllowed)
-	})
-
-	http.HandleFunc(ImagesByName, func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodDelete {
 			s.logURL(r)
 			s.handleDeleteImage(w, r)
 			return
 		}
-		http.Error(w, "use DELETE method", http.StatusMethodNotAllowed)
+		http.Error(w, "use POST, PATCH or DELETE method", http.StatusMethodNotAllowed)
 	})
 
 	http.HandleFunc(ActionsByName, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			s.logURL(r)
+			s.handleSaveAction(w, r)
+			return
+		}
+		if r.Method == http.MethodPatch {
+			s.logURL(r)
+			s.handleRename(w, r, s.interactor.RenameAction)
+			return
+		}
 		if r.Method == http.MethodDelete {
 			s.logURL(r)
 			s.handleDeleteAction(w, r)
 			return
 		}
-		http.Error(w, "use DELETE method", http.StatusMethodNotAllowed)
+		http.Error(w, "use POST, PATCH or DELETE method", http.StatusMethodNotAllowed)
 	})
 }
 
@@ -79,13 +79,13 @@ func (s *serverImpl) handleSaveImage(w http.ResponseWriter, r *http.Request) {
 		DeviceSpecific bool             `json:"device_specific"`
 	}{}
 	err := json.NewDecoder(r.Body).Decode(&data)
-	if err != nil || data.Serial == "" ||
-		data.Rectangle.IsEmpty() || !file.ValidName(data.Rectangle.Label) {
+	name := r.PathValue(NameKey)
+	if err != nil || data.Serial == "" || data.Rectangle.IsEmpty() || !file.ValidName(name) {
 		http.Error(w, "Invalid JSON", http.StatusBadRequest)
 		return
 	}
 
-	name := strings.TrimSpace(data.Rectangle.Label)
+	name = strings.TrimSpace(name)
 	if data.DeviceSpecific {
 		name = s.interactor.GetDeviceSpecificName(data.Serial, name)
 		if name == "" {
@@ -118,6 +118,7 @@ func (s *serverImpl) handleSaveAction(w http.ResponseWriter, r *http.Request) {
 
 	var data = &models.Action{}
 	err := json.NewDecoder(r.Body).Decode(data)
+	data.Name = r.PathValue(NameKey)
 	if err != nil || data.IsEmpty() || !file.ValidName(data.Name) {
 		http.Error(w, "Invalid JSON", http.StatusBadRequest)
 		return
@@ -141,6 +142,44 @@ func (s *serverImpl) handleDeleteImage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	http.Error(w, "image not found", http.StatusNotFound)
+}
+
+func (s *serverImpl) handleRename(
+	w http.ResponseWriter,
+	r *http.Request,
+	rename func(from string, to string) (string, error),
+) {
+	defer r.Body.Close()
+
+	var data = map[string]string{}
+	err := json.NewDecoder(r.Body).Decode(&data)
+	if err != nil || !file.ValidName(data["name"]) {
+		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		return
+	}
+
+	name, err := rename(r.PathValue(NameKey), data["name"])
+	if err != nil {
+		http.Error(w, err.Error(), renameStatus(err))
+		return
+	}
+
+	var response = map[string]string{
+		"status": "ok",
+		"name":   name,
+	}
+	s.setHeaders(w)
+	json.NewEncoder(w).Encode(response)
+}
+
+func renameStatus(err error) int {
+	if strings.Contains(err.Error(), "not found in library") {
+		return http.StatusNotFound
+	}
+	if strings.Contains(err.Error(), "exists in library") {
+		return http.StatusConflict
+	}
+	return http.StatusInternalServerError
 }
 
 func (s *serverImpl) handleDeleteAction(w http.ResponseWriter, r *http.Request) {
