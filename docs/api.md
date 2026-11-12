@@ -108,10 +108,22 @@ lists are ordered top-to-bottom, left-to-right (reading order), so when a
 value matches several places and no disambiguating landmark precedes it, a
 bare landmark deterministically takes the first candidate on screen.
 
+A fourth landmark type, `point`, is not located at all: its `value` is `"x:y"`
+in video-frame pixels, and a `tap` or `long_tap` is generated at exactly that
+place, with no search, no region and no random offset. It is for a client that
+sees the screen itself (a vision model, a person) and wants to touch a control
+that no text, image or YOLO class names. A point is the only landmark of its
+step and takes `tap` and `long_tap` alone: in a chain, or under an empty event,
+a swipe or a library event, the step is invalid. `timeout` plays no part. A
+value that is not `x:y` or lies outside the frame fails the step like a target
+that is not found (`unable to find point <value> on screen`). A route stores
+such a step like any other; its coordinates fit the frame size and the layout
+it was written for.
+
 | `event` | Behavior |
 | ------- | -------- |
 | *(empty)* | Visibility check of the landmark chain — no touch. Landmarks required. |
-| `tap` / `long_tap` | Generated tap pair placed at a random point inside the last landmark's region. Landmarks required. |
+| `tap` / `long_tap` | Generated tap pair placed at a random point inside the last landmark's region, or exactly at a `point` landmark's place. Landmarks required. |
 | `swipe_up` / `swipe_down` / `swipe_left` / `swipe_right` | Generated human-like swipe named by the finger's direction: fixed length (half the screen dimension), curved Bézier path with per-point jitter, eased 300–500ms timing, random start point inside the middle half of the screen (25% start margin) with the end point kept at least 5% from the screen edge. With landmarks, the swipe starts inside the last landmark's region instead. Reserved names — a library action with the same name is shadowed. Landmarks optional. |
 | `type_text` | The **last landmark's `value` is the text to type** and its `locale` is the keyboard language (`eng` when omitted). The keyboard must already be open: the server reads its letter rows off the live frame, matches them against the layout of that language (QWERTY, AZERTY, QWERTZ, ЙЦУКЕН and the other European layouts), and taps the keys. Letters, space and, when the keyboard shows a number row, digits are typed; capitals go through Shift. Any other character fails the step. A `locale` of `numeric` selects the numeric keypad instead (the `123`, `456`, `789` rows with `0` below), for number and phone fields and for dial pads drawn by the app itself. The number row of a letter keyboard is read with the English model, so digits type the same on every layout. Nothing about keyboards is stored. |
 | any other name | The library event with that name is replayed: **offset into the found region** when landmarks are given (first touch moved into the last landmark's region, relative shape preserved), **verbatim** without them. A gesture recorded on a different screen size is scaled to the current one first (each axis by current ÷ recorded size), so it covers the same share of the screen. Hardware key presses in the gesture are replayed as key events with their recorded timing; offset and scaling leave them alone. |
@@ -137,7 +149,8 @@ status and clears the remaining queue.
     { "event": "swipe_catalog_1", "timeout": 0, "delay": 1000 },
     { "event": "tap", "landmarks": [{ "type": "text", "value": "Checkout", "locale": "eng" }], "timeout": 15000, "delay": 1000 },
     { "event": "tap", "landmarks": [{ "type": "text", "value": "Show refresh rate" }, { "type": "image", "value": "toggle" }], "timeout": 5000, "delay": 1000 },
-    { "event": "type_text", "landmarks": [{ "type": "text", "value": "hello", "locale": "eng" }], "timeout": 5000, "delay": 1000 }
+    { "event": "type_text", "landmarks": [{ "type": "text", "value": "hello", "locale": "eng" }], "timeout": 5000, "delay": 1000 },
+    { "event": "tap", "landmarks": [{ "type": "point", "value": "840:2264" }], "delay": 1000 }
   ]
   ```
   The array must be non-empty and every entry must be a valid
@@ -619,8 +632,8 @@ worker does not start queued steps.
 
 | Field | JSON | Type | Notes |
 | ----- | ---- | ---- | ----- |
-| Type | `type` | string | `image` (template match against `images/<value>_<model_os>.png` when the session's device has that [variant](#device-specific-items), else `images/<value>.png`), `text` (OCR), or `yolo` (detection class) |
-| Value | `value` | string | Library image name, OCR text, or YOLO class name — for `type_text`'s last landmark, the text to type |
+| Type | `type` | string | `image` (template match against `images/<value>_<model_os>.png` when the session's device has that [variant](#device-specific-items), else `images/<value>.png`), `text` (OCR), `yolo` (detection class), or `point` (a place in the frame, not located; `tap` and `long_tap` only) |
+| Value | `value` | string | Library image name, OCR text, YOLO class name, or `x:y` in video-frame pixels for a `point` — for `type_text`'s last landmark, the text to type |
 | Locale | `locale` | string | OCR language for `text` landmarks; on `type_text`'s last landmark it selects the keyboard layout (`numeric` = the numeric keypad). omitempty — an empty locale is read as `eng` when the step runs |
 
 ### Event

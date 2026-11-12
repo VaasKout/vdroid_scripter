@@ -17,6 +17,7 @@ const (
 	Image = "image"
 	Text  = "text"
 	Yolo  = "yolo"
+	Point = "point"
 )
 
 // Landmark ...
@@ -36,7 +37,7 @@ func (l *Landmark) Valid() bool {
 	}
 
 	switch l.Type {
-	case Image, Text, Yolo:
+	case Image, Text, Yolo, Point:
 		return strings.TrimSpace(l.Value) != ""
 	}
 	return false
@@ -167,8 +168,9 @@ func (s *Step) ValidLandmarks() bool {
 	if s == nil || len(s.Landmarks) == 0 {
 		return false
 	}
+	takesPoint := len(s.Landmarks) == 1 && (s.Event == TapEvent || s.Event == LongTapEvent)
 	for _, landmark := range s.Landmarks {
-		if !landmark.Valid() {
+		if !landmark.Valid() || (landmark.Type == Point && !takesPoint) {
 			return false
 		}
 	}

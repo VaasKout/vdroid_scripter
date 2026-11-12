@@ -115,26 +115,26 @@ func (b ControlBytes) Valid() bool {
 }
 
 // GenerateTapEvents ...
-func GenerateTapEvents(screenWidth int, screenHeight int) []Event {
+func GenerateTapEvents(x int, y int, screenWidth int, screenHeight int) []Event {
 	actionUpMs := int64(TapDurationMinMs + rand.IntN(TapDurationGapMs))
-	return generateTapPair(screenWidth, screenHeight, actionUpMs)
+	return generateTapPair(x, y, screenWidth, screenHeight, actionUpMs)
 }
 
 // GenerateLongTapEvents ...
-func GenerateLongTapEvents(screenWidth int, screenHeight int) []Event {
+func GenerateLongTapEvents(x int, y int, screenWidth int, screenHeight int) []Event {
 	actionUpMs := int64(LongTapDurationMinMs + rand.IntN(LongTapDurationGapMs))
-	return generateTapPair(screenWidth, screenHeight, actionUpMs)
+	return generateTapPair(x, y, screenWidth, screenHeight, actionUpMs)
 }
 
-func generateTapPair(screenWidth int, screenHeight int, actionUpMs int64) []Event {
+func generateTapPair(x int, y int, screenWidth int, screenHeight int, actionUpMs int64) []Event {
 	return []Event{
 		{
 			Time: 0,
-			Data: generateTouchData(ActionDown, 0, 0, screenWidth, screenHeight, PressureMax),
+			Data: generateTouchData(ActionDown, x, y, screenWidth, screenHeight, PressureMax),
 		},
 		{
 			Time: actionUpMs,
-			Data: generateTouchData(ActionUp, 0, 0, screenWidth, screenHeight, 0),
+			Data: generateTouchData(ActionUp, x, y, screenWidth, screenHeight, 0),
 		},
 	}
 }

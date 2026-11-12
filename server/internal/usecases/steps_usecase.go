@@ -160,19 +160,29 @@ func (i *interactorImpl) playGeneratedTap(
 	step *models.Step,
 	longTap bool,
 ) error {
-	foundRect, err := i.findRect(serial, step)
-	if err != nil {
-		return err
-	}
-
 	width, height, err := i.scrcpy.GetScreenSize(serial)
 	if err != nil {
 		return err
 	}
 
-	events := models.GenerateTapEvents(width, height)
+	x, y := 0, 0
+	point := step.LastLandmark()
+    onPoint := point != nil && point.Type == models.Point
+	if onPoint {
+		_, err = fmt.Sscanf(point.Value, "%d:%d", &x, &y)
+		if err != nil || x < 0 || y < 0 || x >= width || y >= height {
+			return fmt.Errorf(models.StatusError, point.Type, point.Value)
+		}
+	}
+
+	foundRect, err := i.findRect(serial, step)
+	if err != nil {
+		return err
+	}
+
+	events := models.GenerateTapEvents(x, y, width, height)
 	if longTap {
-		events = models.GenerateLongTapEvents(width, height)
+		events = models.GenerateLongTapEvents(x, y, width, height)
 	}
 	i.playEvent(serial, foundRect, events)
 	return nil
@@ -189,7 +199,7 @@ func (i *interactorImpl) typeTextStep(serial string, step *models.Step) error {
 		return err
 	}
 
-	tapEvents := models.GenerateTapEvents(width, height)
+	tapEvents := models.GenerateTapEvents(0, 0, width, height)
 	return i.typeText(serial, step.GetTimeout(), last.Value, last.Locale, tapEvents)
 }
 

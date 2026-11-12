@@ -10,8 +10,8 @@ import (
 )
 
 type landmarkInput struct {
-	Type   string `json:"type" jsonschema:"image | text | yolo"`
-	Value  string `json:"value" jsonschema:"image name, text or yolo class; for type_text the text to type"`
+	Type   string `json:"type" jsonschema:"image | text | yolo | point"`
+	Value  string `json:"value" jsonschema:"image name, text, yolo class or point as x:y in frame pixels; for type_text the text to type"`
 	Locale string `json:"locale,omitempty" jsonschema:"Tesseract code of value, default eng"`
 }
 

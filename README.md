@@ -62,6 +62,7 @@ The target is a chain of **landmarks**. Each landmark is one thing the server ca
 | `image` | OpenCV template match of the library image named in `value` |
 | `text` | Tesseract OCR for `value`, in the language given by `locale` |
 | `yolo` | YOLO detections whose class matches `value` |
+| `point` | Not located: `value` is `x:y` in video-frame pixels, and a `tap` or `long_tap` touches exactly that place. The only landmark of its step, for a client that sees the screen itself |
 
 The whole chain resolves on a single video frame. The first landmark takes its first match, every following landmark takes the match nearest to the previous one, and the event applies to the last landmark. One landmark is the normal case. A second one in front disambiguates duplicates, as in "the toggle next to *Show refresh rate*".
 
@@ -69,7 +70,7 @@ The `event` decides what happens at the target:
 
 | Event | Effect |
 | ----- | ------ |
-| `tap`, `long_tap` | A generated touch at a random point inside the found region |
+| `tap`, `long_tap` | A generated touch at a random point inside the found region, or exactly at a `point` landmark's place |
 | `swipe_up`, `swipe_down`, `swipe_left`, `swipe_right` | A generated human-like swipe, named by the finger's direction. Landmarks are optional |
 | `type_text` | Types the last landmark's `value` on the open on-screen keyboard. The landmark's `locale` names the keyboard language |
 | a library action name | Replays that recorded gesture, moved into the found region when the step has a target, verbatim otherwise. A gesture recorded on another screen size is scaled to the current one |
@@ -291,7 +292,7 @@ The MCP server ships its own instructions to the AI, so you do not have to expla
 * **Modes.** There are two, and the agent starts in **navigator**. It switches only when you tell it to. In both modes, actions you dictate ("tap this, then that") run exactly as asked, and the agent finds its way on if one fails.
   * **Navigator** records nothing. Any request that is not a direct order to run named steps is treated as a goal, and the agent works the way out itself: it reads the saved routes, chains them, runs only the slice of each that the goal needs, and fills in arguments. You describe the task in words; the agent picks the first and last step of the slice by matching your description to the route's steps. It does not ask you which route to use or for step ids. A goal no chain of routes reaches is reported as a job for explorer. When a route step fails because of the route itself, such as a timeout that is too short or a target that appears twice, the agent fixes that step with `edit_route`, reruns from there, and lists every fix.
   * **Explorer**, given a route name, carries a goal through on its own and records its work into that route as it goes. The steps that succeed go in; failed attempts and the agent's own visibility checks stay out. Everything you dictate is recorded too: your actions and the visibility checks you ask for.
-* **Curation.** Library images come from the Android client or, for a vision-capable agent, from `save_image`: after a `capture` it picks the icon's rectangle and saves it under a `<app>_<screen>_<what>` name — only for targets with no readable text and no YOLO class. Actions come from the client or from `record_action`, and only when you ask for a recording.
+* **Curation.** Library images come from the Android client or, for a vision-capable agent, from `save_image`: after a `capture` it picks the icon's rectangle and saves it under a `<app>_<screen>_<what>` name — only for targets with no readable text and no YOLO class. A control that nothing names can also be touched by its place: with vision the agent reads `x:y` off a `capture` and taps a `point` landmark. Actions come from the client or from `record_action`, and only when you ask for a recording.
 * **Device-specific items.** A library name ending in `_<model_os>` belongs to one device model and Android version; the agent refers to items by the common name and the server runs the device's variant when it has one. New images and actions are common unless you say the item is for this device only; then the agent sets `device_specific` and the server appends the suffix. The agent never writes the suffix itself and never records a suffixed name into a route.
 * **Deleting.** A route, image or action is removed only when you ask for that item by name. The agent never cleans up the library on its own, not even to replace an item: saving under the same name overwrites it.
 * **No adb.** The agent never touches the device with `adb` directly — no input, no `screencap`. Every interaction is a step, every look is `scan` or `capture`.
