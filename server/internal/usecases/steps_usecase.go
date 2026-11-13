@@ -136,10 +136,10 @@ func (i *interactorImpl) runStepAction(serial string, step *models.Step) error {
 }
 
 func (i *interactorImpl) playGeneratedSwipe(serial string, step *models.Step) error {
-	var foundRect *image.Rectangle
+	var stepZone *image.Rectangle
 	if step.ValidLandmarks() {
 		var err error
-		foundRect, err = i.findRect(serial, step)
+		stepZone, err = i.findRect(serial, step)
 		if err != nil {
 			return err
 		}
@@ -151,7 +151,7 @@ func (i *interactorImpl) playGeneratedSwipe(serial string, step *models.Step) er
 	}
 
 	events := models.GenerateSwipeEvents(step.Event, width, height)
-	i.playEvent(serial, foundRect, events)
+	i.playEvent(serial, stepZone, events)
 	return nil
 }
 
@@ -166,25 +166,26 @@ func (i *interactorImpl) playGeneratedTap(
 	}
 
 	x, y := 0, 0
+	var stepZone *image.Rectangle
 	point := step.LastLandmark()
-    onPoint := point != nil && point.Type == models.Point
-	if onPoint {
+	isPoint := point != nil && point.Type == models.Point
+	if isPoint {
 		_, err = fmt.Sscanf(point.Value, "%d:%d", &x, &y)
-		if err != nil || x < 0 || y < 0 || x >= width || y >= height {
+		if err != nil || models.OutOfRange(x, y, width, height) {
 			return fmt.Errorf(models.StatusError, point.Type, point.Value)
 		}
-	}
-
-	foundRect, err := i.findRect(serial, step)
-	if err != nil {
-		return err
+	} else {
+		stepZone, err = i.findRect(serial, step)
+		if err != nil {
+			return err
+		}
 	}
 
 	events := models.GenerateTapEvents(x, y, width, height)
 	if longTap {
 		events = models.GenerateLongTapEvents(x, y, width, height)
 	}
-	i.playEvent(serial, foundRect, events)
+	i.playEvent(serial, stepZone, events)
 	return nil
 }
 
@@ -209,9 +210,9 @@ func (i *interactorImpl) playCustomEvent(serial string, step *models.Step) error
 		return err
 	}
 
-	var foundRect *image.Rectangle
+	var stepZone *image.Rectangle
 	if step.ValidLandmarks() {
-		foundRect, err = i.findRect(serial, step)
+		stepZone, err = i.findRect(serial, step)
 		if err != nil {
 			return err
 		}
@@ -223,7 +224,7 @@ func (i *interactorImpl) playCustomEvent(serial string, step *models.Step) error
 	}
 
 	action.FitScreen(width, height)
-	i.playEvent(serial, foundRect, action.Events)
+	i.playEvent(serial, stepZone, action.Events)
 	return nil
 }
 
@@ -447,10 +448,10 @@ func (i *interactorImpl) detectKeyboardOnLastFrame(
 
 func (i *interactorImpl) playEvent(
 	serial string,
-	rect *image.Rectangle,
+	stepZone *image.Rectangle,
 	events []models.Event,
 ) {
-	offsetX, offsetY := touchOffset(rect, events)
+	offsetX, offsetY := touchOffset(stepZone, events)
 	var lastTimeStamp int64
 	for _, event := range events {
 		var data = &event.Data
@@ -463,10 +464,10 @@ func (i *interactorImpl) playEvent(
 	}
 }
 
-func touchOffset(rect *image.Rectangle, events []models.Event) (int, int) {
+func touchOffset(stepZone *image.Rectangle, events []models.Event) (int, int) {
 	for _, event := range events {
 		if event.Data.IsTouch() {
-			return event.Data.CountOffset(rect)
+			return event.Data.CountOffset(stepZone)
 		}
 	}
 	return 0, 0

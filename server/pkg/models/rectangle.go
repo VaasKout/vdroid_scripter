@@ -101,6 +101,10 @@ func ImageRectIsEmpty(r *image.Rectangle) bool {
 	return r == nil || (r.Dy() == 0 && r.Dx() == 0)
 }
 
+func OutOfRange(x int, y int, width int, height int) bool {
+	return x < 0 || y < 0 || x >= width || y >= height
+}
+
 // CenterX ...
 func CenterX(rect image.Rectangle) int {
 	return (rect.Min.X + rect.Max.X) / 2
