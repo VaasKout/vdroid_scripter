@@ -16,7 +16,7 @@ type landmarkInput struct {
 }
 
 type stepInput struct {
-	Event     string          `json:"event,omitempty" jsonschema:"tap, long_tap, type_text, swipe_up/down/left/right, a library action, or empty = visibility check"`
+	Event     string          `json:"event,omitempty" jsonschema:"tap, long_tap, type_text, swipe_up/down/left/right (half the screen) or the same with _small, _medium or _big for a sized swipe (swipe_up_big), a library action, or empty = visibility check"`
 	Landmarks []landmarkInput `json:"landmarks,omitempty" jsonschema:"target chain, event on the last; empty = replay verbatim"`
 	Timeout   *int            `json:"timeout,omitempty" jsonschema:"ms"`
 	Delay     *int            `json:"delay,omitempty" jsonschema:"ms"`

@@ -156,11 +156,8 @@ func (s *Step) IsSwipeEvent() bool {
 		return false
 	}
 
-	switch s.Event {
-	case SwipeUpEvent, SwipeDownEvent, SwipeLeftEvent, SwipeRightEvent:
-		return true
-	}
-	return false
+	direction, _ := SwipeParts(s.Event)
+	return direction != ""
 }
 
 // ValidLandmarks ...

@@ -150,7 +150,9 @@ func (i *interactorImpl) playGeneratedSwipe(serial string, step *models.Step) er
 		return err
 	}
 
-	events := models.GenerateSwipeEvents(step.Event, width, height)
+	direction, size := models.SwipeParts(step.Event)
+	length := models.SwipeSizeLength(direction, size, width, height)
+	events := models.GenerateSwipeEvents(direction, length, width, height)
 	i.playEvent(serial, stepZone, events)
 	return nil
 }

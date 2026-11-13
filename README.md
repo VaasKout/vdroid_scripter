@@ -71,7 +71,7 @@ The `event` decides what happens at the target:
 | Event | Effect |
 | ----- | ------ |
 | `tap`, `long_tap` | A generated touch at a random point inside the found region, or exactly at a `point` landmark's place |
-| `swipe_up`, `swipe_down`, `swipe_left`, `swipe_right` | A generated human-like swipe, named by the finger's direction. Landmarks are optional |
+| `swipe_up`, `swipe_down`, `swipe_left`, `swipe_right` | A generated human-like swipe, named by the finger's direction. Landmarks are optional. The plain name is half the screen long; with `_small`, `_medium` or `_big` after it (`swipe_up_big`) the finger travels a random 12–20%, 40–50% or 62–75% of the screen along the swipe, never a round number of pixels, and the content stops there |
 | `type_text` | Types the last landmark's `value` on the open on-screen keyboard. The landmark's `locale` names the keyboard language |
 | a library action name | Replays that recorded gesture, moved into the found region when the step has a target, verbatim otherwise. A gesture recorded on another screen size is scaled to the current one |
 | empty | A pure visibility check of the target, no touch |

@@ -6,6 +6,7 @@ import (
 	"image"
 	"math"
 	"math/rand/v2"
+	"strings"
 )
 
 // Size of control bytes buffer
@@ -36,6 +37,9 @@ const (
 	SwipeBowRatioMin      = 0.02
 	SwipeBowRatioMax      = 0.04
 	SwipeJitterPx         = 2
+	SwipeRoundStep        = 5
+	SwipeHoldMinMs        = 80
+	SwipeHoldJitterMs     = 60
 )
 
 // Touch actions
@@ -63,6 +67,24 @@ const (
 	SwipeLeftEvent  = "swipe_left"
 	SwipeRightEvent = "swipe_right"
 )
+
+// Swipe sizes
+const (
+	SwipeSmall  = "small"
+	SwipeMedium = "medium"
+	SwipeBig    = "big"
+)
+
+type swipeShare struct {
+	low  float64
+	high float64
+}
+
+var swipeSizes = map[string]swipeShare{
+	SwipeSmall:  {low: 0.12, high: 0.20},
+	SwipeMedium: {low: 0.40, high: 0.50},
+	SwipeBig:    {low: 0.62, high: 0.75},
+}
 
 // Event ...
 type Event struct {
@@ -140,8 +162,8 @@ func generateTapPair(x int, y int, screenWidth int, screenHeight int, actionUpMs
 }
 
 // GenerateSwipeEvents ...
-func GenerateSwipeEvents(direction string, screenWidth int, screenHeight int) []Event {
-	start, end := swipeEndpoints(direction, screenWidth, screenHeight)
+func GenerateSwipeEvents(direction string, length int, screenWidth int, screenHeight int) []Event {
+	start, end := swipeEndpoints(direction, length, screenWidth, screenHeight)
 	control := swipeControlPoint(start, end)
 	duration := int64(SwipeDurationMinMs + rand.IntN(SwipeDurationJitterMs))
 
@@ -166,6 +188,16 @@ func GenerateSwipeEvents(direction string, screenWidth int, screenHeight int) []
 		})
 	}
 
+	if length > 0 {
+		events = append(events, Event{
+			Time: duration,
+			Data: generateTouchData(
+				ActionMove, end.X, end.Y, screenWidth, screenHeight, PressureMax,
+			),
+		})
+		duration += int64(SwipeHoldMinMs + rand.IntN(SwipeHoldJitterMs))
+	}
+
 	return append(events, Event{
 		Time: duration,
 		Data: generateTouchData(
@@ -174,9 +206,51 @@ func GenerateSwipeEvents(direction string, screenWidth int, screenHeight int) []
 	})
 }
 
-func swipeEndpoints(direction string, screenWidth int, screenHeight int) (image.Point, image.Point) {
+func SwipeParts(event string) (string, string) {
+	directions := []string{SwipeUpEvent, SwipeDownEvent, SwipeLeftEvent, SwipeRightEvent}
+	for _, direction := range directions {
+		if event == direction {
+			return direction, ""
+		}
+		size, suffixed := strings.CutPrefix(event, direction+"_")
+		_, sized := swipeSizes[size]
+		if suffixed && sized {
+			return direction, size
+		}
+	}
+	return "", ""
+}
+
+func SwipeSizeLength(direction string, size string, screenWidth int, screenHeight int) int {
+	share, sized := swipeSizes[size]
+	if !sized {
+		return 0
+	}
+	along := screenHeight
+	if direction == SwipeLeftEvent || direction == SwipeRightEvent {
+		along = screenWidth
+	}
+	return SwipeLength(int(float64(along)*share.low), int(float64(along)*share.high))
+}
+
+func SwipeLength(low int, high int) int {
+	length := randRange(low, high+1)
+	if length%SwipeRoundStep != 0 {
+		return length
+	}
+	shift := 1 + rand.IntN(SwipeRoundStep-1)
+	if length+shift > high && length-shift >= low {
+		return length - shift
+	}
+	return length + shift
+}
+
+func swipeEndpoints(direction string, length int, screenWidth int, screenHeight int) (image.Point, image.Point) {
 	lengthX := int(float64(screenWidth) * SwipeLengthRatio)
 	lengthY := int(float64(screenHeight) * SwipeLengthRatio)
+	if length > 0 {
+		lengthX, lengthY = length, length
+	}
 
 	switch direction {
 	case SwipeUpEvent:
@@ -211,7 +285,7 @@ func swipeStartTowardZero(size int, length int) int {
 func swipeStartTowardEnd(size int, length int) int {
 	startMargin := int(float64(size) * SwipeStartMarginRatio)
 	endMargin := int(float64(size) * SwipeEndMarginRatio)
-	return randRange(startMargin, min(size-startMargin, size-endMargin-length))
+	return randRange(min(startMargin, size-endMargin-length), min(size-startMargin, size-endMargin-length))
 }
 
 func swipeControlPoint(start image.Point, end image.Point) image.Point {
