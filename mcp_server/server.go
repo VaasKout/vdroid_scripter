@@ -11,7 +11,6 @@ const (
 	serverName    = "vdroid-scripter"
 	serverVersion = "0.1.0"
 	runningPrefix = "running"
-	idleStatus    = "idle"
 	pollInterval  = 500 * time.Millisecond
 	toolWaitSec   = 50
 
@@ -29,7 +28,6 @@ const (
 type Server struct {
 	api        *apiClient
 	mcp        *mcp.Server
-	mode       agentMode
 	recordings recordings
 }
 
@@ -145,13 +143,6 @@ func (s *Server) registerTools() {
 		Description: "Change one step of a saved route (timeout, delay, landmarks) or " +
 			"delete it; later ids shift down after a delete.",
 	}, s.handleEditRoute)
-
-	mcp.AddTool(s.mcp, &mcp.Tool{
-		Name: "set_mode",
-		Description: "Switch the agent mode: navigator (the start mode, nothing recorded) " +
-			"or explorer (records your own batches into route). ONLY when the user " +
-			"explicitly tells you to change the mode, never on your own.",
-	}, s.handleSetMode)
 
 	mcp.AddTool(s.mcp, &mcp.Tool{
 		Name:        "delete_route",

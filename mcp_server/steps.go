@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"slices"
 	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -23,9 +22,8 @@ type stepInput struct {
 }
 
 type queueStepsInput struct {
-	Serial   string      `json:"serial" jsonschema:"device serial"`
-	Steps    []stepInput `json:"steps" jsonschema:"in execution order"`
-	Dictated bool        `json:"dictated,omitempty" jsonschema:"explorer: the batch is exactly the user's dictated steps"`
+	Serial string      `json:"serial" jsonschema:"device serial"`
+	Steps  []stepInput `json:"steps" jsonschema:"in execution order"`
 }
 
 func (s *Server) handleQueueSteps(
@@ -33,7 +31,6 @@ func (s *Server) handleQueueSteps(
 	req *mcp.CallToolRequest,
 	in queueStepsInput,
 ) (*mcp.CallToolResult, any, error) {
-	mode, route := s.mode.get()
 	if in.Serial == "" || len(in.Steps) == 0 {
 		return nil, nil, fmt.Errorf("serial and steps are required")
 	}
@@ -43,7 +40,6 @@ func (s *Server) handleQueueSteps(
 		}
 	}
 
-	recorded := slices.Clone(in.Steps)
 	err := s.api.queueSteps(in.Serial, in.Steps)
 	if err != nil {
 		return nil, nil, err
@@ -54,38 +50,5 @@ func (s *Server) handleQueueSteps(
 		return nil, nil, err
 	}
 	var outcome = batchOutcome(fmt.Sprintf("queued %d steps", len(in.Steps)), status, finished)
-	if mode != modeExplorer {
-		return textResult(outcome), nil, nil
-	}
-	var succeeded = succeededSteps(recorded, status, finished)
-	var recordable = recordableSteps(succeeded, in.Dictated)
-	var recordNote = s.recordRoute(route, recordable)
-	return textResult(outcome + "; " + recordNote), nil, nil
-}
-
-func succeededSteps(steps []stepInput, status string, finished bool) []stepInput {
-	if !finished {
-		return nil
-	}
-	if status == idleStatus {
-		return steps
-	}
-
-	var failedID int
-	_, err := fmt.Sscanf(status, "step %d:", &failedID)
-	if err != nil || failedID < 1 || failedID > len(steps) {
-		return nil
-	}
-	return steps[:failedID-1]
-}
-
-func (s *Server) recordRoute(name string, succeeded []stepInput) string {
-	if len(succeeded) == 0 {
-		return fmt.Sprintf("route %s unchanged", name)
-	}
-	total, err := s.api.appendToRoute(name, succeeded)
-	if err != nil {
-		return fmt.Sprintf("route %s not saved: %v", name, err)
-	}
-	return fmt.Sprintf("route %s +%d = %d steps", name, len(succeeded), total)
+	return textResult(outcome), nil, nil
 }
